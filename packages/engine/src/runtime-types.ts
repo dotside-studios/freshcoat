@@ -1,9 +1,10 @@
 // The paint runtime's types. Internal: the renderer builds runtimes, and the
 // conformance runner grades a Painter through them.
+
+import type { DecodedPixels } from "./decode";
 import type { ByteLoader } from "./loader";
 import type { PaintCache } from "./paint-cache";
 import type { EncodeFormat, EncodeOptions } from "./png";
-import type { DecodedPixels } from "./decode";
 import type {
 	Command,
 	FontRequest,

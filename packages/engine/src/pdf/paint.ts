@@ -27,21 +27,20 @@ import {
 	shapeTextLines,
 } from "../canvaskit";
 import { parseColor } from "../color";
-import { isGrainActive, isHalftoneActive } from "../texture";
 import { compileScene } from "../compile-scene";
 import { normalizeDash } from "../dash";
+import { exportPixelSize } from "../export-scale";
 import { fontBytes } from "../font-bytes";
+import {
+	createSharedFontProvider,
+	type SharedFontProvider,
+} from "../font-collection";
 import {
 	type OutputIntent,
 	type ResolvedOutputIntent,
 	resolveOutputIntent,
 	SRGB_PROFILE,
 } from "../icc";
-import {
-	createSharedFontProvider,
-	type SharedFontProvider,
-} from "../font-collection";
-import { exportPixelSize } from "../export-scale";
 import {
 	iccComponents,
 	jpegFrame,
@@ -59,6 +58,7 @@ import { createPaintCache } from "../paint-cache";
 import { fitRect, strokeInset } from "../paint-helpers";
 import type { PaintTarget } from "../runtime-types";
 import { isSvg } from "../svg/sniff";
+import { isGrainActive, isHalftoneActive } from "../texture";
 import { strokeTrim, trimPath } from "../trim";
 import type {
 	BlendMode,
@@ -259,7 +259,9 @@ export function lineClusters(
 ): Map<number, string> {
 	const bytes = new TextEncoder().encode(text);
 	const starts = [
-		...new Set(runs.flatMap((r) => [...r.offsets.subarray(0, r.glyphs.length)])),
+		...new Set(
+			runs.flatMap((r) => [...r.offsets.subarray(0, r.glyphs.length)]),
+		),
 	].sort((a, b) => a - b);
 	const decoder = new TextDecoder();
 	const out = new Map<number, string>();
@@ -593,11 +595,7 @@ class PageBuilder {
 
 	// Reports `cmds` drawn as an image: each spot they carry as lost, and the
 	// layer as rasterized when it carries none.
-	rasterized(
-		feature: string,
-		layer: string | undefined,
-		cmds: DrawCommand[],
-	) {
+	rasterized(feature: string, layer: string | undefined, cmds: DrawCommand[]) {
 		const spots = cmds.flatMap((c) => spotsIn(c, layer));
 		for (const s of spots)
 			this.report({ kind: "spot_rasterized", feature, ...s });
@@ -1055,8 +1053,7 @@ class PageBuilder {
 						out += this.fill(fill, ops, evenOdd, { x, y, w, h });
 				}
 				if (cmd.stroke?.sides) out += this.sideStroke(cmd, cmd.stroke);
-				else if (cmd.stroke)
-					out += this.outlineStroke(shape, cmd, cmd.stroke);
+				else if (cmd.stroke) out += this.outlineStroke(shape, cmd, cmd.stroke);
 				return out;
 			}
 			case "drawPath":
@@ -1317,11 +1314,7 @@ class PageBuilder {
 				? this.ck.Path.MakeFromSVGString(g.d)
 				: g.kind === "rrect" && !trimmed
 					? skiaRRect(this.ck, g.ltrb, g.radii)
-					: boxPath(
-							this.ck,
-							g.ltrb,
-							g.kind === "rrect" ? g.radii : undefined,
-						);
+					: boxPath(this.ck, g.ltrb, g.kind === "rrect" ? g.radii : undefined);
 		if (!path) return "";
 		try {
 			return this.strokePath(stroke, path, { x, y, w, h });
@@ -1437,7 +1430,10 @@ class PageBuilder {
 		let decorations = "";
 		for (const line of plan.lines) {
 			const { spans, clusters, runs } = line;
-			const texts = glyphTexts(runs.map((r) => r.run), clusters);
+			const texts = glyphTexts(
+				runs.map((r) => r.run),
+				clusters,
+			);
 			for (const [r, { run, file, xforms }] of runs.entries()) {
 				const face = this.fonts.embed(file as FontFile);
 				const { info } = face;
@@ -1567,7 +1563,8 @@ class PageBuilder {
 							line.y + (run.positions[i * 2 + 1] as number),
 						];
 					const placed = placeGlyph(glyph, m, 1 / font.unitsPerEm);
-					const owner = spans[line.spanAt[run.offsets[i] ?? 0] ?? 0] ?? spans[0];
+					const owner =
+						spans[line.spanAt[run.offsets[i] ?? 0] ?? 0] ?? spans[0];
 					const c = rgba(owner?.color ?? cmd.color);
 					const color = `${this.alpha(c[3])}${rgb(c)} rg\n`;
 					const last = groups.at(-1);

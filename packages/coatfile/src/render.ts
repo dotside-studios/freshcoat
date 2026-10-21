@@ -1,15 +1,4 @@
 import {
-	type AnalysisCache,
-	type ChannelBalance,
-	type ImageAnalysis,
-	type ImageSampler,
-	type PlanPolicy,
-	type PrintPlan,
-	type PrintPlanOptions,
-	type PrintTarget,
-	planForPrint,
-} from "@freshcoat-js/for-print";
-import {
 	type Command,
 	type DefaultOutput,
 	type ExportSetting,
@@ -29,12 +18,23 @@ import {
 	sampleImageNode,
 	withExportScale,
 } from "@freshcoat-js/engine";
+import {
+	type AnalysisCache,
+	type ChannelBalance,
+	type ImageAnalysis,
+	type ImageSampler,
+	type PlanPolicy,
+	type PrintPlan,
+	type PrintPlanOptions,
+	type PrintTarget,
+	planForPrint,
+} from "@freshcoat-js/for-print";
 import { canvasKitPathOp, type PathOp } from "./boolean";
 import { compile } from "./compile";
 import {
 	type ImageDpiWarning,
-	imageDpiWarnings,
 	type ImageSizeMemo,
+	imageDpiWarnings,
 } from "./image-dpi";
 import { pieceSpec } from "./piece";
 import {
@@ -42,8 +42,7 @@ import {
 	type PrintCheckOptions,
 	printCheckWarnings,
 } from "./print-checks";
-import { hasOpenSubpath } from "./slices";
-import { resolveSlices } from "./slices";
+import { hasOpenSubpath, resolveSlices } from "./slices";
 import type {
 	CompiledTemplate,
 	FrameWarning,
@@ -328,7 +327,9 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 		// layers off their boxes. The sync/preset path is size-independent and
 		// skips this.
 		const prepared = print?.analyze === true;
-		const scene = prepared ? renderer.prepare(f.root as Node) : (f.root as Node);
+		const scene = prepared
+			? renderer.prepare(f.root as Node)
+			: (f.root as Node);
 		const analyses: Array<{ analysis: ImageAnalysis; node: ImageNode }> = [];
 		const plan = print
 			? await planFrame(scene, print, sample, {
@@ -361,11 +362,18 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 		// extra size re-rasterizes the same scene instead of re-compiling it.
 		for (const setting of settings) {
 			const scale = resolveExportScale(setting.constraint, design);
-			const supersample = resolveSupersample(setting.supersample, design, scale);
-			const result = await renderer.paint(withExportScale(commands, scale, supersample), {
-				...(options.images ? { images: options.images } : {}),
-				...(options.output ? { output: options.output } : {}),
-			});
+			const supersample = resolveSupersample(
+				setting.supersample,
+				design,
+				scale,
+			);
+			const result = await renderer.paint(
+				withExportScale(commands, scale, supersample),
+				{
+					...(options.images ? { images: options.images } : {}),
+					...(options.output ? { output: options.output } : {}),
+				},
+			);
 			results.push({
 				...result,
 				// Compile and planning found these, so they sit alongside what the
@@ -417,7 +425,10 @@ export type RenderCompiledPdfOptions = {
 // The sizes of the images a renderer loads itself, so a batch reads each one
 // once. Bytes handed to a render are read again: the same src may name other
 // bytes next time.
-const loadedSizes = new WeakMap<Renderer, Map<string, ReturnType<ImageSizeMemo["get"]>>>();
+const loadedSizes = new WeakMap<
+	Renderer,
+	Map<string, ReturnType<ImageSizeMemo["get"]>>
+>();
 
 function checkImageDpi(
 	renderer: Renderer,

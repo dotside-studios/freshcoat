@@ -391,9 +391,7 @@ function adjustKey(a: Adjust | undefined): string {
 	return [
 		a.colorMatrix?.join(",") ?? "-",
 		a.gamut ?? "-",
-		a.lut
-			? `${tableId(a.lut.r)},${tableId(a.lut.g)},${tableId(a.lut.b)}`
-			: "-",
+		a.lut ? `${tableId(a.lut.r)},${tableId(a.lut.g)},${tableId(a.lut.b)}` : "-",
 		a.lut3d ? `${a.lut3d.size}:${tableId(a.lut3d.data)}` : "-",
 	].join("|");
 }

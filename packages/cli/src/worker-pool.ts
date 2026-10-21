@@ -22,7 +22,11 @@ const ITEMS_PER_WORKER = 8;
 
 /** How many threads render `items`: `jobs` when given, otherwise what the
  *  cores and memory allow, one per ITEMS_PER_WORKER items. One means none. */
-export function poolSize(items: number, largestImagePixels: number, jobs?: number): number {
+export function poolSize(
+	items: number,
+	largestImagePixels: number,
+	jobs?: number,
+): number {
 	if (jobs !== undefined) return Math.max(1, Math.min(jobs, items));
 	const fits = exportPoolSize({
 		cores: availableParallelism(),
@@ -48,10 +52,14 @@ function renderThread(root: string): PoolWorker {
 		},
 	};
 	worker.on("message", (data) => thread.onmessage?.({ data }));
-	worker.on("error", (error: Error) => thread.onerror?.({ message: error.message }));
+	worker.on("error", (error: Error) =>
+		thread.onerror?.({ message: error.message }),
+	);
 	worker.on("exit", (code) => {
 		if (!stopped && code !== 0)
-			thread.onerror?.({ message: `a render thread stopped with code ${code}` });
+			thread.onerror?.({
+				message: `a render thread stopped with code ${code}`,
+			});
 	});
 	return thread;
 }
@@ -74,12 +82,17 @@ export async function startWorkerPool(
 }
 
 /** `promise`, or a rejection as soon as `signal` aborts. */
-function abortable<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+function abortable<T>(
+	promise: Promise<T>,
+	signal: AbortSignal | undefined,
+): Promise<T> {
 	if (!signal) return promise;
 	return new Promise<T>((resolve, reject) => {
 		const stop = () => reject(signal.reason);
 		if (signal.aborted) return stop();
 		signal.addEventListener("abort", stop, { once: true });
-		promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", stop));
+		promise
+			.then(resolve, reject)
+			.finally(() => signal.removeEventListener("abort", stop));
 	});
 }

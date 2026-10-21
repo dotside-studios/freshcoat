@@ -220,7 +220,11 @@ describe("paths point at the offending field", () => {
 	test("names a field several groups deep in a deep tree", () => {
 		let node = rect({ opacity: 4 } as Partial<DrawRectCommand>);
 		for (let d = 0; d < 1000; d++)
-			node = { op: "drawGroup", ...box(0, 0, 5, 5), children: [node] } as Command;
+			node = {
+				op: "drawGroup",
+				...box(0, 0, 5, 5),
+				children: [node],
+			} as Command;
 		const issues = validateCommands([canvas(), node]);
 		expect(issues).toHaveLength(1);
 		expect(issues[0].path).toBe(

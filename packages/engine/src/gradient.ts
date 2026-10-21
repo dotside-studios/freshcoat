@@ -7,7 +7,10 @@
 type Point = [number, number];
 
 /** The points an `angle`-only linear fill resolves to. */
-export function linearGradientPoints(angle: number): { from: Point; to: Point } {
+export function linearGradientPoints(angle: number): {
+	from: Point;
+	to: Point;
+} {
 	const rad = (angle * Math.PI) / 180;
 	const dx = Math.cos(rad) * 0.5;
 	const dy = Math.sin(rad) * 0.5;
@@ -16,7 +19,6 @@ export function linearGradientPoints(angle: number): { from: Point; to: Point } 
 
 /** The `angle` that points along `to - from` in box space, in [0, 360). */
 export function linearGradientAngle(from: Point, to: Point): number {
-	const deg =
-		(Math.atan2(to[1] - from[1], to[0] - from[0]) * 180) / Math.PI;
+	const deg = (Math.atan2(to[1] - from[1], to[0] - from[0]) * 180) / Math.PI;
 	return deg < 0 ? deg + 360 : deg;
 }

@@ -1,5 +1,5 @@
-import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { createRenderer } from "@freshcoat-js/engine";
+import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
 import { compile } from "../src/compile";
 import { describeWarning, renderCompiledPdf } from "../src/render";
@@ -48,7 +48,9 @@ describe("renderCompiledPdf", () => {
 			[40, 20],
 			[40, 20],
 		]);
-		expect(new TextDecoder().decode(pages[0]?.bytes.slice(0, 8))).toBe("%PDF-1.7");
+		expect(new TextDecoder().decode(pages[0]?.bytes.slice(0, 8))).toBe(
+			"%PDF-1.7",
+		);
 		expect(pages[0]?.warnings).toEqual([]);
 		expect(pages[1]?.warnings).toEqual([
 			{ kind: "vector_rasterized", feature: "shadow", layer: "card" },
@@ -68,7 +70,11 @@ describe("renderCompiledPdf", () => {
 						type: "text",
 						pos: { x: 2, y: 2 },
 						size: { width: 36, height: 16 },
-						properties: { value: "Ink", font: { family: "Geist", size: 10 }, ...properties },
+						properties: {
+							value: "Ink",
+							font: { family: "Geist", size: 10 },
+							...properties,
+						},
 					},
 				]),
 			],
@@ -81,9 +87,15 @@ describe("renderCompiledPdf", () => {
 		});
 		const fonts = async (t: Template, text?: "embed" | "outline") => {
 			const compiled = compile(t, {}, { width: 40, height: 20 });
-			const [page] = await renderCompiledPdf(renderer, compiled, text ? { text } : {});
+			const [page] = await renderCompiledPdf(
+				renderer,
+				compiled,
+				text ? { text } : {},
+			);
 			expect(page?.warnings).toEqual([]);
-			return new TextDecoder("latin1").decode(page?.bytes).includes("/FontFile2");
+			return new TextDecoder("latin1")
+				.decode(page?.bytes)
+				.includes("/FontFile2");
 		};
 		expect(await fonts(lettered())).toBe(true);
 		expect(await fonts(lettered(), "outline")).toBe(false);

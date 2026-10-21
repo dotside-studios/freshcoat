@@ -19,7 +19,6 @@ const font: ResolvedFont = {
 	lineHeight: 1.2,
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 let fonts: Map<string, Uint8Array[]>;
@@ -46,12 +45,15 @@ const arcText = (text: string, arc: TextNode["arc"], extra = {}) =>
 	});
 
 const compile = (node: TextNode) =>
-	compileScene(createFrame({ size: { width: SIZE, height: SIZE }, children: [node] }), {
-		width: SIZE,
-		height: SIZE,
-		textEngine: engine,
-		fonts: [{ family: "Geist" }, { family: "Hebrew" }],
-	});
+	compileScene(
+		createFrame({ size: { width: SIZE, height: SIZE }, children: [node] }),
+		{
+			width: SIZE,
+			height: SIZE,
+			textEngine: engine,
+			fonts: [{ family: "Geist" }, { family: "Hebrew" }],
+		},
+	);
 
 function arcCommand(node: TextNode): DrawTextCommand {
 	const find = (cmds: unknown[]): DrawTextCommand | undefined => {
@@ -94,7 +96,8 @@ const paint = async (node: TextNode) => (await paintWithWarnings(node)).px;
 
 const ink = (px: { data: Uint8Array | Uint8ClampedArray }) => {
 	let n = 0;
-	for (let i = 3; i < px.data.length; i += 4) if ((px.data[i] as number) > 128) n++;
+	for (let i = 3; i < px.data.length; i += 4)
+		if ((px.data[i] as number) > 128) n++;
 	return n;
 };
 
@@ -266,7 +269,13 @@ describe("arc text", () => {
 		} as never;
 		const x = placeOnArc(
 			[{ runs: [run], baseline: 0, offset: 0 }],
-			{ radius: 50, startAngle: 0, direction: "outside", align: "center", sweep: 90 },
+			{
+				radius: 50,
+				startAngle: 0,
+				direction: "outside",
+				align: "center",
+				sweep: 90,
+			},
 			0,
 			0,
 		)[0]?.[0] as Float32Array;
@@ -284,9 +293,13 @@ describe("arc text", () => {
 
 	test("arc text is not wrapped to the box", () => {
 		const cmd = arcCommand(
-			arcText("A LONG LINE THAT WOULD WRAP IN A SMALL BOX", {}, {
-				size: { width: 60, height: 60 },
-			}),
+			arcText(
+				"A LONG LINE THAT WOULD WRAP IN A SMALL BOX",
+				{},
+				{
+					size: { width: 60, height: 60 },
+				},
+			),
 		);
 		expect(cmd.layout.lines).toHaveLength(1);
 	});
@@ -400,7 +413,10 @@ describe("arc text", () => {
 			Math.atan2(x[4 * i + 1] as number, x[4 * i] as number),
 		);
 		expect(angles[1] as number).toBeCloseTo(0, 6);
-		expect((angles[2] as number) - (angles[1] as number)).toBeCloseTo(10 / 24, 6);
+		expect((angles[2] as number) - (angles[1] as number)).toBeCloseTo(
+			10 / 24,
+			6,
+		);
 		const { warnings } = await paintWithWarnings(
 			arcText("RING", { radius: 0 }),
 		);
@@ -422,12 +438,24 @@ describe("arc text", () => {
 			"arc_text_overflow",
 		);
 		const blob = (await drawnBlobs(fit))[0] as { xforms: number[] };
-		const scale = Math.hypot(blob.xforms[0] as number, blob.xforms[1] as number);
+		const scale = Math.hypot(
+			blob.xforms[0] as number,
+			blob.xforms[1] as number,
+		);
 		expect(scale).toBeLessThan(1);
 		expect(scale).toBeCloseTo((2 * Math.PI * 30) / w.width, 4);
 
 		const issues = validateCommands([
-			{ ...arcCommand(fit), arc: { radius: 30, startAngle: 0, direction: "outside", align: "center", fit: "grow" as never } },
+			{
+				...arcCommand(fit),
+				arc: {
+					radius: 30,
+					startAngle: 0,
+					direction: "outside",
+					align: "center",
+					fit: "grow" as never,
+				},
+			},
 		]);
 		expect(issues.map((i) => i.code)).toContain("bad_arc");
 	});

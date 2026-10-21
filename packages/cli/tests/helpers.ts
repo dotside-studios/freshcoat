@@ -6,7 +6,7 @@ import { encodePng, type FontFetch } from "@freshcoat-js/engine";
 import { testFontBytes } from "@freshcoat-js/test-utils";
 import type { Workspace } from "@freshcoat-js/workspace";
 import { packWorkspace } from "@freshcoat-js/workspace/archive";
-import { type Io } from "../src/io";
+import type { Io } from "../src/io";
 import { main } from "../src/main";
 
 export const FONT_CSS = "https://fonts.example/css2?family=Inter";
@@ -117,7 +117,9 @@ export type Sandbox = {
 	cleanup(): Promise<void>;
 };
 
-export async function sandbox(options: { cache?: boolean } = {}): Promise<Sandbox> {
+export async function sandbox(
+	options: { cache?: boolean } = {},
+): Promise<Sandbox> {
 	const dir = await mkdtemp(join(tmpdir(), "freshcoat-cli-"));
 	const fetch = fontFetch();
 	await writeFile(join(dir, "logo.png"), await solidPng(40, 40, [20, 160, 60]));
@@ -133,7 +135,9 @@ export async function sandbox(options: { cache?: boolean } = {}): Promise<Sandbo
 		let stdout = "";
 		let stderr = "";
 		const io: Io = {
-			stdout: (text) => void (stdout += text),
+			stdout: (text) => {
+				stdout += text;
+			},
 			stderr: (text) => {
 				stderr += text;
 				watch?.(stderr);
@@ -221,7 +225,9 @@ export function workspaceOf(template: Template): Workspace {
 	};
 }
 
-export async function workspaceBytes(workspace: Workspace): Promise<Uint8Array> {
+export async function workspaceBytes(
+	workspace: Workspace,
+): Promise<Uint8Array> {
 	const blob = await packWorkspace(workspace);
 	if (!blob) throw new Error("no workspace bytes");
 	return new Uint8Array(await blob.arrayBuffer());

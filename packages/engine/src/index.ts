@@ -19,14 +19,6 @@ export {
 } from "./adjust";
 export { approxEngine } from "./approx-layout";
 export {
-	CR80_CORNER_MM,
-	CR80_LONG_MM,
-	CR80_SAFE_MM,
-	CR80_SHORT_MM,
-	cr80Pixels,
-	MM_PER_INCH,
-} from "./card";
-export {
 	type BakeTextOptions,
 	bakeText,
 	resolveDirection,
@@ -39,6 +31,14 @@ export {
 	type BooleanShape,
 	combineShapes,
 } from "./boolean-path";
+export {
+	CR80_CORNER_MM,
+	CR80_LONG_MM,
+	CR80_SAFE_MM,
+	CR80_SHORT_MM,
+	cr80Pixels,
+	MM_PER_INCH,
+} from "./card";
 export { hslToRgb, mixColor, parseColor, type Rgba, toHex } from "./color";
 export { DEFAULT_PRECISION, type Precision } from "./color-policy";
 export {
@@ -62,7 +62,6 @@ export {
 	type PixelRect,
 	sampleImageNode,
 } from "./decode";
-export { DEFAULT_MAX_IMAGE_DECODE_PIXELS } from "./image-info";
 export {
 	type ExportConstraint,
 	type ExportSetting,
@@ -84,30 +83,6 @@ export {
 	resolveFontRequest,
 } from "./font-bytes";
 export {
-	type IccColorSpace,
-	type IccProfileInfo,
-	type IccProfileResult,
-	type OutputIntent,
-	readIccProfile,
-	resolveOutputIntent,
-	type ResolvedOutputIntent,
-	SRGB_OUTPUT_INTENT,
-	SRGB_PROFILE,
-} from "./icc";
-export {
-	base64ToBytes,
-	type ByteLoader,
-	assertLoadableUrl,
-	bytesToBase64,
-	createFetchLoader,
-	dataUrlToBytes,
-	fetchLoader,
-	inheritLoaderPolicy,
-	type LoaderFetch,
-	type LoaderPolicy,
-	mapLoader,
-} from "./loader";
-export {
 	createSharedFontProvider,
 	makeParagraphBuilder,
 	type SharedFontProvider,
@@ -117,6 +92,20 @@ export {
 	readFontMetrics,
 	registerFontMetrics,
 } from "./font-metrics";
+export { linearGradientAngle, linearGradientPoints } from "./gradient";
+export {
+	type IccColorSpace,
+	type IccProfileInfo,
+	type IccProfileResult,
+	type OutputIntent,
+	type ResolvedOutputIntent,
+	readIccProfile,
+	resolveOutputIntent,
+	SRGB_OUTPUT_INTENT,
+	SRGB_PROFILE,
+} from "./icc";
+export { DEFAULT_MAX_IMAGE_DECODE_PIXELS } from "./image-info";
+export { flattenOverWhite } from "./jpeg";
 export {
 	autoLineHeight,
 	FALLBACK_LINE_HEIGHT,
@@ -124,6 +113,21 @@ export {
 	metricsLookup,
 	resolveAutoLineHeights,
 } from "./line-height";
+export {
+	assertLoadableUrl,
+	type ByteLoader,
+	base64ToBytes,
+	bytesToBase64,
+	createFetchLoader,
+	dataUrlToBytes,
+	fetchLoader,
+	inheritLoaderPolicy,
+	type LoaderFetch,
+	type LoaderPolicy,
+	mapLoader,
+} from "./loader";
+export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
+export { modulePixels } from "./module-pixels";
 export type {
 	Align,
 	BitmapNode,
@@ -159,7 +163,17 @@ export {
 	createText,
 	gridLayout,
 } from "./node";
-export { linearGradientAngle, linearGradientPoints } from "./gradient";
+export {
+	ellipsePath,
+	isEllipsePath,
+	type OutlineGeometry,
+	outlineGeometry,
+	outlinePath,
+	outlineSvg,
+	rectShape,
+	type SideStrokeGeometry,
+	sideStrokeGeometry,
+} from "./outline";
 export {
 	createPaintCache,
 	type PaintCache,
@@ -175,11 +189,14 @@ export {
 	skipInkSegments,
 	strokeInset,
 } from "./paint-helpers";
-export { type MissingGlyphs, missingGlyphs } from "./missing-glyphs";
-export { modulePixels } from "./module-pixels";
 export { scalePathData } from "./path-data";
-export { roundCorners } from "./round-corners";
-export { flattenOverWhite } from "./jpeg";
+export {
+	PATTERN_DEFAULTS,
+	PATTERN_KINDS,
+	type PatternFill,
+	patternFill,
+} from "./pattern";
+export type { PdfTextMode } from "./pdf/paint";
 export {
 	DEFAULT_JPEG_QUALITY,
 	DEFAULT_WEBP_QUALITY,
@@ -192,25 +209,6 @@ export {
 	type PngEffort,
 } from "./png";
 export {
-	PATTERN_DEFAULTS,
-	PATTERN_KINDS,
-	type PatternFill,
-	patternFill,
-} from "./pattern";
-export { resolveLayout, rotatedFootprint } from "./resolve-layout";
-export {
-	ellipsePath,
-	isEllipsePath,
-	type OutlineGeometry,
-	outlineGeometry,
-	outlinePath,
-	outlineSvg,
-	rectShape,
-	type SideStrokeGeometry,
-	sideStrokeGeometry,
-} from "./outline";
-export { type StrokeTrim, strokeTrim, trimPath } from "./trim";
-export {
 	type CanvasFrame,
 	createRenderer,
 	type DefaultOutput,
@@ -221,6 +219,8 @@ export {
 	type FrameInfo,
 	type Output,
 	type PaintOptions,
+	type PaintPdfOptions,
+	type PdfFrame,
 	type PixelsFrame,
 	type RenderedFrame,
 	type Renderer,
@@ -229,19 +229,23 @@ export {
 	type RendererStats,
 	type RenderOptions,
 	type RenderPdfOptions,
-	type PaintPdfOptions,
-	type PdfFrame,
 	type SurfaceCanvas,
 } from "./renderer";
-export type { PdfTextMode } from "./pdf/paint";
+export { resolveLayout, rotatedFootprint } from "./resolve-layout";
+export { roundCorners } from "./round-corners";
 export { squircleSvg } from "./squircle";
+export type { TextEngineCacheStats } from "./text-cache";
 export {
 	type ApplyCaseOptions,
 	applyCase,
 	applySpanCase,
 	type TextCase,
 } from "./text-case";
-export type { TextEngineCacheStats } from "./text-cache";
+export type {
+	ClusterAdvance,
+	SpanFont,
+	TextEngine,
+} from "./text-engine";
 export {
 	type FontWeightName,
 	fontWeight,
@@ -250,15 +254,11 @@ export {
 	toColor,
 } from "./text-style";
 export type {
-	ClusterAdvance,
-	SpanFont,
-	TextEngine,
-} from "./text-engine";
-export type {
 	MeasuredLine,
 	MeasureText,
 	TextLayout,
 	TextLayoutInput,
 } from "./text-types";
+export { type StrokeTrim, strokeTrim, trimPath } from "./trim";
 export type * from "./types";
 export { type IrIssue, validateCommands } from "./validate-commands";

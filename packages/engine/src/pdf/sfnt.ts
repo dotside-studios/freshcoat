@@ -48,7 +48,11 @@ export const embeddable = (info: SfntInfo) =>
 // Where a font's table directory starts: past the header of a collection.
 export function faceOffset(bytes: Uint8Array): number {
 	if (tagAt(bytes, 0) !== "ttcf") return 0;
-	return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(12);
+	return new DataView(
+		bytes.buffer,
+		bytes.byteOffset,
+		bytes.byteLength,
+	).getUint32(12);
 }
 
 // Null for WOFF and WOFF2 (see sfntBytes) and files whose tables do not read.

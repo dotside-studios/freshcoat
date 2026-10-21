@@ -21,7 +21,6 @@ these commands from `apps/editor/`:
 | `bun run preview` | Serves the built site on port 3010 |
 | `bun run test` | Unit tests with Vitest and jsdom |
 | `bun run typecheck` | TypeScript checks |
-| `bun run check` | Biome lint and formatting checks |
 | `bun run e2e` | Browser end-to-end tests |
 | `bun run e2e:smoke` | The browser subset used by CI |
 | `bun run fonts:update` | Refreshes `src/fonts/google-fonts.json` |

@@ -216,8 +216,7 @@ export function buildAdjust(o: AdjustOptions): Adjust {
 	return adjust;
 }
 
-const hasColor = (a: Adjust): boolean =>
-	!!(a.colorMatrix || a.lut || a.lut3d);
+const hasColor = (a: Adjust): boolean => !!(a.colorMatrix || a.lut || a.lut3d);
 
 // The cube size composeAdjust bakes a second adjustment into.
 const COMPOSE_CUBE = 33;
@@ -265,9 +264,7 @@ function composedCube(
 		second.lut
 			? `${tableId(second.lut.r)},${tableId(second.lut.g)},${tableId(second.lut.b)}`
 			: "-",
-		second.lut3d
-			? `${second.lut3d.size}:${tableId(second.lut3d.data)}`
-			: "-",
+		second.lut3d ? `${second.lut3d.size}:${tableId(second.lut3d.data)}` : "-",
 	].join("|");
 	return memoLru(bakeMemo, BAKE_MEMO_MAX, key, () =>
 		bakeLut3d(size, (rgb) =>

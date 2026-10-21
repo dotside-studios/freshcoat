@@ -69,11 +69,7 @@ function resolveNode(node: Node, ctx: LayoutCtx): Node {
 		// output is absolute (the painter's space; drawGroup never translates).
 		return {
 			...node,
-			children: resolveChildren(
-				node.children,
-				node.pos ?? { x: 0, y: 0 },
-				ctx,
-			),
+			children: resolveChildren(node.children, node.pos ?? { x: 0, y: 0 }, ctx),
 		};
 	}
 	const pos: Vec2 = node.pos ?? { x: 0, y: 0 };
@@ -393,12 +389,7 @@ function resolveFlex(
 	};
 }
 
-function placeChild(
-	child: Node,
-	abs: Vec2,
-	size: Size,
-	ctx: LayoutCtx,
-): Node {
+function placeChild(child: Node, abs: Vec2, size: Size, ctx: LayoutCtx): Node {
 	if (child.kind === "mask") {
 		return {
 			...stripChild(child),
@@ -822,11 +813,7 @@ function measureChild(
 	return { child, main, cross, grow: lc.grow ?? 0, maxMain };
 }
 
-function intrinsicCross(
-	child: Node,
-	isRow: boolean,
-	ctx: LayoutCtx,
-): number {
+function intrinsicCross(child: Node, isRow: boolean, ctx: LayoutCtx): number {
 	if (child.kind === "text") {
 		const m = measureText(child, ctx, null);
 		return isRow ? m.height : m.width;

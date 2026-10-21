@@ -43,19 +43,17 @@ beforeEach(() => {
 		"@freshcoat-js/coatfile",
 		"@freshcoat-js/workspace",
 		"@freshcoat-js/cli",
-	].map(
-		(name) => {
-			const filename = `${name.replace(/^@/, "").replace("/", "-")}-0.1.0.tgz`;
-			const bytes = Buffer.from(name);
-			writeFileSync(join(directory, "dist", "releases", filename), bytes);
-			return {
-				name,
-				version: "0.1.0",
-				filename,
-				integrity: `sha512-${createHash("sha512").update(bytes).digest("base64")}`,
-			};
-		},
-	);
+	].map((name) => {
+		const filename = `${name.replace(/^@/, "").replace("/", "-")}-0.1.0.tgz`;
+		const bytes = Buffer.from(name);
+		writeFileSync(join(directory, "dist", "releases", filename), bytes);
+		return {
+			name,
+			version: "0.1.0",
+			filename,
+			integrity: `sha512-${createHash("sha512").update(bytes).digest("base64")}`,
+		};
+	});
 	writeFileSync(
 		join(directory, "dist", "releases", "packages.json"),
 		JSON.stringify(artifacts),
@@ -149,9 +147,7 @@ describe("release publisher", () => {
 
 	test("reruns skip versions only when registry integrity matches", () => {
 		expect(publish(false, { REGISTRY_MODE: "same" }).exitCode).toBe(0);
-		expect(calls().map((args) => args[0])).toEqual(
-			artifacts.map(() => "view"),
-		);
+		expect(calls().map((args) => args[0])).toEqual(artifacts.map(() => "view"));
 	});
 
 	test("refuses to overwrite an existing version with different bytes", () => {

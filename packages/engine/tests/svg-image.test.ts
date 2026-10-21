@@ -1,11 +1,10 @@
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import { compileScene, createImage, createPaintCache } from "../src/index";
 import type { ImageNode, MaskNode, PathNode } from "../src/node";
 import { parseSvg, svgToNode } from "../src/svg";
+import { createHeadlessEnv } from "./helpers/headless";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit is untyped here
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
@@ -35,10 +34,7 @@ async function paint(
 		fit: "fill",
 		...node,
 	});
-	const result = (await env.paint(
-		compileScene(scene, opts),
-		ck,
-	)) as Painted;
+	const result = (await env.paint(compileScene(scene, opts), ck)) as Painted;
 	const img = ck.MakeImageFromEncoded(result.bytes);
 	const w = img.width();
 	const px = img.readPixels(0, 0, {
@@ -49,7 +45,9 @@ async function paint(
 		colorSpace: ck.ColorSpace.SRGB,
 	}) as Uint8Array;
 	img.delete();
-	const at = (x: number, y: number) => [...px.slice((y * w + x) * 4, (y * w + x) * 4 + 4)];
+	const at = (x: number, y: number) => [
+		...px.slice((y * w + x) * 4, (y * w + x) * 4 + 4),
+	];
 	return { at, warnings: result.warnings };
 }
 
@@ -164,19 +162,31 @@ describe("svgToNode", () => {
 
 describe("SVG image sources", () => {
 	test("fill stretches the drawing over the box", async () => {
-		const { at, warnings } = await paint(HALVES, { fit: "fill" }, { width: 100, height: 50 });
+		const { at, warnings } = await paint(
+			HALVES,
+			{ fit: "fill" },
+			{ width: 100, height: 50 },
+		);
 		expect(warnings).toEqual([]);
 		expect(at(20, 25)).toEqual(RED);
 		expect(at(80, 25)).toEqual(BLUE);
 	});
 
 	test("contain letterboxes and cover crops", async () => {
-		const contain = await paint(HALVES, { fit: "contain" }, { width: 100, height: 50 });
+		const contain = await paint(
+			HALVES,
+			{ fit: "contain" },
+			{ width: 100, height: 50 },
+		);
 		expect(contain.at(10, 25)).toEqual(CLEAR);
 		expect(contain.at(35, 25)).toEqual(RED);
 		expect(contain.at(65, 25)).toEqual(BLUE);
 		expect(contain.at(90, 25)).toEqual(CLEAR);
-		const cover = await paint(HALVES, { fit: "cover" }, { width: 50, height: 100 });
+		const cover = await paint(
+			HALVES,
+			{ fit: "cover" },
+			{ width: 50, height: 100 },
+		);
 		expect(cover.at(5, 50)).toEqual(RED);
 		expect(cover.at(45, 50)).toEqual(BLUE);
 	});
@@ -192,7 +202,11 @@ describe("SVG image sources", () => {
 	});
 
 	test("tile repeats the drawing at its own size", async () => {
-		const { at } = await paint(HALVES, { fit: "tile" }, { width: 40, height: 10 });
+		const { at } = await paint(
+			HALVES,
+			{ fit: "tile" },
+			{ width: 40, height: 10 },
+		);
 		expect(at(12, 5)).toEqual(RED);
 		expect(at(17, 5)).toEqual(BLUE);
 		expect(at(32, 5)).toEqual(RED);
@@ -221,7 +235,12 @@ describe("SVG image sources", () => {
 		const markup =
 			'<svg width="10" height="10"><text>hi</text><rect width="10" height="10" fill="red"/></svg>';
 		for (let n = 0; n < 2; n++) {
-			const { at, warnings } = await paint(markup, {}, { width: 10, height: 10 }, cache);
+			const { at, warnings } = await paint(
+				markup,
+				{},
+				{ width: 10, height: 10 },
+				cache,
+			);
 			expect(at(5, 5)).toEqual(RED);
 			expect(warnings).toEqual([
 				{ kind: "svg_unsupported", src: "art.svg", feature: "text" },

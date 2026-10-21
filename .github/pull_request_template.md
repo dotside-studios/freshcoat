@@ -12,7 +12,7 @@
 
 ## Checklist
 
-- [ ] Tests and available type-check and lint scripts pass in the packages I touched
+- [ ] `bun run check`, tests and available type-check scripts pass in the packages I touched
 - [ ] Relevant application browser tests pass, if interactions changed
 - [ ] Release artifact checks pass, if SDK exports or runtime behavior changed
 - [ ] New behavior has tests

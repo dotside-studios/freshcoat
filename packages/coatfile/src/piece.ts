@@ -1,6 +1,7 @@
 import type { Renderer } from "@freshcoat-js/engine";
 import { normalizePath } from "@freshcoat-js/engine/svg";
 import { extendIntoBleed, offsetElements } from "./bleed";
+import type { ResolvedSlice } from "./slices";
 import type {
 	Background,
 	Element,
@@ -8,7 +9,6 @@ import type {
 	Sides,
 	TemplateFrame,
 } from "./types";
-import type { ResolvedSlice } from "./slices";
 
 type CanvasKit = Renderer["ck"];
 

@@ -145,32 +145,29 @@ describe("makeSurface falls back to SW when WebGL setup fails", () => {
 		["webgl2", "null"],
 		["webgl", "null"],
 		["webgl2", "throw"],
-	] as const)(
-		"%s context bound, then MakeOnScreenGLSurface fails (%s)",
-		async (bind, surface) => {
-			const f = fakeCk({ bind, surface });
-			const { rt, created, loseContext, spawned } = fakeRt();
+	] as const)("%s context bound, then MakeOnScreenGLSurface fails (%s)", async (bind, surface) => {
+		const f = fakeCk({ bind, surface });
+		const { rt, created, loseContext, spawned } = fakeRt();
 
-			const out = await paintScene(f.ck, commands, rt);
+		const out = await paintScene(f.ck, commands, rt);
 
-			expect(f.makeOnScreen).toHaveBeenCalledTimes(1);
-			expect(f.grDelete).toHaveBeenCalledTimes(1);
-			expect(f.deleteContext).toHaveBeenCalledWith(7);
-			expect(f.grDelete.mock.invocationCallOrder[0]).toBeLessThan(
-				f.deleteContext.mock.invocationCallOrder[0] ?? 0,
-			);
-			expect(loseContext).toHaveBeenCalledTimes(1);
-			expect(spawned).toEqual([]);
-			expect(f.makeWebGLCanvas).not.toHaveBeenCalled();
-			expect(f.makeSW).toHaveBeenCalledWith(created[1]);
-			expect(f.makeSurface).not.toHaveBeenCalled();
-			expect(out.canvas).toBe(created[1]);
+		expect(f.makeOnScreen).toHaveBeenCalledTimes(1);
+		expect(f.grDelete).toHaveBeenCalledTimes(1);
+		expect(f.deleteContext).toHaveBeenCalledWith(7);
+		expect(f.grDelete.mock.invocationCallOrder[0]).toBeLessThan(
+			f.deleteContext.mock.invocationCallOrder[0] ?? 0,
+		);
+		expect(loseContext).toHaveBeenCalledTimes(1);
+		expect(spawned).toEqual([]);
+		expect(f.makeWebGLCanvas).not.toHaveBeenCalled();
+		expect(f.makeSW).toHaveBeenCalledWith(created[1]);
+		expect(f.makeSurface).not.toHaveBeenCalled();
+		expect(out.canvas).toBe(created[1]);
 
-			out.dispose();
-			expect(f.deleteContext).toHaveBeenCalledTimes(1);
-			expect(loseContext).toHaveBeenCalledTimes(1);
-		},
-	);
+		out.dispose();
+		expect(f.deleteContext).toHaveBeenCalledTimes(1);
+		expect(loseContext).toHaveBeenCalledTimes(1);
+	});
 
 	test("context bound, then MakeWebGLContext returns null", async () => {
 		const f = fakeCk({ bind: "webgl2", grCtx: false });

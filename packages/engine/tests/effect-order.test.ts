@@ -5,9 +5,9 @@ import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { beforeAll, describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createGroup, createRect, type Node } from "../src/node";
 import type { Adjust } from "../src/types";
+import { renderSceneToPng } from "./helpers/headless";
 
 const W = 120;
 const H = 80;

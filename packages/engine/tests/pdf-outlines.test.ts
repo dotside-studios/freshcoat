@@ -1,13 +1,14 @@
-import { loadCanvasKit, testFontBytes, type TestFont } from "@freshcoat-js/test-utils";
+import {
+	loadCanvasKit,
+	type TestFont,
+	testFontBytes,
+} from "@freshcoat-js/test-utils";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { type GlyphPath, readOutlines } from "../src/pdf/outlines";
 import { sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit surface
 let surface: any;
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit paint
 let paint: any;
 const SIZE = 64;
 const EDGE = 128;
@@ -25,7 +26,6 @@ afterAll(() => {
 	surface.delete();
 });
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit canvas
 function pixels(draw: (canvas: any) => void): Uint8Array {
 	const canvas = surface.getCanvas();
 	canvas.clear(ck.WHITE);
@@ -50,7 +50,10 @@ function drawPath(glyph: GlyphPath, unitsPerEm: number) {
 		const op = glyph[i++] as number;
 		cmds.push(verbs[op]);
 		for (let p = 0; p < (op === 2 ? 3 : op === 3 ? 0 : 1); p++)
-			cmds.push(32 + (glyph[i++] as number) * k, 96 - (glyph[i++] as number) * k);
+			cmds.push(
+				32 + (glyph[i++] as number) * k,
+				96 - (glyph[i++] as number) * k,
+			);
 	}
 	const path = ck.Path.MakeFromCmds(cmds);
 	try {
@@ -75,7 +78,10 @@ describe("readOutlines", () => {
 		const outlines = readOutlines(bytes);
 		expect(outlines).not.toBeNull();
 		if (!outlines) return;
-		const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+		const data = bytes.buffer.slice(
+			bytes.byteOffset,
+			bytes.byteOffset + bytes.byteLength,
+		);
 		const typeface = ck.Typeface.MakeTypefaceFromData(data);
 		const font = new ck.Font(typeface, SIZE);
 		font.setHinting(ck.FontHinting.None);
@@ -84,8 +90,12 @@ describe("readOutlines", () => {
 			for (const id of font.getGlyphIDs(text)) {
 				const glyph = outlines.glyph(id);
 				expect(glyph).not.toBeNull();
-				const drawn = pixels((canvas) => canvas.drawGlyphs([id], [0, 0], 32, 96, font, paint));
-				expect(off(drawn, drawPath(glyph as GlyphPath, outlines.unitsPerEm))).toBe(0);
+				const drawn = pixels((canvas) =>
+					canvas.drawGlyphs([id], [0, 0], 32, 96, font, paint),
+				);
+				expect(
+					off(drawn, drawPath(glyph as GlyphPath, outlines.unitsPerEm)),
+				).toBe(0);
 			}
 		} finally {
 			font.delete();
@@ -137,10 +147,18 @@ describe("readOutlines", () => {
 		const trueIds = glyphIds(vend);
 		glyphIds(cff2Bytes).forEach((id, i) => {
 			const blended = drawPath(cff2.glyph(id) as GlyphPath, cff2.unitsPerEm);
-			const varied = drawPath(truetype.glyph(trueIds[i] as number) as GlyphPath, truetype.unitsPerEm);
+			const varied = drawPath(
+				truetype.glyph(trueIds[i] as number) as GlyphPath,
+				truetype.unitsPerEm,
+			);
 			expect(off(blended, varied)).toBe(0);
 			if (wght > 300)
-				expect(off(blended, drawPath(light.glyph(id) as GlyphPath, light.unitsPerEm))).toBeGreaterThan(0);
+				expect(
+					off(
+						blended,
+						drawPath(light.glyph(id) as GlyphPath, light.unitsPerEm),
+					),
+				).toBeGreaterThan(0);
 		});
 	});
 

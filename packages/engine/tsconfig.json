@@ -1,13 +1,7 @@
 {
 	"extends": "../../tsconfig.base.json",
-	"include": [
-		"src/**/*",
-		"tests/**/*",
-		"conformance/**/*"
-	],
+	"include": ["src/**/*", "tests/**/*", "conformance/**/*"],
 	"compilerOptions": {
-		"types": [
-			"bun"
-		]
+		"types": ["bun"]
 	}
 }

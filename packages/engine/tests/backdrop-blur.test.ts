@@ -3,7 +3,6 @@ import { beforeAll, describe, expect, test } from "vitest";
 import { buildAdjust } from "../src/adjust";
 import { auditAdjustedBounds, setLayerBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
-import { renderSceneToPng } from "./helpers/headless";
 import {
 	createEllipse,
 	createFrame,
@@ -16,6 +15,7 @@ import {
 import type { EncodedPaintResult } from "../src/runtime-types";
 import type { DrawCommand } from "../src/types";
 import { validateCommands } from "../src/validate-commands";
+import { renderSceneToPng } from "./helpers/headless";
 
 const W = 80;
 const H = 80;

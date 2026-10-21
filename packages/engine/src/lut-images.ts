@@ -89,7 +89,8 @@ export function evictUnusedLutImages(luts: LutImages): void {
 }
 
 export function freeLutImages(luts: LutImages): void {
-	for (const bucket of luts.byHash.values()) for (const e of bucket) freeEntry(e);
+	for (const bucket of luts.byHash.values())
+		for (const e of bucket) freeEntry(e);
 	luts.byHash.clear();
 	luts.byArray = new WeakMap();
 }

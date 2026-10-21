@@ -28,7 +28,6 @@ import { createHeadlessEnv } from "./helpers/headless";
 const W = 240;
 const H = 200;
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let renderer: Renderer;
 const fonts = new Map([
@@ -60,7 +59,13 @@ const text = (value: string, size: number, x: number, y: number) =>
 	createText({
 		...box(x, y, 120, size * 1.3),
 		text: value,
-		font: { family: "Geist", weight: 400, style: "normal", size, lineHeight: 1.2 },
+		font: {
+			family: "Geist",
+			weight: 400,
+			style: "normal",
+			size,
+			lineHeight: 1.2,
+		},
 		color: "#1d3557",
 	});
 
@@ -114,7 +119,9 @@ const scenes: Record<
 		tolerance: 1,
 	},
 	"shadowed text": {
-		nodes: [{ ...text("Fresh coat", 28, 40, 80), shadow: shadow(5, 5, 8) } as Node],
+		nodes: [
+			{ ...text("Fresh coat", 28, 40, 80), shadow: shadow(5, 5, 8) } as Node,
+		],
 	},
 	"viewBox path with shadow and stroke": {
 		nodes: [
@@ -193,9 +200,10 @@ const scenes: Record<
 	},
 	"masked group": {
 		nodes: [
-			createMask(createRect({ ...box(70, 60, 60, 60), fills: solid("#ffffff") }), [
-				createRect({ ...box(50, 50, 120, 90), fills: solid("#2a9d8f") }),
-			]),
+			createMask(
+				createRect({ ...box(70, 60, 60, 60), fills: solid("#ffffff") }),
+				[createRect({ ...box(50, 50, 120, 90), fills: solid("#2a9d8f") })],
+			),
 		],
 	},
 	"image with stroke": {
@@ -237,7 +245,10 @@ async function pixels(
 	scale: number,
 	area?: { x: number; y: number; width: number; height: number },
 ) {
-	const rt = createHeadlessEnv({ fonts, images: new Map([["a.jpg", stripes]]) });
+	const rt = createHeadlessEnv({
+		fonts,
+		images: new Map([["a.jpg", stripes]]),
+	});
 	const out = await paintScene(
 		ck,
 		[
@@ -311,14 +322,19 @@ describe("shapeTextLines", () => {
 describe("drawableBounds", () => {
 	test("text is bounded while a variable font is in the fallback chain", () => {
 		const shared = createSharedFontProvider(ck, fonts);
-		(shared.provider as { __families?: string[] }).__families = ["Geist", "Vend"];
+		(shared.provider as { __families?: string[] }).__families = [
+			"Geist",
+			"Vend",
+		];
 		const bin = makeBin();
 		try {
 			const commands = renderer.compile(
 				createFrame({ ...box(0, 0, W, H), children: [text("Hi", 20, 10, 10)] }),
 				{ width: W, height: H },
 			);
-			const layer = flatten(commands).find((c) => c.op === "drawText") as DrawCommand;
+			const layer = flatten(commands).find(
+				(c) => c.op === "drawText",
+			) as DrawCommand;
 			const b = drawableBounds(ck, shared.provider, bin, layer, 1);
 			expect(b).not.toBeNull();
 			expect((b as number[])[2]).toBeLessThan(W);
@@ -364,11 +380,16 @@ describe("drawableBounds", () => {
 							height: Math.min(Math.ceil(b[3]), full.height) - y,
 						};
 						if (!(area.width > 0 && area.height > 0)) {
-							expect(full.data.some((v, i) => i % 4 === 3 && v !== 0)).toBe(false);
+							expect(full.data.some((v, i) => i % 4 === 3 && v !== 0)).toBe(
+								false,
+							);
 							continue;
 						}
 						const part = await pixels([layer], setup, scale, area);
-						expect([part.width, part.height]).toEqual([area.width, area.height]);
+						expect([part.width, part.height]).toEqual([
+							area.width,
+							area.height,
+						]);
 						let outside = 0;
 						let worst = 0;
 						for (let py = 0; py < full.height; py++) {

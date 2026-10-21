@@ -43,10 +43,23 @@ describe("scalePathData", () => {
 	});
 
 	it("matches the quadratic reference on a long path", () => {
-		const arity: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, C: 6, A: 7, Z: 0 };
+		const arity: Record<string, number> = {
+			M: 2,
+			L: 2,
+			H: 1,
+			V: 1,
+			C: 6,
+			A: 7,
+			Z: 0,
+		};
 		const axes: Record<string, (number | null)[]> = {
-			M: [2, 3], L: [2, 3], H: [2], V: [3], C: [2, 3, 2, 3, 2, 3],
-			A: [2, 3, null, null, null, 2, 3], Z: [],
+			M: [2, 3],
+			L: [2, 3],
+			H: [2],
+			V: [3],
+			C: [2, 3, 2, 3, 2, 3],
+			A: [2, 3, null, null, null, 2, 3],
+			Z: [],
 		};
 		const reference = (d: string, sx: number, sy: number): string => {
 			let out = "";
@@ -74,7 +87,11 @@ describe("scalePathData", () => {
 					token = ch;
 					i++;
 				} else {
-					token = (/^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/.exec(d.slice(i)) as RegExpExecArray)[0];
+					token = (
+						/^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/.exec(
+							d.slice(i),
+						) as RegExpExecArray
+					)[0];
 					i += token.length;
 				}
 				const axis = (axes[upper] as (number | null)[])[slot];
@@ -104,6 +121,8 @@ describe("scalePathData", () => {
 		const small = build(3000);
 		expect(scalePathData(small, 0.37, 1.9)).toBe(reference(small, 0.37, 1.9));
 		const large = build(30_000);
-		expect(scalePathData(large, 0.37, 1.9).length).toBeGreaterThan(large.length / 2);
+		expect(scalePathData(large, 0.37, 1.9).length).toBeGreaterThan(
+			large.length / 2,
+		);
 	});
 });

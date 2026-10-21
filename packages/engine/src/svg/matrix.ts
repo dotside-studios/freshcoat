@@ -119,7 +119,9 @@ export function parseTransform(src: string): Matrix {
 		}
 		m = multiply(m, t);
 	}
-	if (src.replace(/[\s,]/g, "").length !== consumed.replace(/[\s,]/g, "").length)
+	if (
+		src.replace(/[\s,]/g, "").length !== consumed.replace(/[\s,]/g, "").length
+	)
 		return IDENTITY;
 	return m;
 }

@@ -67,8 +67,7 @@ export function minimumFormatVersion(template: Template): string {
 		template.version === undefined
 	)
 		need(1);
-	if (template.bleed !== undefined || template.safeArea !== undefined)
-		need(5);
+	if (template.bleed !== undefined || template.safeArea !== undefined) need(5);
 
 	const barcodeIds = new Set<string>();
 	const frameIds = new Set<string>();
@@ -142,14 +141,12 @@ export function minimumFormatVersion(template: Template): string {
 					delta.hidden !== undefined
 				)
 					need(4);
-				if (textIds.has(delta.id) && usesTextLayout(delta.properties))
-					need(5);
+				if (textIds.has(delta.id) && usesTextLayout(delta.properties)) need(5);
 				if (usesArc(delta.properties)) need(6);
 				if (usesTextPath(delta.properties)) need(6);
 				if (frameIds.has(delta.id) && usesPerCornerRadius(delta.properties))
 					need(5);
-				if (frameIds.has(delta.id) && usesGridLayout(delta.properties))
-					need(5);
+				if (frameIds.has(delta.id) && usesGridLayout(delta.properties)) need(5);
 				if (imageIds.has(delta.id) && usesImageFraming(delta.properties))
 					need(5);
 				if (barcodeIds.has(delta.id) && usesBearerBars(delta.properties))
@@ -162,8 +159,7 @@ export function minimumFormatVersion(template: Template): string {
 				if (usesBoolean(delta.properties)) need(6);
 				if (usesSlice(delta.properties)) need(7);
 				if (usesSpot(delta.properties)) need(7);
-				if (textIds.has(delta.id) && usesTextStroke(delta.properties))
-					need(7);
+				if (textIds.has(delta.id) && usesTextStroke(delta.properties)) need(7);
 				if (textIds.has(delta.id) && usesPdfText(delta.properties)) need(7);
 				if (usesSideStroke(delta.properties)) need(7);
 				if (qrIds.has(delta.id) && usesQrStyle(delta.properties)) need(7);

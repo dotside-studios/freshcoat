@@ -9,8 +9,8 @@
 // and any image bytes keyed by src. Text is drawn at the compile-baked baseline
 // (`line.baseline`).
 import type {
-	BlendModeEnumValues,
 	Blender,
+	BlendModeEnumValues,
 	Canvas,
 	CanvasKit,
 	ColorFilter,
@@ -22,9 +22,9 @@ import type {
 	Image,
 	ImageFilter,
 	ImageInfo,
-	Paragraph,
 	InputMatrix,
 	Paint,
+	Paragraph,
 	Path,
 	Rect,
 	RRect,
@@ -54,14 +54,6 @@ import {
 } from "./arc-text";
 import { parseColor } from "./color";
 import {
-	fontWeight,
-	fontWeightName,
-	spanTextStyle,
-	solidColor,
-	toColor,
-} from "./text-style";
-import { withPathMeasure } from "./path-measure";
-import {
 	imageInfo,
 	makeImageFromPixels,
 	makeLayerSurface,
@@ -70,16 +62,16 @@ import {
 } from "./color-policy";
 import { compileScene } from "./compile-scene";
 import { normalizeDash } from "./dash";
-import { strokeTrim, trimPath } from "./trim";
 import { exportPixelSize, resolveSupersample } from "./export-scale";
 import { fontBytes } from "./font-bytes";
-import { assertDecodableImage } from "./image-info";
-import { dataUrlToBytes } from "./loader";
 import {
 	createSharedFontProvider,
 	makeParagraphBuilder,
 	type SharedFontProvider,
 } from "./font-collection";
+import { assertDecodableImage } from "./image-info";
+import { flattenOverWhite } from "./jpeg";
+import { dataUrlToBytes } from "./loader";
 import {
 	cachedLutImage,
 	createLutImages,
@@ -88,9 +80,15 @@ import {
 	type LutImages,
 } from "./lut-images";
 import {
+	boxPath,
+	outlineGeometry,
+	outlineIsPath,
+	rectShape,
+	sideStrokeGeometry,
+} from "./outline";
+import {
 	backgroundFits,
 	cacheBackground,
-	cacheFinishNoise,
 	cachedBitmap,
 	cachedFontProvider,
 	cachedLine,
@@ -99,6 +97,7 @@ import {
 	cachedSurface,
 	cachedTile,
 	cachedWorkSurface,
+	cacheFinishNoise,
 	closestBackground,
 	evictUnusedBitmaps,
 	evictUnusedImages,
@@ -119,28 +118,10 @@ import {
 	skipInkSegments,
 	strokeInset,
 } from "./paint-helpers";
-import { flattenOverWhite } from "./jpeg";
-import {
-	DEFAULT_JPEG_QUALITY,
-	DEFAULT_WEBP_QUALITY,
-	encodePng,
-} from "./png";
-import {
-	boxPath,
-	outlineGeometry,
-	outlineIsPath,
-	rectShape,
-	sideStrokeGeometry,
-} from "./outline";
+import { withPathMeasure } from "./path-measure";
 import { PATTERN_SKSL, type PatternFill, patternMean } from "./pattern";
-import {
-	CMYK_SCREENS,
-	grainSeed,
-	grainSksl,
-	halftoneSksl,
-	isGrainActive,
-	isHalftoneActive,
-} from "./texture";
+import { DEFAULT_JPEG_QUALITY, DEFAULT_WEBP_QUALITY, encodePng } from "./png";
+import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
 import type {
 	SvgDrawing,
 	SvgFilter,
@@ -149,14 +130,29 @@ import type {
 	SvgItem,
 } from "./svg/index";
 import { isSvg } from "./svg/sniff";
-import type { CanvasLike, PaintOutput, PaintTarget } from "./runtime-types";
+import {
+	fontWeight,
+	fontWeightName,
+	solidColor,
+	spanTextStyle,
+	toColor,
+} from "./text-style";
+import {
+	CMYK_SCREENS,
+	grainSeed,
+	grainSksl,
+	halftoneSksl,
+	isGrainActive,
+	isHalftoneActive,
+} from "./texture";
+import { strokeTrim, trimPath } from "./trim";
 import type {
 	AdjustLut,
 	BlendMode,
 	Command,
 	DrawBitmapCommand,
-	DrawGroupCommand,
 	DrawCommand,
+	DrawGroupCommand,
 	DrawImageCommand,
 	DrawMaskedCommand,
 	DrawPathCommand,
@@ -172,9 +168,9 @@ import type {
 	Size,
 	Stroke,
 	TextArc,
+	TextLine,
 	TextPath,
 	TextStroke,
-	TextLine,
 } from "./types";
 
 type EnumKey<E> = Exclude<keyof E, "values">;
@@ -241,9 +237,7 @@ export function makeBin(cache?: PaintCacheState | null): Bin {
 		cache: cache ?? null,
 		mipmaps: (src, img) => {
 			const build = () => img.makeCopyWithDefaultMipmaps();
-			return (
-				(cache && cachedMipmaps(cache, src, img, build)) ?? track(build())
-			);
+			return (cache && cachedMipmaps(cache, src, img, build)) ?? track(build());
 		},
 		path: (ck, d, evenOdd = false) => {
 			const build = () => {
@@ -678,10 +672,18 @@ function drawSideStroke(
 ) {
 	if (!stroke.sides) return;
 	const { width: w, height: h } = cmd.size;
-	const g = sideStrokeGeometry(0, 0, w, h, cmd.cornerRadius, cmd.cornerSmoothing, {
-		align: stroke.align,
-		sides: stroke.sides,
-	});
+	const g = sideStrokeGeometry(
+		0,
+		0,
+		w,
+		h,
+		cmd.cornerRadius,
+		cmd.cornerSmoothing,
+		{
+			align: stroke.align,
+			sides: stroke.sides,
+		},
+	);
 	if (!g) return;
 	const box = { x: 0, y: 0, w, h };
 	const band = bin.path(ck, g.band, true) as Path;
@@ -932,10 +934,7 @@ function drawTextFill(
 				else p.setColor(toColor(ck, d.color));
 				decorationPaints.set(color, p);
 			}
-			canvas.drawRect(
-				ck.LTRBRect(d.x0, d.top, d.x1, d.top + d.thickness),
-				p,
-			);
+			canvas.drawRect(ck.LTRBRect(d.x0, d.top, d.x1, d.top + d.thickness), p);
 		}
 	}
 }
@@ -1196,12 +1195,13 @@ function arcLines(
 		const sl = glyphLines(bin, shaped)[0];
 		const runs = sl?.runs ?? [];
 		const starts = spanByteStarts(line.spans.map((s) => s.text));
-		const spacing = (shaped.spacing ??= runs.map((run) =>
+		shaped.spacing ??= runs.map((run) =>
 			Float32Array.from(
 				run.offsets.subarray(0, run.glyphs.length),
 				(byte) => line.spans[spanAt(starts, byte)]?.font.letterSpacing ?? 0,
 			),
-		));
+		);
+		const spacing = shaped.spacing;
 		out.push({
 			line,
 			arc: {
@@ -1216,10 +1216,7 @@ function arcLines(
 }
 
 function arcCenter(cmd: DrawTextCommand): [number, number] {
-	return [
-		cmd.pos.x + cmd.size.width / 2,
-		cmd.pos.y + cmd.size.height / 2,
-	];
+	return [cmd.pos.x + cmd.size.width / 2, cmd.pos.y + cmd.size.height / 2];
 }
 
 function runFont(ck: CanvasKit, bin: Bin, run: GlyphRun): Font {
@@ -1243,7 +1240,8 @@ function glyphLines(
 	const lines = shaped.para.getShapedLines();
 	if (!shaped.cached)
 		for (const l of lines) for (const run of l.runs) bin.track(run.typeface);
-	return (shaped.glyphLines = lines);
+	shaped.glyphLines = lines;
+	return lines;
 }
 
 type ArcDecoration = {
@@ -1278,9 +1276,7 @@ function arcDecorations(
 				const range = ranges.get(span);
 				ranges.set(
 					span,
-					range
-						? [Math.min(range[0], x), Math.max(range[1], end)]
-						: [x, end],
+					range ? [Math.min(range[0], x), Math.max(range[1], end)] : [x, end],
 				);
 			}
 		});
@@ -1938,9 +1934,17 @@ function loadSvg(): Promise<SvgModule> {
 const SVG_COMPOSITE: Record<
 	Extract<SvgFilterPrimitive, { kind: "composite" }>["operator"],
 	EnumKey<BlendModeEnumValues>
-> = { over: "SrcOver", in: "SrcIn", out: "SrcOut", atop: "SrcATop", xor: "Xor" };
+> = {
+	over: "SrcOver",
+	in: "SrcIn",
+	out: "SrcOut",
+	atop: "SrcATop",
+	xor: "Xor",
+};
 
-const SOURCE_ALPHA = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0];
+const SOURCE_ALPHA = [
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+];
 
 const srgbToLinear = (v: number) =>
 	v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
@@ -1989,7 +1993,10 @@ function svgImageFilter(
 		mode: EnumKey<BlendModeEnumValues>,
 		background: ImageFilter | null,
 		foreground: ImageFilter | null,
-	) => bin.track(ck.ImageFilter.MakeBlend(ck.BlendMode[mode], background, foreground));
+	) =>
+		bin.track(
+			ck.ImageFilter.MakeBlend(ck.BlendMode[mode], background, foreground),
+		);
 	for (const p of filter.primitives) {
 		const at = (i: SvgFilterInput) => inSpace(get(i), p.linear);
 		let linear: boolean | null = p.linear;
@@ -1998,7 +2005,14 @@ function svgImageFilter(
 			case "blur":
 				f =
 					p.sx > 0 || p.sy > 0
-						? bin.track(ck.ImageFilter.MakeBlur(p.sx, p.sy, ck.TileMode.Decal, at(p.in)))
+						? bin.track(
+								ck.ImageFilter.MakeBlur(
+									p.sx,
+									p.sy,
+									ck.TileMode.Decal,
+									at(p.in),
+								),
+							)
 						: at(p.in);
 				break;
 			case "offset": {
@@ -2025,7 +2039,9 @@ function svgImageFilter(
 			case "flood":
 				f = bin.track(
 					ck.ImageFilter.MakeShader(
-						bin.track(ck.Shader.MakeColor(color(p.color, false), ck.ColorSpace.SRGB)),
+						bin.track(
+							ck.Shader.MakeColor(color(p.color, false), ck.ColorSpace.SRGB),
+						),
 					),
 				);
 				linear = false;
@@ -2036,7 +2052,9 @@ function svgImageFilter(
 					first === undefined
 						? bin.track(
 								ck.ImageFilter.MakeShader(
-									bin.track(ck.Shader.MakeColor(ck.TRANSPARENT, ck.ColorSpace.SRGB)),
+									bin.track(
+										ck.Shader.MakeColor(ck.TRANSPARENT, ck.ColorSpace.SRGB),
+									),
 								),
 							)
 						: rest.reduce((acc, i) => blend("SrcOver", acc, at(i)), at(first));
@@ -2054,7 +2072,8 @@ function svgImageFilter(
 	return inSpace(results.at(-1) ?? source, false);
 }
 
-const svgMatrix = (m: number[]) => [m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1] as number[];
+const svgMatrix = (m: number[]) =>
+	[m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1] as number[];
 
 // Records `children`, each filtered group drawn from a picture of its own
 // content inside a layer carrying the filter. Those pictures join `images`.
@@ -2069,7 +2088,12 @@ function recordSvg(
 	filter?: SvgFilter,
 ): SkPicture {
 	const { width, height } = drawing;
-	const vbm = svg.viewBoxMatrix(drawing.viewBox, width, height, drawing.preserveAspectRatio);
+	const vbm = svg.viewBoxMatrix(
+		drawing.viewBox,
+		width,
+		height,
+		drawing.preserveAspectRatio,
+	);
 	const [sx, , , sy, tx, ty] = vbm;
 	const lift = (items: SvgItem[]): SvgItem[] =>
 		items.map((item) => {
@@ -2077,7 +2101,16 @@ function recordSvg(
 			const { filter: own, ...group } = item;
 			if (group.mask) group.mask = lift(group.mask);
 			if (!own) return { ...group, children: lift(item.children) };
-			const picture = recordSvg(ck, provider, svg, drawing, item.children, images, bin, own);
+			const picture = recordSvg(
+				ck,
+				provider,
+				svg,
+				drawing,
+				item.children,
+				images,
+				bin,
+				own,
+			);
 			const key = `svg-filter:${images.size}`;
 			images.set(key, {
 				svgPicture: picture,
@@ -2102,10 +2135,13 @@ function recordSvg(
 				],
 			};
 		});
-	const commands = compileScene(svg.svgToNode({ ...drawing, children: lift(children) }), {
-		width,
-		height,
-	});
+	const commands = compileScene(
+		svg.svgToNode({ ...drawing, children: lift(children) }),
+		{
+			width,
+			height,
+		},
+	);
 	const recorder = new ck.PictureRecorder();
 	try {
 		const canvas = recorder.beginRecording(ck.LTRBRect(0, 0, width, height));
@@ -2180,14 +2216,23 @@ function makeSvgPicture(
 					: null
 				: decodeImage(ck, data, maxImagePixels);
 			if (img) images.set(src, img);
-			else if (!features.includes("image-decode")) features.push("image-decode");
+			else if (!features.includes("image-decode"))
+				features.push("image-decode");
 		} catch {
 			if (!features.includes("image-decode")) features.push("image-decode");
 		}
 	}
 	const bin = makeBin();
 	try {
-		const picture = recordSvg(ck, provider, svg, drawing, drawing.children, images, bin);
+		const picture = recordSvg(
+			ck,
+			provider,
+			svg,
+			drawing,
+			drawing.children,
+			images,
+			bin,
+		);
 		let rasterPixels = 0;
 		for (const img of images.values())
 			rasterPixels += isSvgPicture(img)
@@ -2244,7 +2289,11 @@ function drawSvgPicture(
 		cmd.fit,
 		cmd,
 	);
-	canvas.clipRect(ck.XYWHRect(r.dx, r.dy, r.dw, r.dh), ck.ClipOp.Intersect, true);
+	canvas.clipRect(
+		ck.XYWHRect(r.dx, r.dy, r.dw, r.dh),
+		ck.ClipOp.Intersect,
+		true,
+	);
 	canvas.translate(r.dx, r.dy);
 	canvas.scale(r.dw / r.sw, r.dh / r.sh);
 	canvas.translate(-r.sx, -r.sy);
@@ -2464,7 +2513,17 @@ function drawShape(
 			: null;
 		if (snap) {
 			canvas.save();
-			canvas.concat([snap[0], snap[1], snap[2], snap[3], snap[4], snap[5], 0, 0, 1]);
+			canvas.concat([
+				snap[0],
+				snap[1],
+				snap[2],
+				snap[3],
+				snap[4],
+				snap[5],
+				0,
+				0,
+				1,
+			]);
 		}
 		for (const child of cmd.children)
 			paintDrawable(ck, canvas, provider, images, bin, child, issues, frame);
@@ -2535,9 +2594,7 @@ function maskPaint(ck: CanvasKit, bin: Bin, cmd: DrawMaskedCommand): Paint {
 							0.0722, 0, 0,
 						]),
 					),
-					bin.track(
-						ck.ColorFilter.MakeBlend(ck.BLACK, ck.BlendMode.DstOver),
-					),
+					bin.track(ck.ColorFilter.MakeBlend(ck.BLACK, ck.BlendMode.DstOver)),
 				),
 			),
 		);
@@ -2977,11 +3034,10 @@ function predictedBounds(
 		}
 		const whole = outlineOf(ck, bin, shape, x, y, w, h) as Outline;
 		const doubled = { ...stroke, width: stroke.width * 2 };
-		add(
-			strokeBounds(outlineBounds(whole), doubled),
-			outlineMatrix(whole, m),
-			[...within, { ctm: m }],
-		);
+		add(strokeBounds(outlineBounds(whole), doubled), outlineMatrix(whole, m), [
+			...within,
+			{ ctm: m },
+		]);
 	};
 	// drawSideStroke's translate makes its save real.
 	const addSideStroke = (
@@ -2992,10 +3048,18 @@ function predictedBounds(
 	) => {
 		if (!stroke.sides) return;
 		const { width: w, height: h } = c.size;
-		const g = sideStrokeGeometry(0, 0, w, h, c.cornerRadius, c.cornerSmoothing, {
-			align: stroke.align,
-			sides: stroke.sides,
-		});
+		const g = sideStrokeGeometry(
+			0,
+			0,
+			w,
+			h,
+			c.cornerRadius,
+			c.cornerSmoothing,
+			{
+				align: stroke.align,
+				sides: stroke.sides,
+			},
+		);
 		if (!g) return;
 		const pm = translateAffine(m, c.pos.x, c.pos.y);
 		const saves = [...within, { ctm: m }];
@@ -3132,8 +3196,14 @@ function predictedBounds(
 		}
 		return false;
 	};
-	const ctm = [matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]]
-		.map(f32) as Affine;
+	const ctm = [
+		matrix[0],
+		matrix[1],
+		matrix[2],
+		matrix[3],
+		matrix[4],
+		matrix[5],
+	].map(f32) as Affine;
 	if (!visit(inner, ctm, []) || singular) return null;
 	if (full) return cull;
 	return out ?? [0, 0, 0, 0];
@@ -3413,7 +3483,8 @@ function strokeBounds(b: Bounds, stroke: Stroke): Bounds {
 	if (width > 0) {
 		let multiplier = 1;
 		if ((stroke.join ?? "miter") === "miter") multiplier = 4;
-		if (stroke.cap === "square") multiplier = Math.max(multiplier, f32(Math.SQRT2));
+		if (stroke.cap === "square")
+			multiplier = Math.max(multiplier, f32(Math.SQRT2));
 		radius = f32((width / 2) * multiplier);
 	}
 	return outsetBounds(b, radius);
@@ -3423,7 +3494,9 @@ function textStrokeBounds(b: Bounds, stroke: TextStroke | undefined): Bounds {
 	if (!stroke || stroke.align === "inside") return b;
 	return strokeBounds(
 		b,
-		stroke.align === "outside" ? { ...stroke, width: stroke.width * 2 } : stroke,
+		stroke.align === "outside"
+			? { ...stroke, width: stroke.width * 2 }
+			: stroke,
 	);
 }
 
@@ -3468,7 +3541,12 @@ function affineKind(m: Affine): number {
 function mapAffine(m: Affine, b: Bounds): Bounds {
 	const kind = affineKind(m);
 	if (kind <= 1)
-		return sortBounds([f32(b[0] + m[2]), f32(b[1] + m[5]), f32(b[2] + m[2]), f32(b[3] + m[5])]);
+		return sortBounds([
+			f32(b[0] + m[2]),
+			f32(b[1] + m[5]),
+			f32(b[2] + m[2]),
+			f32(b[3] + m[5]),
+		]);
 	if (kind === 2)
 		return sortBounds([
 			f32(f32(b[0] * m[0]) + m[2]),
@@ -3529,7 +3607,8 @@ function concatAffine(a: Affine, b: Affine): Affine {
 			f32(a[4] * b[4]),
 			f32(f32(a[4] * b[5]) + a[5]),
 		];
-	const mam = (p: number, q: number, r: number, t: number) => f32(p * q + r * t);
+	const mam = (p: number, q: number, r: number, t: number) =>
+		f32(p * q + r * t);
 	return [
 		mam(a[0], b[0], a[1], b[3]),
 		mam(a[0], b[1], a[1], b[4]),
@@ -3545,7 +3624,8 @@ function translateAffine(m: Affine, dx: number, dy: number): Affine {
 	const x = f32(dx);
 	const y = f32(dy);
 	if (x === 0 && y === 0) return m;
-	if (affineKind(m) <= 1) return [m[0], m[1], f32(m[2] + x), m[3], m[4], f32(m[5] + y)];
+	if (affineKind(m) <= 1)
+		return [m[0], m[1], f32(m[2] + x), m[3], m[4], f32(m[5] + y)];
 	return [
 		m[0],
 		m[1],
@@ -3561,7 +3641,14 @@ function scaleAffine(m: Affine, sx: number, sy: number): Affine {
 	const x = f32(sx);
 	const y = f32(sy);
 	if (x === 1 && y === 1) return m;
-	return [f32(m[0] * x), f32(m[1] * y), m[2], f32(m[3] * x), f32(m[4] * y), m[5]];
+	return [
+		f32(m[0] * x),
+		f32(m[1] * y),
+		m[2],
+		f32(m[3] * x),
+		f32(m[4] * y),
+		m[5],
+	];
 }
 
 // SkMatrix::setRotate about the origin.
@@ -3678,7 +3765,11 @@ function adjustedDeviceRect(
 	const x0 = Math.max(Math.floor(l) - pad, clip[0] - grow, -reach);
 	const y0 = Math.max(Math.floor(t) - pad, clip[1] - grow, -reach);
 	const x1 = Math.min(Math.ceil(r) + pad, clip[2] + grow, device.width + reach);
-	const y1 = Math.min(Math.ceil(b) + pad, clip[3] + grow, device.height + reach);
+	const y1 = Math.min(
+		Math.ceil(b) + pad,
+		clip[3] + grow,
+		device.height + reach,
+	);
 	if (!(x1 > x0 && y1 > y0)) return null;
 	return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
@@ -3738,7 +3829,9 @@ function paintAdjustedOffscreen(
 	const effects = { ...cmd, adjust: undefined } as DrawCommand;
 	const matrixOnly = {
 		...cmd,
-		adjust: adjust.colorMatrix ? { colorMatrix: adjust.colorMatrix } : undefined,
+		adjust: adjust.colorMatrix
+			? { colorMatrix: adjust.colorMatrix }
+			: undefined,
 	} as DrawCommand;
 	if (hasLut3d && !validLut3d(adjust.lut3d)) {
 		reportAdjustUnsupported(issues, cmd, "lut3d");
@@ -3900,10 +3993,7 @@ function paintAdjustedOffscreen(
 		canvas.saveLayer(lp, bounds ? ck.LTRBRect(...bounds) : null);
 	}
 	canvas.concat(inverse);
-	canvas.drawRect(
-		ck.XYWHRect(rect.x, rect.y, rect.width, rect.height),
-		paint,
-	);
+	canvas.drawRect(ck.XYWHRect(rect.x, rect.y, rect.width, rect.height), paint);
 	if (lp) canvas.restore();
 	canvas.restore();
 }
@@ -4049,7 +4139,9 @@ function paintTexturedOffscreen(
 	const ly = [inverse[3], inverse[4], inverse[5] - py];
 	if (halftone && ht?.eff) {
 		const origin =
-			halftone.anchor === "element" ? cmd.pos : (halftone.origin ?? { x: 0, y: 0 });
+			halftone.anchor === "element"
+				? cmd.pos
+				: (halftone.origin ?? { x: 0, y: 0 });
 		const space =
 			halftone.anchor === "element" ? local : sceneMatrix(ck, canvas, frame);
 		const toDevice = ck.Matrix.multiply(
@@ -4122,10 +4214,7 @@ function paintTexturedOffscreen(
 		canvas.saveLayer(lp, bounds ? ck.LTRBRect(...bounds) : null);
 	}
 	canvas.concat(inverse);
-	canvas.drawRect(
-		ck.XYWHRect(rect.x, rect.y, rect.width, rect.height),
-		paint,
-	);
+	canvas.drawRect(ck.XYWHRect(rect.x, rect.y, rect.width, rect.height), paint);
 	if (lp) canvas.restore();
 	canvas.restore();
 }
@@ -4790,9 +4879,7 @@ function pixelGridEdges(
 	const r = snapModules(m, cmd.pos, cmd.size, snap.columns, snap.rows, grid);
 	if (!r) return false;
 	const whole = (v: number) => Number.isInteger(v / grid);
-	if (
-		![r.x, r.y, r.width / snap.columns, r.height / snap.rows].every(whole)
-	)
+	if (![r.x, r.y, r.width / snap.columns, r.height / snap.rows].every(whole))
 		return false;
 	return cmd.children.every(
 		(c) =>
@@ -4873,8 +4960,7 @@ function layerPaint(
 	const paint = bin.track(new ck.Paint());
 	if (hasOpacity) paint.setAlphaf(opacity);
 	setLayerBlend(ck, bin, paint, blendMode);
-	const onPaint =
-		precision === "f16" && !hasOpacity && !hasBlur && !shadow;
+	const onPaint = precision === "f16" && !hasOpacity && !hasBlur && !shadow;
 	if (colorFilter && onPaint) paint.setColorFilter(colorFilter);
 	let filter: ImageFilter | null =
 		colorFilter && !onPaint
@@ -5229,15 +5315,7 @@ function paintDrawable(
 	const outer = lp !== null || (isolated && !inner);
 	const bounds =
 		(outer || inner) && layerPaintBoundable(cmd)
-			? layerBounds(
-					ck,
-					canvas,
-					provider,
-					images,
-					bin,
-					layerContent(cmd),
-					frame,
-				)
+			? layerBounds(ck, canvas, provider, images, bin, layerContent(cmd), frame)
 			: null;
 	if (outer) canvas.saveLayer(lp ?? undefined, bounds);
 	if (clips && cmd.clip)
@@ -5539,7 +5617,8 @@ async function paintSceneIn(
 				: decodeImage(ck, bytes, rt.maxImageDecodePixels);
 			if (img) {
 				imageMap.set(src, img);
-				if (cache) cache.images.set(src, { image: img, mipped: null, tile: null });
+				if (cache)
+					cache.images.set(src, { image: img, mipped: null, tile: null });
 				else bin.track(img);
 				warnSvgFeatures(warnings, src, img);
 			} else
@@ -5703,16 +5782,7 @@ async function paintSceneIn(
 				adjustUnsupported: new Map(),
 				patternUnsupported: new Map(),
 			};
-			paintDrawable(
-				ck,
-				skCanvas,
-				provider,
-				imageMap,
-				bin,
-				cmd,
-				issues,
-				frame,
-			);
+			paintDrawable(ck, skCanvas, provider, imageMap, bin, cmd, issues, frame);
 			for (const op of issues.unhandled)
 				warnings.push({ kind: "unhandled_op", op });
 			for (const warning of issues.adjustUnsupported.values())
@@ -5733,7 +5803,11 @@ async function paintSceneIn(
 				}
 			}
 			if (cache && pixelInfo && i + 1 === snapAfter) {
-				const pixels = skCanvas.readPixels(0, 0, pixelInfo) as Uint8Array | null;
+				const pixels = skCanvas.readPixels(
+					0,
+					0,
+					pixelInfo,
+				) as Uint8Array | null;
 				if (pixels)
 					cacheBackground(
 						cache,

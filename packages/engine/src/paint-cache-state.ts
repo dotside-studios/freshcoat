@@ -2,21 +2,17 @@
 // declarations need no CanvasKit types.
 
 import type {
+	ShapedLine as GlyphLine,
 	Image,
 	Paragraph,
 	Path,
 	Shader,
-	ShapedLine as GlyphLine,
 	Surface,
 	TypefaceFontProvider,
 } from "canvaskit-wasm";
 import type { SvgPicture } from "./canvaskit";
 import type { SharedFontProvider } from "./font-collection";
-import {
-	createLutImages,
-	freeLutImages,
-	type LutImages,
-} from "./lut-images";
+import { createLutImages, freeLutImages, type LutImages } from "./lut-images";
 import type {
 	PaintCache,
 	PaintCacheOptions,
@@ -360,7 +356,8 @@ export function closestBackground(
 // paint's began with, the part worth keeping a snapshot of.
 export function noteLead(state: PaintCacheState, keys: string[]): number {
 	let seen = 0;
-	for (const lead of state.leads) seen = Math.max(seen, sharedLength(lead, keys));
+	for (const lead of state.leads)
+		seen = Math.max(seen, sharedLength(lead, keys));
 	if (keys.length === 0) return 0;
 	state.leads = [keys, ...state.leads.filter((lead) => lead !== keys)];
 	if (state.leads.length > MAX_BACKGROUNDS)
@@ -496,7 +493,8 @@ export function cachedTile(
 ): Shader | null {
 	const entry = state.images.get(src);
 	if (!entry || entry.image !== image) return null;
-	return (entry.tile ??= build());
+	entry.tile ??= build();
+	return entry.tile;
 }
 
 function freeImage(entry: CachedImage): void {

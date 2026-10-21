@@ -22,8 +22,7 @@
 	},
 	"scripts": {
 		"test": "vitest run",
-		"typecheck": "tsc --noEmit",
-		"check": "biome check"
+		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
 		"@freshcoat-js/coatfile": "workspace:*",
@@ -35,7 +34,6 @@
 		"zod": "^4.1.13"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.5",
 		"@freshcoat-js/test-utils": "workspace:*",
 		"@types/bun": "^1.3.12",
 		"@types/node": "^26.6.3",

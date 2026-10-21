@@ -4,9 +4,9 @@ import { brightnessMatrix, buildAdjust } from "../src/adjust";
 import { imageInfo, resolvePrecision } from "../src/color-policy";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
-import { renderSceneToPng } from "./helpers/headless";
 import { createFrame, createRect, type Node } from "../src/node";
 import { validateCommands } from "../src/validate-commands";
+import { renderSceneToPng } from "./helpers/headless";
 
 const W = 256;
 const H = 4;

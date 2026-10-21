@@ -98,7 +98,6 @@ let ck: TextEngine & { dispose(): void };
 beforeAll(async () => {
 	const bytes = new Uint8Array(readFileSync(FONT));
 	const kit = await loadCanvasKit();
-	// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 	ck = createParagraphEngine(kit as any, new Map([["Geist", [bytes]]]));
 });
 

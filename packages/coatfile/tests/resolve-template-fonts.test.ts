@@ -41,7 +41,10 @@ const text = (family: string, weight?: number, spans?: unknown[]) => ({
 	},
 });
 
-function template(elements: unknown[], extra: Partial<Template> = {}): Template {
+function template(
+	elements: unknown[],
+	extra: Partial<Template> = {},
+): Template {
 	return {
 		format_version: "1.0",
 		name: "T",

@@ -6,7 +6,6 @@
 import { readFileSync } from "node:fs";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { describe, expect, test } from "vitest";
-import { createHeadlessEnv } from "./helpers/headless";
 import type { MeasureText } from "../src/index";
 import {
 	approxEngine,
@@ -23,6 +22,7 @@ import {
 	createText,
 } from "../src/index";
 import type { BakedTextLayout, Command } from "../src/types";
+import { createHeadlessEnv } from "./helpers/headless";
 
 const FONT = testFontPath("Geist-Regular.ttf");
 

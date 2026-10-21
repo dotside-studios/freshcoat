@@ -13,7 +13,6 @@ import { createFrame, createImage } from "../src/node";
 import { createRenderer } from "../src/renderer";
 import { MAX_UNPACKED_FONT_BYTES, sfntBytes } from "../src/woff";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
@@ -133,7 +132,9 @@ describe("image pixel limit", () => {
 	});
 
 	test("decodePixels checks before decoding", () => {
-		expect(() => decodePixels(ck, pngHeader(30000, 30000))).toThrow(/30000x30000/);
+		expect(() => decodePixels(ck, pngHeader(30000, 30000))).toThrow(
+			/30000x30000/,
+		);
 		expect(() => decodePixels(ck, new Uint8Array(8))).toThrow(/header/);
 		expect(decodePixels(ck, smallPng())?.width).toBe(2);
 		expect(() => assertDecodableImage(smallPng(), 3)).toThrow();
@@ -267,5 +268,8 @@ function woff2Tables(lengths: number[], payload: Uint8Array): Uint8Array {
 	return out;
 }
 
-const woff2Single = (origLength: number, _length: number, payload: Uint8Array) =>
-	woff2Tables([origLength], payload);
+const woff2Single = (
+	origLength: number,
+	_length: number,
+	payload: Uint8Array,
+) => woff2Tables([origLength], payload);

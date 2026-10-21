@@ -146,7 +146,9 @@ function description(b: Uint8Array, count: number): string {
 		if (type === "desc") {
 			const n = u32(b, start + 8);
 			if (12 + n > length) return "";
-			return ascii(b, start + 12, n).replace(/\0.*$/s, "").trim();
+			return ascii(b, start + 12, n)
+				.replace(/\0.*$/s, "")
+				.trim();
 		}
 		if (type === "mluc") {
 			if (u32(b, start + 8) < 1 || length < 28) return "";

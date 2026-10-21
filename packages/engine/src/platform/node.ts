@@ -4,8 +4,8 @@ import { dirname, join } from "node:path";
 import type { CanvasKit } from "canvaskit-wasm";
 import type { CanvasKitBuild, CanvasKitInit } from "./types";
 
-export type { CanvasKitBuild } from "./types";
 export { type FileLoaderOptions, fileLoader } from "./file-loader";
+export type { CanvasKitBuild } from "./types";
 
 const require = createRequire(import.meta.url);
 const BIN = dirname(require.resolve("canvaskit-wasm"));

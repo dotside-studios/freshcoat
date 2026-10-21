@@ -112,10 +112,7 @@ describe("missingGlyphs", () => {
 		const commands = compileScene(
 			scene(
 				text("greeting", "", {
-					spans: [
-						{ text: "Hello " },
-						{ text: "世界", font: { weight: 700 } },
-					],
+					spans: [{ text: "Hello " }, { text: "世界", font: { weight: 700 } }],
 				}),
 			),
 			{ width: 400, height: 200, textEngine: engine },

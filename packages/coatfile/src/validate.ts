@@ -112,7 +112,7 @@ function issueToError(issue: ZodIssueLite): ValidationError {
 
 function pathToPointer(path: (string | number)[]): string {
 	if (path.length === 0) return "";
-	return "/" + path.map(String).join("/");
+	return `/${path.map(String).join("/")}`;
 }
 
 export function validateValues(

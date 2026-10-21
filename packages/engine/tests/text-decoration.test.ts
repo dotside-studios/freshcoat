@@ -6,7 +6,6 @@ import { createParagraphEngine } from "../src/paragraph-layout";
 import { makeRuntime, paintCanvasKit } from "../src/runtime";
 import type { DrawTextCommand, ResolvedFont } from "../src/types";
 
-// biome-ignore lint/suspicious/noExplicitAny: CanvasKit instance
 let ck: any;
 let engine: ReturnType<typeof createParagraphEngine>;
 const fonts = new Map([["Geist", [testFontBytes("Geist-Regular.ttf")]]]);

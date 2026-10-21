@@ -197,11 +197,15 @@ export function trimEdgesTouched(
 	trim: { width: number; height: number },
 ): SafeAreaEdge[] {
 	const gaps = [box[0], box[1], trim.width - box[2], trim.height - box[3]];
-	return SAFE_EDGES.filter((_, i) => Math.abs(gaps[i] as number) <= EDGE_EPSILON);
+	return SAFE_EDGES.filter(
+		(_, i) => Math.abs(gaps[i] as number) <= EDGE_EPSILON,
+	);
 }
 
 /** A layer's box after its rotation, as `[left, top, right, bottom]`. */
-export function rotatedBox(el: Element): [number, number, number, number] | null {
+export function rotatedBox(
+	el: Element,
+): [number, number, number, number] | null {
 	if (!el.size) return null;
 	const { width, height } = rotatedFootprint(el.size, el.rotation);
 	const cx = (el.pos?.x ?? 0) + el.size.width / 2;

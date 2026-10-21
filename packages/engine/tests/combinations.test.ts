@@ -1,13 +1,13 @@
 // Invariants that hold across combinations of features, rather than per feature.
 // Each table below takes a new case in one line.
+
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import type { CanvasKit } from "canvaskit-wasm";
-import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { identityColorMatrix, identityLut3d } from "../src/adjust";
 import { paintScene, setLayerBounds } from "../src/canvaskit";
 import { compileScene, prepareScene } from "../src/compile-scene";
 import { deriveFontMetrics } from "../src/font-metrics";
-import { createHeadlessEnv } from "./helpers/headless";
 import {
 	createEllipse,
 	createGroup,
@@ -26,6 +26,7 @@ import type {
 	DrawCommand,
 	PaintWarning,
 } from "../src/types";
+import { createHeadlessEnv } from "./helpers/headless";
 import { config, fuzzImages, LAYERED, rng, scene } from "./scene-gen";
 
 const W = 120;
@@ -184,16 +185,13 @@ describe("identity adjustments are no-ops", () => {
 		]);
 	}
 
-	each(
-		{ adjust: adjusts, layer: layers },
-		async ({ adjust, layer }) => {
-			const plain = await paintNode(layerScene(layer));
-			const adjusted = await paintNode(layerScene(layer, adjust.adjust));
-			expect(plain.warnings).toEqual([]);
-			expect(adjusted.warnings).toEqual([]);
-			expect(diff(plain.pixels, adjusted.pixels, 2).over).toBe(0);
-		},
-	);
+	each({ adjust: adjusts, layer: layers }, async ({ adjust, layer }) => {
+		const plain = await paintNode(layerScene(layer));
+		const adjusted = await paintNode(layerScene(layer, adjust.adjust));
+		expect(plain.warnings).toEqual([]);
+		expect(adjusted.warnings).toEqual([]);
+		expect(diff(plain.pixels, adjusted.pixels, 2).over).toBe(0);
+	});
 });
 
 describe("the mask clip shortcut and drawMasked paint the same", () => {
@@ -215,7 +213,10 @@ describe("the mask clip shortcut and drawMasked paint the same", () => {
 					fills: white,
 				}),
 		},
-		{ name: "ellipse", make: (b: Box) => createEllipse({ ...b, fills: white }) },
+		{
+			name: "ellipse",
+			make: (b: Box) => createEllipse({ ...b, fills: white }),
+		},
 	];
 	const placements = [
 		{ name: "aligned", offset: false },
@@ -245,7 +246,10 @@ describe("the mask clip shortcut and drawMasked paint the same", () => {
 
 	// drawMasked over the mask node's own box, built from the same prepared tree.
 	function general(node: MaskNode): Command[] {
-		const prepared = prepareScene(node, { textEngine, fontMetrics }) as MaskNode;
+		const prepared = prepareScene(node, {
+			textEngine,
+			fontMetrics,
+		}) as MaskNode;
 		const one = (n: Node) =>
 			compileScene(n, { width: W, height: H, prepared: true }).at(
 				-1,
@@ -304,22 +308,19 @@ describe("mask coverage is luminance times alpha", () => {
 		{ name: "ellipse", make: createEllipse },
 	];
 
-	each(
-		{ fill: fills, shape: shapes },
-		async ({ fill: f, shape }) => {
-			const out = await paintNode(
-				createMask(
-					shape.make({ ...at(0, 0, 80, 60), fills: solid(f.color) }),
-					[createRect({ ...at(0, 0, 80, 60), fills: solid("#ef4444") })],
-					{ ...at(20, 15, 80, 60), channel: f.channel },
-				),
-			);
-			expect(out.warnings).toEqual([]);
-			const alpha = (pixel(out, 60, 45)[3] ?? 0) / 255;
-			expect(Math.abs(alpha - f.coverage)).toBeLessThan(0.02);
-			expect(pixel(out, 5, 5)[3]).toBe(0);
-		},
-	);
+	each({ fill: fills, shape: shapes }, async ({ fill: f, shape }) => {
+		const out = await paintNode(
+			createMask(
+				shape.make({ ...at(0, 0, 80, 60), fills: solid(f.color) }),
+				[createRect({ ...at(0, 0, 80, 60), fills: solid("#ef4444") })],
+				{ ...at(20, 15, 80, 60), channel: f.channel },
+			),
+		);
+		expect(out.warnings).toEqual([]);
+		const alpha = (pixel(out, 60, 45)[3] ?? 0) / 255;
+		expect(Math.abs(alpha - f.coverage)).toBeLessThan(0.02);
+		expect(pixel(out, 5, 5)[3]).toBe(0);
+	});
 });
 
 describe("bounded and unbounded layers paint the same", () => {
@@ -328,31 +329,27 @@ describe("bounded and unbounded layers paint the same", () => {
 	// a bounded layer's new origin, as in layer-bounds.test.ts.
 	const ROUNDED_TOLERANCE = 32;
 
-	test.each(SEEDS)(
-		"seed %i",
-		async (seed) => {
-			const r = rng(seed);
-			const cfg = config(r);
-			const node = scene(r, LAYERED, cfg.size);
-			const commands = compileScene(node, {
-				...cfg.size,
-				textEngine,
-				fontMetrics,
-				scale: cfg.scale,
-				supersample: cfg.supersample,
-			});
-			setLayerBounds(false);
-			const unbounded = await paintCommands(commands);
-			setLayerBounds(true);
-			const bounded = await paintCommands(commands);
-			expect(bounded.warnings).toEqual(unbounded.warnings);
-			for (const w of bounded.warnings)
-				expect(w.kind, `seed ${seed}`).toBe("image_load_failed");
-			expect(
-				diff(bounded.pixels, unbounded.pixels, ROUNDED_TOLERANCE).over,
-				`seed ${seed}`,
-			).toBe(0);
-		},
-		60_000,
-	);
+	test.each(SEEDS)("seed %i", async (seed) => {
+		const r = rng(seed);
+		const cfg = config(r);
+		const node = scene(r, LAYERED, cfg.size);
+		const commands = compileScene(node, {
+			...cfg.size,
+			textEngine,
+			fontMetrics,
+			scale: cfg.scale,
+			supersample: cfg.supersample,
+		});
+		setLayerBounds(false);
+		const unbounded = await paintCommands(commands);
+		setLayerBounds(true);
+		const bounded = await paintCommands(commands);
+		expect(bounded.warnings).toEqual(unbounded.warnings);
+		for (const w of bounded.warnings)
+			expect(w.kind, `seed ${seed}`).toBe("image_load_failed");
+		expect(
+			diff(bounded.pixels, unbounded.pixels, ROUNDED_TOLERANCE).over,
+			`seed ${seed}`,
+		).toBe(0);
+	}, 60_000);
 });

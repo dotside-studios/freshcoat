@@ -78,7 +78,8 @@ export function sniffImageType(b: Uint8Array): string | null {
 	if (at(0, 0x47, 0x49, 0x46, 0x38)) return "image/gif";
 	if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50))
 		return "image/webp";
-	if (at(4, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66)) return "image/avif";
+	if (at(4, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66))
+		return "image/avif";
 	return null;
 }
 
@@ -226,8 +227,7 @@ export function jpegIccProfile(b: Uint8Array): Uint8Array | "none" | "invalid" {
  *  RGB, 4 for CMYK, or null when the header is not a profile's or names
  *  another space. */
 export function iccComponents(profile: Uint8Array): number | null {
-	if (profile.length < 128 || u32be(profile, 0) !== profile.length)
-		return null;
+	if (profile.length < 128 || u32be(profile, 0) !== profile.length) return null;
 	if (ascii(profile, 36, 4) !== "acsp") return null;
 	switch (ascii(profile, 16, 4)) {
 		case "GRAY":

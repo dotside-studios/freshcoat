@@ -517,11 +517,15 @@ describe("compile with resize", () => {
 			constraints: { horizontal: "stretch" },
 			properties: { d: "M0 0 L200 20 A10 10 0 0 1 180 0 Z", fill: "#000" },
 		};
-		const root = compile(template([wave]), {}, {
-			width: 300,
-			height: 100,
-			resize: { width: 300, height: 100 },
-		}).frames[0].root;
+		const root = compile(
+			template([wave]),
+			{},
+			{
+				width: 300,
+				height: 100,
+				resize: { width: 300, height: 100 },
+			},
+		).frames[0].root;
 		const node = findNode(root, "wave");
 		expect(node?.size).toEqual({ width: 300, height: 20 });
 		expect(node?.kind === "path" && node.d).toBe(

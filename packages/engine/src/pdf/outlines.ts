@@ -49,9 +49,14 @@ export function readOutlines(
 				({ version, tables } = readTables(fixed));
 			}
 			read = glyfOutlines(tables, count);
-		} else if (tables.has("CFF ")) read = cffOutlines(get(tables, "CFF "), count);
+		} else if (tables.has("CFF "))
+			read = cffOutlines(get(tables, "CFF "), count);
 		else if (tables.has("CFF2"))
-			read = cff2Outlines(get(tables, "CFF2"), count, normalize(tables, settings));
+			read = cff2Outlines(
+				get(tables, "CFF2"),
+				count,
+				normalize(tables, settings),
+			);
 		else return null;
 		const cache = new Map<number, GlyphPath | null>();
 		return {
@@ -137,7 +142,9 @@ function quadPath(contours: Point[][]): GlyphPath {
 		const first = c.findIndex((p) => p.on);
 		if (c.length === 0) continue;
 		const start =
-			first < 0 ? mid(c[c.length - 1] as Point, c[0] as Point) : (c[first] as Point);
+			first < 0
+				? mid(c[c.length - 1] as Point, c[0] as Point)
+				: (c[first] as Point);
 		const rest = first < 0 ? c : [...c.slice(first + 1), ...c.slice(0, first)];
 		let { x, y } = start;
 		out.push(0, x, y);
@@ -201,8 +208,10 @@ function readDict(b: Uint8Array): Dict {
 			}
 			args.push(Number(text));
 		} else if (c >= 32 && c <= 246) args.push(c - 139);
-		else if (c >= 247 && c <= 250) args.push((c - 247) * 256 + (b[i++] as number) + 108);
-		else if (c >= 251 && c <= 254) args.push(-(c - 251) * 256 - (b[i++] as number) - 108);
+		else if (c >= 247 && c <= 250)
+			args.push((c - 247) * 256 + (b[i++] as number) + 108);
+		else if (c >= 251 && c <= 254)
+			args.push(-(c - 251) * 256 - (b[i++] as number) - 108);
 		else if (c <= 27) {
 			out.set(c === 12 ? 1200 + (b[i++] as number) : c, args);
 			args = [];
@@ -219,7 +228,8 @@ function readIndex(dv: DataView, o: number, cff2: boolean) {
 	const size = dv.getUint8(head);
 	const offset = (i: number) => {
 		let v = 0;
-		for (let k = 0; k < size; k++) v = v * 256 + dv.getUint8(head + 1 + i * size + k);
+		for (let k = 0; k < size; k++)
+			v = v * 256 + dv.getUint8(head + 1 + i * size + k);
 		return v;
 	};
 	const base = head + (count + 1) * size;
@@ -314,7 +324,8 @@ function cff2Outlines(cff: Uint8Array, count: number, coords: number[]) {
 	const at = top.get(1237)?.[0];
 	const select = at === undefined ? () => 0 : fdSelect(dv, at);
 	const vstore = top.get(24)?.[0];
-	const scalars = vstore === undefined ? [] : blendScalars(dv, vstore + 2, coords);
+	const scalars =
+		vstore === undefined ? [] : blendScalars(dv, vstore + 2, coords);
 	return (g: number) =>
 		charstring(glyphs[g] as Uint8Array, global, fds[select(g)], true, scalars);
 }
@@ -389,7 +400,14 @@ function charstring(
 		y += dy;
 		out.push(1, x, y);
 	};
-	const curve = (a: number, b: number, c: number, d: number, e: number, f: number) => {
+	const curve = (
+		a: number,
+		b: number,
+		c: number,
+		d: number,
+		e: number,
+		f: number,
+	) => {
 		const x1 = x + a;
 		const y1 = y + b;
 		const x2 = x1 + c;
@@ -410,8 +428,10 @@ function charstring(
 			const b0 = bytes[i++] as number;
 			if (b0 >= 32 || b0 === 28) {
 				if (b0 <= 246) s.push(b0 === 28 ? dv.getInt16(i) : b0 - 139);
-				else if (b0 <= 250) s.push((b0 - 247) * 256 + (bytes[i] as number) + 108);
-				else if (b0 <= 254) s.push(-(b0 - 251) * 256 - (bytes[i] as number) - 108);
+				else if (b0 <= 250)
+					s.push((b0 - 247) * 256 + (bytes[i] as number) + 108);
+				else if (b0 <= 254)
+					s.push(-(b0 - 251) * 256 - (bytes[i] as number) - 108);
 				else s.push(dv.getInt32(i) / 65536);
 				i += b0 === 28 ? 2 : b0 === 255 ? 4 : b0 >= 247 ? 1 : 0;
 				if (s.length > MAX_STACK) throw new Error("stack overflow");

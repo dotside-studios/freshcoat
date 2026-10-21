@@ -5,10 +5,10 @@ import {
 	buildAdjust,
 	type ChildLayout,
 	type EllipseNode,
-	type Grain,
-	type Halftone,
 	FALLBACK_LINE_HEIGHT,
+	type Grain,
 	type GroupNode,
+	type Halftone,
 	type ImageNode,
 	isEllipsePath,
 	type MaskNode,
@@ -17,13 +17,13 @@ import {
 	type PathNode,
 	parseColor,
 	patternFill,
-	roundCorners,
 	type RectNode,
+	roundCorners,
+	type Layout as SceneLayout,
 	scalePathData,
 	strokeTrim,
 	type TextNode,
 	type TrackSize,
-	type Layout as SceneLayout,
 } from "@freshcoat-js/engine";
 import { encodeBarcode } from "./barcode";
 import {
@@ -45,14 +45,14 @@ import { applyBooleans } from "./boolean";
 import { leadColor, linearPoints } from "./fills";
 import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
 import { parseImageFocus } from "./image-focus";
-import { fieldContext, prepareTemplate } from "./prepare";
 import { substitute } from "./mustache";
+import { pieceBox, pieceFrame, pieceSize } from "./piece";
+import { fieldContext, prepareTemplate } from "./prepare";
+import type { PrintCheckWarning } from "./print-checks";
 import { DEFAULT_QR_STYLE, type QrStyle, qrSymbol } from "./qr";
 import { qrIssues } from "./qr-checks";
-import { pieceBox, pieceFrame, pieceSize } from "./piece";
 import { resolveStrokeTrim, type StrokeTrimInput } from "./stroke-trim";
 import { strokeSides, widestStroke } from "./stroke-width";
-import type { PrintCheckWarning } from "./print-checks";
 import { walkElements } from "./tree";
 import type {
 	Background,
@@ -69,15 +69,15 @@ import type {
 	FrameFlexLayout,
 	Gradient,
 	GradientFill,
-	QrFinderInner,
-	QrFinderOuter,
-	QrLogo,
-	QrModuleShape,
 	GridTrack,
 	ImageCrop,
 	LayerSpot,
 	Layout,
 	LayoutChild,
+	QrFinderInner,
+	QrFinderOuter,
+	QrLogo,
+	QrModuleShape,
 	ResolvedFill,
 	ResolvedFont,
 	Shadow,
@@ -302,9 +302,7 @@ function compileFrame(
 		assets: { fonts, images: [...images] },
 		root,
 		...(scope.warnings.length > 0 ? { warnings: scope.warnings } : {}),
-		...(scope.printChecks.length > 0
-			? { printChecks: scope.printChecks }
-			: {}),
+		...(scope.printChecks.length > 0 ? { printChecks: scope.printChecks } : {}),
 	};
 }
 
@@ -626,10 +624,7 @@ function compileArc(arc: TextArcInput, ratio: number): TextNode["arc"] {
 
 type TextPathInput = NonNullable<TextProperties["path"]>;
 
-function compileTextPath(
-	path: TextPathInput,
-	ratio: number,
-): TextNode["path"] {
+function compileTextPath(path: TextPathInput, ratio: number): TextNode["path"] {
 	return {
 		...(path.d !== undefined ? { d: scalePathString(path.d, ratio) } : {}),
 		...(path.ref !== undefined ? { ref: path.ref } : {}),
@@ -1416,8 +1411,7 @@ function applySpot(
 		const raw = props.fill as Fill | Fill[] | undefined;
 		const lead = Array.isArray(raw) ? raw[0] : raw;
 		const color = spot.fill.alt ?? (lead !== undefined ? leadColor(lead) : "");
-		if (color)
-			fills = [{ kind: "solid", color, spot: ink(spot.fill) }];
+		if (color) fills = [{ kind: "solid", color, spot: ink(spot.fill) }];
 	}
 	if (spot.stroke && stroke) {
 		const { gradient: _, ...solid } = stroke;
@@ -1485,9 +1479,7 @@ function lowerEffects(
 						? { origin: page }
 						: {}),
 					color: halftone.color ?? "#000000",
-					...(halftone.background
-						? { background: halftone.background }
-						: {}),
+					...(halftone.background ? { background: halftone.background } : {}),
 				}
 			: undefined,
 	};
