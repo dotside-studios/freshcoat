@@ -21,7 +21,7 @@ these commands from `apps/editor/`:
 | `bun run preview` | Serves the built site on port 3010 |
 | `bun run test` | Unit tests with Vitest and jsdom |
 | `bun run typecheck` | TypeScript checks |
-| `bun run e2e` | Browser end-to-end tests |
+| `bun run e2e` | Browser end-to-end tests, without the benchmark |
 | `bun run e2e:smoke` | The browser subset used by CI, including the Firefox and WebKit smoke tests |
 | `bun run e2e:cross-browser` | Only the Firefox and WebKit smoke tests |
 | `bun run fonts:update` | Refreshes `src/fonts/google-fonts.json` |
@@ -81,11 +81,13 @@ For a UI change, inspect both themes and the relevant viewport sizes.
 
 ```sh
 bunx playwright test e2e/screenshots.spec.ts --grep "desktop light"
-FRESHCOAT_PREVIEW=1 bunx playwright test e2e/bench.spec.ts
+bun run e2e:bench
 bunx vitest bench --run src/tests/perf
 ```
 
-The running app also exposes `/bench?sample=<id>&frames=<n>`.
+`e2e:bench` runs `e2e/bench.spec.ts`, the `bench` project, against the
+production build; the `desktop` project leaves it out. The running app also
+exposes `/bench?sample=<id>&frames=<n>`.
 [Performance](docs/performance.md) records earlier measurements and their
 conditions. For a hot-path change, report new before-and-after measurements.
 

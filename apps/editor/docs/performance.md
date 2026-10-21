@@ -133,9 +133,9 @@ with a barcode opens or the Barcode tool is chosen.
 
 Open `/bench?sample=<id>&frames=<n>` in a running editor to time a bundled
 sample: awaited edits, a drag of `n` frames at the display's rate, and
-typing. From `apps/editor/`,
-`bunx playwright test e2e/bench.spec.ts` with `FRESHCOAT_PREVIEW=1` runs the
-benchmark against the production build. It records the numbers, and fails only
-on gross regressions. In that mode the build is `vite build --mode e2e`, the
+typing. From `apps/editor/`, `bun run e2e:bench` runs the benchmark, the
+`bench` Playwright project, against the production build. The `desktop`
+project leaves it out. It records the numbers, and fails only on gross
+regressions. In that mode the build is `vite build --mode e2e`, the
 production build plus the e2e probes as modules of their own, so every spec
 runs against it too.

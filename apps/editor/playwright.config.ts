@@ -6,6 +6,16 @@ const port = Number(process.env.FRESHCOAT_PORT ?? 3010);
 // should measure: React's development build costs several times as much.
 const preview = !!process.env.FRESHCOAT_PREVIEW;
 
+const BENCH = /bench\.spec\.ts$/;
+const chromium = {
+	...devices["Desktop Chrome"],
+	viewport: { width: 1440, height: 900 },
+	launchOptions: {
+		...(executablePath ? { executablePath } : {}),
+		args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+	},
+};
+
 export default defineConfig({
 	testDir: "./e2e",
 	timeout: 60_000,
@@ -24,14 +34,14 @@ export default defineConfig({
 	projects: [
 		{
 			name: "desktop",
-			use: {
-				...devices["Desktop Chrome"],
-				viewport: { width: 1440, height: 900 },
-				launchOptions: {
-					...(executablePath ? { executablePath } : {}),
-					args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
-				},
-			},
+			testIgnore: BENCH,
+			use: chromium,
+		},
+		// Timings for e2e:bench: slow and machine-bound, so not in desktop.
+		{
+			name: "bench",
+			testMatch: BENCH,
+			use: chromium,
 		},
 		{
 			name: "firefox",
