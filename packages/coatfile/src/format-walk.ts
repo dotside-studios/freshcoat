@@ -182,11 +182,12 @@ export function schemaPaths(schema: Schema): SchemaPath[] {
 			at = inner(at);
 		}
 		const effective = own ?? since;
-		out.push({
-			path,
-			...(effective && { since: effective }),
-			...(own && { feature: name }),
-		});
+		if (path)
+			out.push({
+				path,
+				...(effective && { since: effective }),
+				...(own && { feature: name }),
+			});
 		if (!effective) {
 			if (expanded.has(node)) return;
 			expanded.add(node);
