@@ -355,7 +355,10 @@ test("a photo pulled into printer range says how much, in the preview and the re
 
 	const out = await exportZip(page);
 	expect(out.report).toHaveLength(2);
-	expect(out.report[1]).toMatch(/,ok,,on,\d+%,,$/);
+	// Studio checks a minimum of 300 DPI since #244, which the small photo misses.
+	expect(out.report[1]).toMatch(
+		/,ok,,on,\d+%,,"Image prints at \d+ DPI, under 300: photo"$/,
+	);
 });
 
 /** The PNG with every color channel scaled, as a photo exposed below the
