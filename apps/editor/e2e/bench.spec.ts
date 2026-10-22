@@ -148,12 +148,11 @@ test("bench: watermark 200 photos", async ({ page }, info) => {
 	}
 });
 
-// The largest CSV of 20 columns the 100,000-row import limit of #255 takes,
-// header included, read and imported as the wizard does it: in the import
-// worker, and on the page for comparison.
-const IMPORT_RECORDS = 99_999;
+// A CSV of 100,000 records and 20 columns, read and imported as the wizard
+// does it: in the import worker, and on the page for comparison.
+const IMPORT_RECORDS = 100_000;
 
-test("bench: import a 99,999-record CSV", async ({ page }, info) => {
+test("bench: import a 100,000-record CSV", async ({ page }, info) => {
 	test.setTimeout(300_000);
 	await page.goto("/");
 	await page.waitForLoadState("networkidle");
