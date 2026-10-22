@@ -8,6 +8,7 @@ import {
 import { compiledPattern, textRuleBreaks } from "../src/text-rules";
 
 const TIME_LIMIT_MS = 100;
+const CHAIN = "(?:.|a)".repeat(10);
 
 function timeMatch(pattern: string, input: string): number {
 	const re = compiledPattern(pattern) as RegExp;
@@ -35,6 +36,12 @@ describe("catastrophic patterns are refused", () => {
 		[`^${"(?:.|a)".repeat(30)}$`, "a".repeat(31), "ambiguous_alternatives"],
 		[`^${"(?:\\d|\\w)".repeat(30)}$`, "1".repeat(31), "ambiguous_alternatives"],
 		[`^${"(?:.|a){5}".repeat(6)}$`, "a".repeat(31), "ambiguous_alternatives"],
+		[`.*${CHAIN}b`, "a".repeat(10_000), "adjacent_quantifiers"],
+		[`\\w*${CHAIN}b`, "a".repeat(2_000), "adjacent_quantifiers"],
+		[`.*${"(?:.|a)".repeat(3)}b`, "a".repeat(2_000), "adjacent_quantifiers"],
+		[`\\w{0,40}${CHAIN}b`, "a".repeat(2_000), "adjacent_quantifiers"],
+		[`[a-z]+${CHAIN}b`, "a".repeat(2_000), "adjacent_quantifiers"],
+		[`${CHAIN}.*b`, "a".repeat(2_000), "ambiguous_alternatives"],
 		["^(?i:a|A)*$", `${"a".repeat(40)}!`, "modifier_group"],
 		["^(?-i:a|.)*$", `${"a".repeat(40)}!`, "modifier_group"],
 		["^(?ims:x)$", "x", "modifier_group"],
@@ -76,6 +83,9 @@ describe("common safe patterns are accepted", () => {
 		[`^${"(?:.|a)".repeat(10)}.*$`, `${"a".repeat(9_000)}\n`],
 		["^[^\\s@]+@[^\\s@]+\\.[^\\s@.]+$", `a@${".".repeat(9_000)}`],
 		["^\\d+\\.\\d+\\.\\d+\\.\\d+$", `${"1.".repeat(4_500)}x`],
+		[".*(?:jpg|jpeg)$", `${"j".repeat(9_000)}!`],
+		["(?:Mr|Mrs)\\.?\\s+\\w+", `${"Mr ".repeat(3_000)}!`],
+		[`${CHAIN}b`, "a".repeat(9_000)],
 	];
 
 	test.each(safe)("%p", (pattern, input) => {
@@ -93,6 +103,16 @@ describe("guarded input cap", () => {
 		const ip = "^(\\d{1,3}\\.){3}\\d{1,3}$";
 		expect(patternInputMaxLength(ip)).toBe(PATTERN_GUARDED_INPUT_MAX_LENGTH);
 		expect(patternInputMaxLength("^[A-Z]+$")).toBe(PATTERN_INPUT_MAX_LENGTH);
+	});
+
+	test("ambiguous chains get the lower cap", () => {
+		for (const pattern of [`${CHAIN}b`, `^${CHAIN}.*$`, ".*(?:jpg|jpeg)$"])
+			expect(patternInputMaxLength(pattern)).toBe(
+				PATTERN_GUARDED_INPUT_MAX_LENGTH,
+			);
+		expect(patternInputMaxLength("^(png|jpg|gif)$")).toBe(
+			PATTERN_INPUT_MAX_LENGTH,
+		);
 	});
 
 	test("values past the guarded cap never match", () => {

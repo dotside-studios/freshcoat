@@ -1245,7 +1245,11 @@ Patterns are checked before they compile, so a pattern cannot stall validation:
   (a class, `.` or an escape) counts as overlapping.
 - A pattern that chains enough groups with overlapping alternatives to split
   a value more than 1,024 ways, such as eleven `(?:.|a)` in a row, is refused,
-  even without an outer repeat.
+  even without an outer repeat. A variable quantifier before the chain that
+  can stop on the chain's first characters counts as 256 ways, so
+  `.*(?:.|a)(?:.|a)(?:.|a)b` is refused. In a pattern that does not start with
+  `^`, a variable quantifier after the chain also counts as 256 ways, so
+  `(?:.|a)(?:.|a)(?:.|a).*b` is refused.
 - A pattern that puts two variable quantifiers able to match the same
   character next to each other, such as `\d*\d*` or `.*a.*`, is refused.
 - A pattern with an inline modifier group (`(?i:...)`, `(?-i:...)`) is
@@ -1253,7 +1257,8 @@ Patterns are checked before they compile, so a pattern cannot stall validation:
 - A pattern with a backreference (`\1`, `\k<name>`) is refused.
 - A value over 10,000 characters (`PATTERN_INPUT_MAX_LENGTH`) never matches a
   pattern. A pattern accepted only because a bounded repeat keeps its
-  backtracking small, such as `^(\d{1,3}\.){3}\d{1,3}$`, has a lower cap of
+  backtracking small, such as `^(\d{1,3}\.){3}\d{1,3}$`, or one with a group
+  whose alternatives may overlap, such as `^(?:\d+|\.\d+)fr$`, has a lower cap of
   256 characters (`PATTERN_GUARDED_INPUT_MAX_LENGTH`);
   `patternInputMaxLength(pattern)` returns the cap for a pattern.
 

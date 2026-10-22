@@ -25,7 +25,7 @@ const SPLIT_BUDGET = 1024;
 
 type Node =
 	| { kind: "atom"; raw: string }
-	| { kind: "assertion" }
+	| { kind: "assertion"; start?: boolean }
 	| { kind: "group"; alts: Node[][]; lookaround: boolean }
 	| { kind: "repeat"; node: Node; min: number; max: number };
 
@@ -132,7 +132,7 @@ function parse(pattern: string): Node[][] {
 		}
 		if (ch === "^" || ch === "$") {
 			i++;
-			return { kind: "assertion" };
+			return { kind: "assertion", start: ch === "^" };
 		}
 		i += (pattern.codePointAt(i) as number) > 0xffff ? 2 : 1;
 		return { kind: "atom", raw: pattern.slice(start, i) };
@@ -190,6 +190,13 @@ function compile(source: string, flags: string): RegExp | null {
 }
 
 function analyze(pattern: string): { guarded: boolean } {
+	const tree = parse(pattern);
+	// An unanchored pattern is retried from every offset, so a variable tail
+	// after an ambiguous chain runs once per way the chain splits.
+	const anchored = tree.every((seq) => {
+		const head = seq[0];
+		return head?.kind === "assertion" && head.start === true;
+	});
 	const probes = probesFor(pattern);
 	const ALL = (1n << BigInt(probes.length)) - 1n;
 	const masks = new Map<string, bigint>();
@@ -234,10 +241,21 @@ function analyze(pattern: string): { guarded: boolean } {
 			guarded: false,
 		};
 		let live = 0n;
+		let widened = false;
+		let tailed = false;
 		for (const node of seq) {
 			const n = info(node);
 			if ((live & n.lead) !== 0n) throw new Unsafe("adjacent_quantifiers");
+			if (n.choices > 1 && !widened && (live & n.first) !== 0n) {
+				out.choices *= PATTERN_GUARDED_INPUT_MAX_LENGTH;
+				widened = true;
+			}
+			if (!anchored && !tailed && out.choices > 1 && n.lead !== 0n) {
+				out.choices *= PATTERN_GUARDED_INPUT_MAX_LENGTH;
+				tailed = true;
+			}
 			live = (live & n.pass) | n.trail;
+			if (live === 0n) widened = false;
 			out.chars |= n.chars;
 			if (out.nullable) out.first |= n.first;
 			out.last = n.nullable ? out.last | n.last : n.last;
@@ -250,7 +268,11 @@ function analyze(pattern: string): { guarded: boolean } {
 			out.choices *= n.choices;
 			out.guarded ||= n.guarded;
 		}
-		if (out.choices > SPLIT_BUDGET) throw new Unsafe("ambiguous_alternatives");
+		if (out.choices > SPLIT_BUDGET)
+			throw new Unsafe(
+				widened ? "adjacent_quantifiers" : "ambiguous_alternatives",
+			);
+		if (out.choices > 1) out.guarded = true;
 		return out;
 	};
 
@@ -365,7 +387,7 @@ function analyze(pattern: string): { guarded: boolean } {
 		};
 	};
 
-	return { guarded: group(parse(pattern)).guarded };
+	return { guarded: group(tree).guarded };
 }
 
 type Verdict = { reason: UnsafePatternReason | null; guarded: boolean };
@@ -397,9 +419,10 @@ function verdict(pattern: string): Verdict {
  *  long, that use backreferences, that repeat a group which itself repeats or
  *  whose alternatives may overlap (`(a+)+`, `(a|aa)*`, `(\w|\d)*`,
  *  `(.*a){20}`), that chain enough overlapping alternatives to split a value
- *  more than 1024 ways (`(?:.|a)` eleven times), that use inline modifier
- *  groups (`(?i:a|A)`), and that put two variable quantifiers able to match the same
- *  character next to each other (`\d*\d*`, `.*a.*`). */
+ *  more than 1024 ways (`(?:.|a)` eleven times, or three after `.*`), that
+ *  use inline modifier groups (`(?i:a|A)`), and that put two variable
+ *  quantifiers able to match the same character next to each other
+ *  (`\d*\d*`, `.*a.*`). */
 export function unsafePatternReason(
 	pattern: string,
 ): UnsafePatternReason | null {
@@ -408,7 +431,8 @@ export function unsafePatternReason(
 
 /** The longest value a pattern is tested against. Patterns that pass only
  *  because a bounded repeat keeps their backtracking small, such as
- *  `^(\d{1,3}\.){3}\d{1,3}$`, get the lower guarded cap. */
+ *  `^(\d{1,3}\.){3}\d{1,3}$`, and patterns with overlapping alternatives get
+ *  the lower guarded cap. */
 export function patternInputMaxLength(pattern: string): number {
 	return verdict(pattern).guarded
 		? PATTERN_GUARDED_INPUT_MAX_LENGTH
