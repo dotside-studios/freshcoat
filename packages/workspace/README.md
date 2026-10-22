@@ -257,8 +257,15 @@ renders one item at a time on the calling thread, or through `pool`, a
 `createItemRenderer` and the fonts; `renderer` still checks glyphs then. The renderer is the host's, so its `load`
 decides where image sources that are not dataset photos come from. Without
 an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
-it to a path, the zip as it renders, and deletes the partial file when the
-job is cancelled or fails. A PDF is held in memory until it is built: once its
+it to `<path>.<pid>.tmp` beside the path, the zip as it renders, and renames
+that over the path once the job succeeds, so a cancelled or failed job leaves
+an existing file as it was and removes only the temporary file. A symlinked
+path keeps its link: the file it points to is replaced. The replaced file's
+mode carries over. An `ExportOutput` of the host's own follows the same
+contract: after the last `sink()` write or `save()`, `exportWorkspace` calls
+`commit()` once the job finishes, even with failed items, to make the output
+final, and `discard()` when the job is cancelled or throws, `commit()`
+included, to remove what was written and leave anything already there. A PDF is held in memory until it is built: once its
 first `PDF_SAMPLE_PAGES` items are rendered, `confirmLargePdf` is asked with the
 whole PDF's estimated size when that is over `largePdfBytes` (default
 `PDF_CONFIRM_BYTES`, 1 GiB), and false cancels the job.
