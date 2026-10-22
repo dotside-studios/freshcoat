@@ -35,6 +35,73 @@ These land in the next release's notes.
   "json")` now returns a promise, as the `"coat"` form already did. Migration:
   `await` it.
 
+- **Narrower engine and coatfile APIs (breaking).** Each package root now
+  holds what its README documents plus the types its public functions take
+  and return. Helpers that only other Freshcoat packages use moved to a new
+  `./internal` subpath, which is unstable and not for applications.
+  - Engine, moved to `@freshcoat-js/engine/internal`: `applyAdjustColor`,
+    `concatColorMatrix`, `contrastMatrix`, `identityColorMatrix`,
+    `saturationMatrix`, `ColorMatrix`, `resolveDirection`, `combineShapes`,
+    `BooleanOp`, `BooleanOperand`, `BooleanShape`, `cr80Pixels`, `mixColor`,
+    `parseColor`, `toHex`, `MAX_SUPERSAMPLE`, `resolveExportScale`,
+    `resolveSupersample`, `withExportScale`, `clearFontBytesCache`,
+    `policyFetch`, `resolveFontRequest`, `createSharedFontProvider`,
+    `makeParagraphBuilder`, `SharedFontProvider`, `getFontMetrics`,
+    `readFontMetrics`, `registerFontMetrics`, `linearGradientAngle`,
+    `linearGradientPoints`, `FALLBACK_LINE_HEIGHT`, `base64ToBytes`,
+    `bytesToBase64`, `inheritLoaderPolicy`, `modulePixels`, `ellipsePath`,
+    `isEllipsePath`, `outlineGeometry`, `outlinePath`, `outlineSvg`,
+    `rectShape`, `sideStrokeGeometry`, `OutlineGeometry`,
+    `SideStrokeGeometry`, `fitRect`, `strokeInset`, `resolveLayout`,
+    `rotatedFootprint`, `roundCorners`, `applyCase`, `applySpanCase`,
+    `ApplyCaseOptions`, `TextCase`, `spanTextStyle`, `toColor`, `strokeTrim`,
+    `trimPath`, `StrokeTrim`.
+  - Engine, now only on their own subpath: `scalePathData` on
+    `@freshcoat-js/engine/path`; `readIccProfile`, `resolveOutputIntent`,
+    `ResolvedOutputIntent`, `SRGB_OUTPUT_INTENT`, `SRGB_PROFILE`,
+    `IccColorSpace`, `IccProfileInfo` and `IccProfileResult` on
+    `@freshcoat-js/engine/icc`; `DEFAULT_MAX_IMAGE_DECODE_PIXELS` on
+    `@freshcoat-js/engine/image`.
+  - Engine, no longer exported: `brightnessMatrix`, `gammaLut`,
+    `identityLut3d`, `bakeText`, `BakeTextOptions`, `resolveLeadingTrim`,
+    `textClipOutset`, `hslToRgb`, `Rgba`, `DEFAULT_PRECISION`,
+    `prepareScene`, `sceneAssets`, `ColorResolver`, `oklchToHex`,
+    `parseCssColor`, `parseLinearGradient`, `drawImageToPixels`,
+    `flattenOverWhite`, `autoLineHeight`, `MetricsLookup`, `metricsLookup`,
+    `resolveAutoLineHeights`, `assertLoadableUrl`, `dataUrlToBytes`,
+    `createPaintCache`, `PaintCache`, `DecorationMetrics`, `decorationLine`,
+    `FitOptions`, `insetCorner`, `skipInkSegments`, `DEFAULT_JPEG_QUALITY`,
+    `DEFAULT_WEBP_QUALITY`, `encodeDecodedPng`, `squircleSvg`,
+    `FontWeightName`, `fontWeight`, `fontWeightName`, `IrIssue`,
+    `validateCommands`. A renderer makes its own paint cache from `cache`.
+  - Engine test switches: `setCpuFinish` and `setLayerBounds` are gone. The
+    painter takes `switches: { cpuFinish, layerBounds }` per paint.
+  - Coatfile no longer re-exports engine symbols. Import these from
+    `@freshcoat-js/engine`: `approxEngine`, `encodePng`, `exportPixelSize`,
+    `MAX_EXPORT_DIMENSION`, `fontRequestKey`, `googleCss2Url`,
+    `googleFamilyParam`, `CR80_CORNER_MM`, `CR80_LONG_MM`, `CR80_SAFE_MM`,
+    `CR80_SHORT_MM`, `MM_PER_INCH`, and every engine type coatfile passed
+    through (`Command`, `DrawCommand`, `Renderer`, `TextEngine`, `Vec2`,
+    `Size`, `FontRequest`, `GradientStop`, `ExportSetting`,
+    `EncodePngOptions` and the rest). The others it re-exported
+    (`applyCase`, `ellipsePath`, `isEllipsePath`, `linearGradientAngle`,
+    `linearGradientPoints`, `MAX_SUPERSAMPLE`, `resolveExportScale`,
+    `resolveSupersample`, `getFontMetrics`, `readFontMetrics`,
+    `registerFontMetrics`, `base64ToBytes`, `bytesToBase64`) are on
+    `@freshcoat-js/engine/internal`; `createPaintCache` is gone.
+  - Coatfile subpaths removed, since everything on them is on the root and
+    none was a lightweight entry: `./assets`, `./define`, `./fields`,
+    `./normalize` and `./slices`. Import from `@freshcoat-js/coatfile`.
+    `unwrapLegacyBundle` and `hasOpenSubpath` are no longer exported.
+  - Coatfile, moved to `@freshcoat-js/coatfile/internal`: `applyBooleans`,
+    `cachePathOp`, `barcodeBox`, `resizeVectorBoolean`, `resizeVectorPath`,
+    `pieceSpec`, `sliceLayers`, `isOpenVector`, `resolveStrokeTrim`,
+    `ResolvedStrokeTrim`, `textRuleBreaks`, `TextRuleBreak`,
+    `activeVariantId`.
+  - Coatfile, no longer exported: `constrainBox`, `resizeElements`,
+    `fieldContext`, `isLightFace`, `POINTS_PER_INCH`, `generateMatrix`,
+    `parseTrimValue`, `StrokeTrimInput`, `compiledPattern`.
+
 - **Safer defaults for untrusted templates.** The engine's default loader
   accepts only `data:`, `blob:` and `https:`. See
   [safer defaults](security-defaults.md).

@@ -454,7 +454,7 @@ subpath.
 
 | Subpath | What it is |
 |---|---|
-| `@freshcoat-js/engine` | `createRenderer`, node types, `compileScene`, layout, adjust and export-scale math, byte loaders, CR80 card size (`CR80_LONG_MM`, `CR80_SHORT_MM`, `cr80Pixels(dpi)`, …) |
+| `@freshcoat-js/engine` | `createRenderer`, node and command types, `compileScene`, `buildAdjust` and `composeAdjust`, `exportPixelSize`, byte loaders, font requests, `encodePng`, CR80 card size (`CR80_LONG_MM`, `CR80_SHORT_MM`, …) |
 | `@freshcoat-js/engine/node` | `loadCanvasKit`, `initCanvasKit`, `fileLoader`, `canvasKitBinDir` for Node and Bun |
 | `@freshcoat-js/engine/browser` | `loadCanvasKit(baseUrl)` for a page or a worker |
 | `@freshcoat-js/engine/path` | SVG path data parsing and maths |
@@ -463,6 +463,7 @@ subpath.
 | `@freshcoat-js/engine/svg/sniff` | `isSvg` alone, to sniff a source without loading the parser |
 | `@freshcoat-js/engine/icc` | `SRGB_PROFILE`, the bundled sRGB profile; `readIccProfile`, which checks a profile can be a PDF's destination output profile and reads its description; `SRGB_OUTPUT_INTENT` and `resolveOutputIntent` |
 | `@freshcoat-js/engine/image` | PNG, JPEG, GIF, WebP, BMP, ICO, WBMP and AVIF size, EXIF orientation and capture time read from the file header, image type sniffing, `rgbIdat` for passing an RGB PNG's data through as is, and `jpegFrame`, `jpegIccProfile` and `iccComponents` for passing a JPEG through with its ICC profile |
+| `@freshcoat-js/engine/internal` | Helpers the other Freshcoat packages share. Unstable: it can change or lose exports in any release, minor and patch included, so applications should not import it |
 
 ## Staying warm
 

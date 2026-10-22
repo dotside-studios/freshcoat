@@ -75,6 +75,9 @@ An SVG picture counts as the rasters it embeds plus a fixed cost for its
 recorded drawing.
 
 ```ts
+import { createRenderer } from "@freshcoat-js/engine";
+import { renderTemplate } from "@freshcoat-js/coatfile/render";
+
 const renderer = await createRenderer({ ck, cache: { maxImagePixels: 48_000_000 } });
 for (const record of records)
   await renderTemplate(renderer, template, record, { frameNames: ["front"] });
@@ -93,6 +96,8 @@ and text shaping all happen there. `exports` is the density that compiled scene 
 **rasterized** at, exactly like a row in Figma's export panel:
 
 ```ts
+import { renderTemplate } from "@freshcoat-js/coatfile/render";
+
 const results = await renderTemplate(renderer, template, values, {
   width: 1012,
   height: 638,
@@ -284,7 +289,7 @@ same checks over compiled commands.
 For print, `cardSizeMm(width, height, dpi)` is a design's trim size in
 millimetres at a DPI, and `bleedMm(templateBleed(t), dpi)` is its bleed.
 The CR80 constants (`CR80_LONG_MM`, `CR80_SHORT_MM`, `CR80_CORNER_MM`,
-`CR80_SAFE_MM`) and `MM_PER_INCH` are re-exported from the engine.
+`CR80_SAFE_MM`) and `MM_PER_INCH` come from `@freshcoat-js/engine`.
 `pxToUnit`, `unitToPx` and `parseLength` convert design px to and from mm,
 in and pt at a DPI, and `resolveUnitSuffixes` rewrites `3mm` or `12pt` in
 typed text as numbers in another unit.
@@ -325,7 +330,7 @@ A consumer that wants a template backed by real URLs uploads the bytes and ends
 the inline state:
 
 ```ts
-import { detachAssets, readAssets } from "@freshcoat-js/coatfile/assets";
+import { detachAssets, readAssets } from "@freshcoat-js/coatfile";
 
 const urlByHash = await upload(readAssets(template));   // [{ sha256, blob, contentType }]
 const stored = detachAssets(template, urlByHash);       // srcs → URLs, `assets` gone
@@ -1439,11 +1444,13 @@ declared, including the families a variant's deltas and barcodes bring in.
 whether any of it is italic, across text, spans, barcodes and variants.
 `googleCss2Url(family, weights?, italic?)` builds the Google Fonts css2
 stylesheet URL for those, and `fontRequestKey(request)` names the bytes a
-request resolves to, for a cache. All three, with `defaultFontFamily`, also
-come from `@freshcoat-js/coatfile/fonts`, which leaves out the font loaders:
+request resolves to, for a cache. Those two come from
+`@freshcoat-js/engine`. `fontUsage` and `defaultFontFamily` also come from
+`@freshcoat-js/coatfile/fonts`, which leaves out the font loaders:
 
 ```ts
-import { fontUsage, googleCss2Url } from "@freshcoat-js/coatfile/fonts";
+import { googleCss2Url } from "@freshcoat-js/engine";
+import { fontUsage } from "@freshcoat-js/coatfile/fonts";
 
 for (const [family, { weights, italic }] of fontUsage(template))
 	console.log(googleCss2Url(family, weights, italic));
@@ -1729,6 +1736,12 @@ looking across span boundaries, so `élan émile` becomes `Élan Émile` and a w
 split over two spans keeps one capital. `applyCase(text, mode, prevChar?)`
 applies the same rule; pass `{ preserveLength: true }` to keep a character whose
 cased form changes length (`ß` in upper case), so string indices stay stable.
+
+## Internal
+
+`@freshcoat-js/coatfile/internal` holds helpers the other Freshcoat packages
+share. It is unstable: it can change or lose exports in any release, minor and
+patch included, so applications should not import it.
 
 ## Spec
 
