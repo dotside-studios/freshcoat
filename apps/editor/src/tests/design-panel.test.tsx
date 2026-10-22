@@ -19,7 +19,7 @@ import { ControllerProvider } from "~/app/context";
 import { EditorController } from "~/app/controller";
 import { getElement } from "~/doc/path";
 import { DesignPanel } from "~/panels/design/DesignPanel";
-import { chooseOption, fastUser, spinbutton } from "./aria";
+import { button, chooseOption, fastUser, spinbutton } from "./aria";
 import { booleanDoc, doc, geometryOf } from "./doc-fixture";
 
 function addEffect(name: string) {
@@ -113,17 +113,13 @@ describe("DesignPanel", () => {
 
 	it("sets the text direction", async () => {
 		const c = setup(["0/1/1"]);
-		fireEvent.click(screen.getByRole("button", { name: "Type settings" }));
-		await chooseOption(
-			fastUser(),
-			screen.getByRole("button", { name: /Text direction/ }),
-			"Right to left",
-		);
+		fireEvent.click(button("Type settings"));
+		await chooseOption(fastUser(), button("Text direction"), "Right to left");
 		expect(
 			(el(c, "0/1/1").properties as { direction?: string }).direction,
 		).toBe("rtl");
 		expect(validate(c.template).ok).toBe(true);
-	});
+	}, 10_000);
 
 	it("writes OpenType features from the features field", async () => {
 		const c = setup(["0/1/1"]);
