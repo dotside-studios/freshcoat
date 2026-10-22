@@ -270,12 +270,15 @@ The engine and workspace also add:
 
 ### CLI users
 
-- **PDF page cap (breaking).** `render` and workspace exports refuse a PDF of
-  more than 2000 pages before rendering or writing anything, exiting 1 with
-  no output file. **A job that wrote a PDF of more than 2000 pages in 0.4 now
-  fails.** Pages are counted as rendered, one per card side, before sheets are
-  laid out. `--max-pdf-pages <n>` raises the cap and `--max-pdf-pages 0`
-  removes it. The flag is a usage error for image presets.
+- **PDF card cap (breaking).** `render` and workspace exports refuse a PDF
+  that renders more than 2000 cards before rendering or writing anything,
+  exiting 1 with no output file, since every rendered card is held in memory
+  until the PDF is built. **A job that rendered more than 2000 cards into a
+  PDF in 0.4 now fails**, even on sheets where they fill far fewer pages.
+  Each card side counts once, before sheets are laid out; the message gives
+  the card count and, on sheets, the sheet count. `--max-pdf-cards <n>`
+  raises the cap and `--max-pdf-cards 0` removes it. The flag is a usage
+  error for image presets.
 - **Import limits (breaking).** `render --data` applies `readTable`'s limits:
   500,000 records, 500 columns, 10,000,000 cells and 128 MiB per file.
   `--max-rows <n>` raises the record limit and, above the default, the file
@@ -300,7 +303,7 @@ The engine and workspace also add:
   `--marks <list>`, `--min-dpi <n>`, `--back-offset <x,y>`, `--blank-backs`,
   `--print-target <target>`, `--output-intent <file>`,
   `--output-intent-id <name>`, `--no-output-intent`, `--cut-spot`,
-  `--max-rows <n>` and `--max-pdf-pages <n>`. See the [CLI
+  `--max-rows <n>` and `--max-pdf-cards <n>`. See the [CLI
   README](../packages/cli/README.md).
 
 ### Studio
