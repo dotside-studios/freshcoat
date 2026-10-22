@@ -172,4 +172,21 @@ describe("spot PDF", () => {
 		expect(body).toContain("[/Separation /White /DeviceRGB");
 		expect(body).toMatch(/<<\/OP true \/op true \/OPM 1>>/);
 	});
+
+	test("writes a name's # literally, so escapes cannot spell a reserved name", async () => {
+		const renderer = await createRenderer({ ck: await loadCanvasKit() });
+		const t = withLayers(
+			rect({
+				fill: "#ffffff",
+				spot: { fill: { spot: "#41ll" }, stroke: { spot: "N#6Fne" } },
+				stroke: { color: "#000000", width: 2 },
+			}),
+		);
+		expect(validate(t).ok).toBe(true);
+		const [page] = await renderCompiledPdf(renderer, compiled(t), { dpi: 72 });
+		const body = new TextDecoder("latin1").decode(page?.bytes);
+		expect(body).toContain("[/Separation /#2341ll /DeviceRGB");
+		expect(body).toContain("[/Separation /N#236Fne /DeviceRGB");
+		expect(body).not.toMatch(/\/Separation \/(All|None)\b/);
+	});
 });

@@ -963,6 +963,38 @@ describe("assemblePdf with cut lines", () => {
 			expect(new TextDecoder("latin1").decode(plain)).toContain("/Thru#20Cut");
 		});
 
+		it("writes a name's # literally, so escapes cannot spell a reserved name", async () => {
+			const bytes = await one({
+				cutSpots: { through: "#41ll", kiss: "Al#6C", perforate: "N#6Fne" },
+			});
+			const doc = await PDFDocument.load(bytes);
+			const [page] = doc.getPages() as [PDFPage];
+			expect(separation(page, "CutThrough").name).toBe("#41ll");
+			expect(separation(page, "CutPerforate").name).toBe("N#6Fne");
+			const plain = new TextDecoder("latin1").decode(
+				await doc.save({ useObjectStreams: false }),
+			);
+			expect(plain).toContain("/Separation /#2341ll");
+			expect(plain).toContain("/Separation /N#236Fne");
+			expect(plain).not.toMatch(/\/Separation \/(All|None)\b/);
+		});
+
+		it("round-trips a name holding # or characters past ASCII", async () => {
+			const bytes = await one({
+				cutSpots: { through: "PMS #12A", perforate: "Découpe €" },
+			});
+			const doc = await PDFDocument.load(bytes);
+			const [page] = doc.getPages() as [PDFPage];
+			expect(separation(page, "CutThrough").name).toBe("PMS #12A");
+			const spaces = page.node
+				.Resources()
+				?.lookup(PDFName.of("ColorSpace"), PDFDict);
+			const perforate = spaces
+				?.lookup(PDFName.of("CutPerforate"), PDFArray)
+				.lookup(1, PDFName);
+			expect(new TextDecoder().decode(perforate?.asBytes())).toBe("Découpe €");
+		});
+
 		it("writes one Separation per kind for the whole document", async () => {
 			const page = {
 				bytes: makePng(4, 3),
