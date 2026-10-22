@@ -206,6 +206,8 @@ in the renderer or the importer.
   of the file body, as PDF/X requires. Numbers are never written in exponent
   form. Every PDF the engine writes changes, so tests that compare PDF bytes
   need new goldens; with a fixed `date` the bytes are still repeatable.
+  Studio and CLI PDFs, assembled by `assemblePdf`, carry an `/ID` too, the
+  MD5 of the content and the creation date.
 - **Fonts that forbid embedding are outlined (output change).** In a vector
   PDF, a font whose OS/2 `fsType` sets Restricted License, No Subsetting or
   Bitmap Only is not embedded: its text is drawn as glyph outlines, which
@@ -227,8 +229,10 @@ in the renderer or the importer.
   stay in the Cut optional content group at 0.25 pt. Only their colour space
   changed, from DeviceRGB to the separations, plus the overprint ExtGState.
   Presets take `cutSpots`, the CLI `--cut-spot`, and Studio's Output tab a
-  name per kind to rename them. PDFs without cut lines are unchanged, and so
-  are SVG and DXF cut files.
+  name per kind to rename them. `All` and `None`, which PDF reserves for every
+  or no plate, are refused in any case by the CLI and Studio; a saved preset
+  naming one opens with that kind on its default name and a warning. PDFs
+  without cut lines are unchanged, and so are SVG and DXF cut files.
 - **Template spot colours (format 1.7).** A `rect` or `vector` can print its
   fill or stroke in a named spot ink with `spot`, for white ink, foil or
   varnish. A vector PDF paints it as a Separation, overprinting on request;
@@ -236,11 +240,12 @@ in the renderer or the importer.
   mixed with white as the Separation's tint transform does.
 - **Rasterized layers in vector PDFs are reported.** A layer a vector PDF
   draws as an image (shadow, blur, grain, halftone, gradient text stroke and
-  the like) used to pass without a word in an export. One that paints a spot
-  ink now warns for each item with the engine's new `spot_rasterized`, naming
-  the layer and the ink, as the separation is lost. The rest are listed once
-  per side: in `JobResult.rasterized`, as an `info` row per side in
-  `export-report.csv`, after a CLI export, and in Studio's export checks.
+  the like, or inside a mask) used to pass without a word in an export. One
+  that paints a spot ink, in its content or its mask, now warns for each
+  item with the engine's new `spot_rasterized`, naming the layer and the
+  ink, as the separation is lost. The rest are listed once per side: in
+  `JobResult.rasterized`, as an `info` row per side in `export-report.csv`,
+  after a CLI export, and in Studio's export checks.
 
 #### New in the format and the engine
 
