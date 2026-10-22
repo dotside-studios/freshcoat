@@ -166,8 +166,10 @@ export type ExportJobOptions = {
 	 *  back as `file` */
 	sink?: OutputSink;
 	/** Asked once three PDF pages are made, when the whole PDF would pass
-	 *  PDF_CONFIRM_BYTES; false cancels the job. */
+	 *  `largePdfBytes`; false cancels the job. */
 	confirmLargePdf?: (estimatedBytes: number) => Promise<boolean>;
+	/** default PDF_CONFIRM_BYTES */
+	largePdfBytes?: number;
 	/** what a PDF names as its creator; default Freshcoat Studio */
 	pdfCreator?: string;
 	now?: () => number;
@@ -176,7 +178,8 @@ export type ExportJobOptions = {
 export const REPORT_FILE_NAME = "export-report.csv";
 /** A PDF is assembled in memory, so past this it asks first. */
 export const PDF_CONFIRM_BYTES = 1024 ** 3;
-const PDF_SAMPLE_PAGES = 3;
+/** How many PDF pages a size estimate is taken from. */
+export const PDF_SAMPLE_PAGES = 3;
 
 const defaultAssemblePdf: AssemblePdf = async (pages, options, extras) =>
 	(await import("../pdf")).assemblePdf(pages, {
@@ -670,7 +673,7 @@ export function runExportJob(
 								asked = true;
 								const estimate = (collector.bytes / PDF_SAMPLE_PAGES) * total;
 								if (
-									estimate > PDF_CONFIRM_BYTES &&
+									estimate > (options.largePdfBytes ?? PDF_CONFIRM_BYTES) &&
 									!(await options.confirmLargePdf(estimate))
 								) {
 									abort();

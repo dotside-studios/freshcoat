@@ -235,7 +235,10 @@ renders one item at a time on the calling thread, or through `pool`, a
 decides where image sources that are not dataset photos come from. Without
 an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to a path, the zip as it renders, and deletes the partial file when the
-job is cancelled or fails.
+job is cancelled or fails. A PDF is held in memory until it is built: once its
+first `PDF_SAMPLE_PAGES` items are rendered, `confirmLargePdf` is asked with the
+whole PDF's estimated size when that is over `largePdfBytes` (default
+`PDF_CONFIRM_BYTES`, 1 GiB), and false cancels the job.
 
 When the preset has `markExported`, `result.workspace` is the workspace with
 the job's record statuses written: `exported` with the time for records whose

@@ -48,6 +48,11 @@ export type ExportWorkspaceOptions = {
 	now?: Date;
 	/** what a PDF names as its creator; default Freshcoat Studio */
 	pdfCreator?: string;
+	/** Asked once three PDF pages are made, when the whole PDF would pass
+	 *  `largePdfBytes`; false cancels the job. */
+	confirmLargePdf?: (estimatedBytes: number) => Promise<boolean>;
+	/** default PDF_CONFIRM_BYTES */
+	largePdfBytes?: number;
 };
 
 export type ExportWorkspaceResult = JobResult & {
@@ -120,6 +125,12 @@ export async function exportWorkspace(
 			...(signal ? { signal } : {}),
 			...(onProgress ? { onProgress } : {}),
 			...(options.pdfCreator ? { pdfCreator: options.pdfCreator } : {}),
+			...(options.confirmLargePdf
+				? { confirmLargePdf: options.confirmLargePdf }
+				: {}),
+			...(options.largePdfBytes !== undefined
+				? { largePdfBytes: options.largePdfBytes }
+				: {}),
 		});
 		const result: ExportWorkspaceResult = {
 			...job,

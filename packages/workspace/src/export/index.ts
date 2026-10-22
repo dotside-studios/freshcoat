@@ -50,6 +50,7 @@ export {
 	LARGE_IMAGE_PIXELS,
 	largestImagePixels,
 	PDF_CONFIRM_BYTES,
+	PDF_SAMPLE_PAGES,
 	type PoolSizeInput,
 	type RasterizedSide,
 	REPORT_FILE_NAME,
