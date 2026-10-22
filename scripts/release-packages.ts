@@ -22,6 +22,7 @@ export const packages = [
 ] as const;
 export const stagingRoot = join(root, "dist", "npm");
 export const artifactRoot = join(root, "dist", "releases");
+export const nodeEngine = ">=22";
 
 type Manifest = {
 	name: string;
@@ -166,6 +167,7 @@ export function publishedManifest(
 			"NOTICE",
 			"README.md",
 		],
+		engines: { node: nodeEngine },
 		publishConfig: { access: "public" },
 		...(bin
 			? {

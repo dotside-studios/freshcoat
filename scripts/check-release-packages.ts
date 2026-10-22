@@ -13,6 +13,7 @@ import { join } from "node:path";
 import {
 	artifactRoot,
 	manifest,
+	nodeEngine,
 	packages,
 	root,
 	run,
@@ -58,6 +59,8 @@ try {
 		const staged = JSON.parse(
 			readFileSync(join(stagingRoot, directory, "package.json"), "utf8"),
 		);
+		if (staged.engines?.node !== nodeEngine)
+			throw new Error(`${filename} must declare engines.node ${nodeEngine}`);
 		for (const path of Object.values(
 			(staged.bin ?? {}) as Record<string, string>,
 		)) {
