@@ -186,20 +186,25 @@ function toastReadFailed(): void {
 		tone: "danger",
 		timeout: 0,
 		actions: [
-			{ label: AUTOSAVE_COPY.retry, onAction: () => void rereadFailed() },
-			{ label: AUTOSAVE_COPY.discard, onAction: () => void discardFailed() },
+			{ label: AUTOSAVE_COPY.retry, onAction: () => void retryAutosaveRead() },
+			{
+				label: AUTOSAVE_COPY.discard,
+				onAction: () => void discardUnreadableAutosave(),
+			},
 		],
 	});
 }
 
-async function rereadFailed(): Promise<void> {
+/** Reads the stored autosave again after a failed read. */
+export async function retryAutosaveRead(): Promise<void> {
 	const read = await rereadAutosave();
 	if (read.status === "failed") toastReadFailed();
 	else if (read.status === "newer") toastNewerAutosave();
 	else if (read.status === "found") offerRecovered?.(read.autosave);
 }
 
-async function discardFailed(): Promise<void> {
+/** Deletes the stored autosave that couldn't be read, so autosave resumes. */
+export async function discardUnreadableAutosave(): Promise<void> {
 	try {
 		await discardAutosave();
 	} catch {
@@ -227,6 +232,11 @@ configureAutosave({
 	onReadProblem: (problem) =>
 		problem === "newer" ? toastNewerAutosave() : toastReadFailed(),
 	onWriteBlocked: toastReadFailed,
+	onPausedChange: (paused) => {
+		if (paused) return;
+		closeReadFailed?.();
+		closeReadFailed = undefined;
+	},
 	onStorageFull: () =>
 		toast("Storage full. Photos aren't autosaved.", {
 			tone: "warning",

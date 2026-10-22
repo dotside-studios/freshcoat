@@ -358,9 +358,12 @@ The engine and workspace also add:
   [`apps/editor/server.ts`](../apps/editor/server.ts) sends, including
   `'wasm-unsafe-eval'` and, on scripts, `'unsafe-eval'`.
 - **Autosave failures are shown, and stored work is kept.** A failed write shows a
-  persistent "Couldn't autosave" toast with Retry. An autosave that cannot be
-  read, or that a newer Studio wrote, is never overwritten. Pending changes are
-  saved when the tab is hidden or closed.
+  persistent "Couldn't autosave" toast with Retry. An autosave that a newer
+  Studio wrote is never overwritten, and one that cannot be read is never
+  overwritten unless you choose Discard old autosave. While it holds back new
+  edits, an "Autosave paused" indicator stays in the status bar with Retry and
+  Discard old autosave, and leaving the page with unsaved edits asks first.
+  Pending changes are saved when the tab is hidden or closed.
 - **Faster large exports.** The Export tab no longer re-renders settings,
   checks and records each time an item finishes, so the page stays responsive
   during large exports.
