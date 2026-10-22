@@ -1,6 +1,7 @@
 # Migrating to 0.5
 
-In 0.5, loaders refuse unsafe URL schemes, and the image, font and
+0.5 is safer for hosts that render templates, fonts, images and spreadsheets
+they did not write. Loaders refuse unsafe URL schemes, and the image, font and
 spreadsheet readers refuse input over new size limits. Coatfile throws one
 typed error, and the engine and coatfile package roots export only their
 documented API. The [release notes](releases.md#unreleased-changes) list
@@ -127,8 +128,8 @@ gives the full list for your code.
 
 ## Limits
 
-Each limit stops input that would exhaust memory. Raise one only for input
-you trust; `Number.POSITIVE_INFINITY` lifts it.
+Each limit refuses input large enough to exhaust memory. Raise one only for
+input you trust; `Number.POSITIVE_INFINITY` lifts it.
 
 ### Images
 
@@ -140,8 +141,8 @@ An image over the limit, or one whose header size cannot be read, paints a
 placeholder and reports `image_load_failed`. The header reader handles PNG,
 JPEG, GIF, WebP, BMP, ICO and CUR, WBMP and AVIF; HEIF is refused. Studio, the
 CLI and `exportWorkspace`'s worker pools use the default. A decoded image
-takes 4 bytes per pixel of CanvasKit's 2 GiB heap, so one image at 400,000,000
-pixels needs about 1.6 GB.
+takes 4 bytes per pixel from CanvasKit's 2 GiB heap, so a 400,000,000-pixel
+image needs about 1.6 GB of it.
 
 ### Fonts
 
@@ -192,8 +193,8 @@ lifts all four. Columns and zip entries keep their limits.
 `--max-pdf-pages` defaults to 2000. **A job that wrote a larger PDF in 0.4 now
 exits 1 with no output.** Pass a higher limit or `--max-pdf-pages 0` to restore
 the old behaviour. The CLI holds every page in memory until it builds the
-PDF, so a very large one can still run out of memory; split it with `--where`
-instead.
+PDF, so a very large one can still run out of memory; to avoid that, split the
+export with `--where`.
 
 For scripts that check exit codes: Ctrl-C now exits 130 and SIGTERM 143, and
 a cancelled export removes its partial file.
@@ -219,9 +220,10 @@ A `$schema` pinned to `@0.4.0` keeps working.
 
 ## Output that changes
 
-These need no code changes. Goldens and byte comparisons will differ.
+Nothing here needs a code change, but goldens and byte comparisons will
+differ:
 
-- PDF text strings that are not ASCII are UTF-16BE; they used to be `?`. The
+- PDF text strings outside printable ASCII are UTF-16BE; they used to be `?`. The
   trailer has an `/ID`, and every PDF declares an sRGB output intent unless
   you pass `outputIntent: false` (`--no-output-intent` in the CLI). Fix
   `date` to keep the bytes repeatable.
@@ -230,7 +232,7 @@ These need no code changes. Goldens and byte comparisons will differ.
   cannot be selected or searched. There is no option to embed it, since its
   licence forbids that.
 - Cut lines stroke in overprinting `/Separation` spots (`CutContour`,
-  `KissCut`, `Crease`, `Perfcut`) where they used DeviceRGB. They look the
+  `KissCut`, `Crease`, `Perfcut`) instead of DeviceRGB. They look the
   same; `cutSpots` or `--cut-spot` renames the spots.
 - CSV and TSV cells starting with `=`, `+`, `-`, `@`, a tab or a carriage
   return get a leading `'`. Machine consumers can pass `escapeFormulas: false`

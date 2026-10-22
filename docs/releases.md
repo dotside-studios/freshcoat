@@ -150,8 +150,8 @@ old behaviour where that is possible.
 
 #### New limits
 
-All of these are new in 0.5. Each refuses input that would exhaust memory in
-the renderer or the importer.
+All of these are new in 0.5. Each refuses input large enough to exhaust memory
+in the renderer or the importer.
 
 - **Image decode cap (breaking).** An image whose width times height is over
   `RendererOptions.maxImageDecodePixels`, default 200,000,000
@@ -314,13 +314,13 @@ The engine and workspace also add:
   proxy that adds its own CSP must allow at least what
   [`apps/editor/server.ts`](../apps/editor/server.ts) sends, including
   `'wasm-unsafe-eval'` and, on scripts, `'unsafe-eval'`.
-- **Autosave failures are shown.** A failed write shows a
+- **Autosave failures are shown, and stored work is kept.** A failed write shows a
   persistent "Couldn't autosave" toast with Retry. An autosave that cannot be
   read, or that a newer Studio wrote, is never overwritten. Pending changes are
   saved when the tab is hidden or closed.
 - **Faster large exports.** The Export tab no longer re-renders settings,
-  checks and records each time an item finishes, and the records list of a
-  200,000-record dataset renders in about 330 ms.
+  checks and records each time an item finishes, so the page stays responsive
+  during large exports.
 - **Import limits** are stated in the import wizard, and an oversized file is
   refused before it is read.
 - **New:** a Print tab, settings popovers and reworked Data and Export panels;
