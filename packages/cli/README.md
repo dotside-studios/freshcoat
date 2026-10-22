@@ -472,7 +472,8 @@ or id, and without it every template goes into a `.zip` of
 
 `main(argv, io)` runs the same commands in-process and resolves to the exit
 code, which is how the tests drive it. `io` supplies stdout, stderr, the
-working directory and a `fetch` for fonts, so a test needs no network.
+working directory, a `fetch` for fonts, so a test needs no network, and an
+optional `signal` that cancels the run.
 
 ```ts
 import { main } from "@freshcoat-js/cli";

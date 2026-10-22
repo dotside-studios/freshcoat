@@ -7,6 +7,10 @@
 //
 // Links with a scheme (https:, mailto:) are not fetched. Code blocks and code
 // spans are skipped, so an example link in a fence is not checked.
+//
+// It also fails when Markdown names an `@freshcoat-js/<pkg>/<subpath>` that the
+// package's `exports` lacks. The release notes and migration guides are
+// exempt, since they name removed subpaths on purpose.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -137,9 +141,59 @@ export function checkLinks(root: string): BrokenLink[] {
 	return broken;
 }
 
+const HISTORY = /^docs\/(releases|migrating-to-[^/]+)\.md$/;
+
+function exportPatterns(root: string): Map<string, RegExp[]> {
+	const out = new Map<string, RegExp[]>();
+	const dir = join(root, "packages");
+	if (!existsSync(dir)) return out;
+	for (const name of readdirSync(dir)) {
+		const manifest = join(dir, name, "package.json");
+		if (!existsSync(manifest)) continue;
+		const pkg = JSON.parse(readFileSync(manifest, "utf8"));
+		if (!pkg.name || typeof pkg.exports !== "object") continue;
+		out.set(
+			pkg.name,
+			Object.keys(pkg.exports).map(
+				(key) =>
+					new RegExp(
+						`^${key.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".+")}$`,
+					),
+			),
+		);
+	}
+	return out;
+}
+
+export function checkSubpaths(root: string): BrokenLink[] {
+	const exports = exportPatterns(root);
+	const broken: BrokenLink[] = [];
+	for (const file of markdownFiles(root)) {
+		const rel = relative(root, file).split("\\").join("/");
+		if (HISTORY.test(rel)) continue;
+		readFileSync(file, "utf8")
+			.split("\n")
+			.forEach((text, i) => {
+				for (const m of text.matchAll(
+					/(@freshcoat-js\/[a-z0-9-]+)\/([\w.*/-]*\w)/g,
+				)) {
+					const patterns = exports.get(m[1]);
+					if (patterns && !patterns.some((p) => p.test(`./${m[2]}`)))
+						broken.push({
+							file: relative(root, file),
+							line: i + 1,
+							target: m[0],
+							reason: `not in ${m[1]} exports`,
+						});
+				}
+			});
+	}
+	return broken;
+}
+
 if (import.meta.main) {
 	const root = resolve(process.argv[2] ?? join(import.meta.dir, ".."));
-	const broken = checkLinks(root);
+	const broken = [...checkLinks(root), ...checkSubpaths(root)];
 	for (const b of broken)
 		console.error(`${b.file}:${b.line}: ${b.target} (${b.reason})`);
 	if (broken.length > 0) {

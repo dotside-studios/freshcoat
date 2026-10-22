@@ -728,12 +728,9 @@ for PDF417 and Aztec, the error correction.
 - **Export failures:** an export item whose barcode is invalid, or that
   could not load the encoder, fails with `Barcode: <message>` and marks its
   record failed. A placeholder is never exported in place of a code.
-- **The encoder:** bwip-js is about 85 KB gzipped, so it is a chunk of its
-  own (`@freshcoat-js/coatfile/barcode`), fetched the first time a template with
-  a barcode opens or the tool is chosen. Until then, and in any app that
-  never registers it, a barcode draws a hatched placeholder with a warning.
-  The export workers register it when they start. Any other app using the
-  kits can load it the same way, only for templates that have a barcode.
+- **The encoder:** `compile` encodes barcodes itself with bwip-js, through
+  `encodeBarcode` from `@freshcoat-js/coatfile`, so no app registers an
+  encoder.
 
 ## Sheets
 
