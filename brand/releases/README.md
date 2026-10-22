@@ -41,8 +41,8 @@ The art starts from a word, not from a feature.
 2. **Find the word.** Distill those sentences into one verb or adjective that
    describes the release as a whole: *converge*, *loosen*, *sharpen*, *settle*,
    *unfold*, *quick*, *exact*. Avoid a feature's name; ask what the release
-   does or how it feels. 0.4 folded many pieces into one renderer driven by one
-   command, so its word is *converge*.
+   does or how it feels. 0.3 took weight off every paint, list and export, so
+   its word is *lighten*.
 3. **Draw the word, not the release.** No cards, screens, UI or pictures of
    the features. Ask what the word looks like as form, motion or material.
 4. **Choose how to draw it.** This is where the engine comes in. A technique
@@ -91,6 +91,7 @@ release. Write the word and a line on the idea at the top of the module.
 
 | Release | Word | Idea | Drawn with |
 |---|---|---|---|
+| [0.5.0](v0.5.0.coat.ts) | *overprint* | Rounded slabs in cyan, magenta, yellow and a deep navy, laid in clusters of two or three and multiplied so each overlap prints a new colour, on toothed paper; magenta is screened like a second plate and the other inks are stamped with paper speckling through, every slab kept clear of the lockup | 33 rects with per-corner radii and smoothing, `grain` and `halftone` effects, `multiply` in an isolated frame |
 | [0.4.0](v0.4.0.coat.ts) | *interfere* | Interference rings: concentric circles from three centres, the moiré left where they cross, printed flat in two tones of cobalt with a panel cut out for the lockup | a live `exclude` boolean over about 70 circles inside a live `subtract`, a variable font in the lockup |
 | [0.3.0](v0.3.0.coat.ts) | *lighten* | An engraving: ruled lines that start nearly solid and thin to hairlines across the strip, swelling over a slow seeded field, in vermilion on paper, each line cut exactly at a rounded panel for the lockup | one compound vector of 56 filled line shapes, each edge sampled from the field |
 | [0.2.0](v0.2.0.coat.ts) | *arrange* | Truchet tiles: one tile of paired quarter arcs turned one of two ways in every cell, joining into meandering paths, in mint on deep green, the cells behind the lockup left empty | one stroked vector of about 1,000 arcs on a 40 px grid |
