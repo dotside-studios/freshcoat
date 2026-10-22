@@ -24,7 +24,7 @@ Create a renderer with a CanvasKit instance and render a scene:
 
 ```ts
 import { createRenderer, type RectNode } from "@freshcoat-js/engine";
-import { loadCanvasKit } from "@freshcoat-js/engine/node"; // or /browser
+import { loadCanvasKit } from "@freshcoat-js/engine/node";
 
 const renderer = await createRenderer({ ck: await loadCanvasKit() });
 
@@ -43,6 +43,24 @@ The engine depends on the `canvaskit-wasm` version its conformance goldens were
 made with. `loadCanvasKit` from `@freshcoat-js/engine/node` creates the
 instance in Node or Bun; from `@freshcoat-js/engine/browser` it loads
 `canvaskit.js` and `canvaskit.wasm` from a URL on a page or in a worker.
+
+### In a browser
+
+Serve `canvaskit.js` and `canvaskit.wasm` from `node_modules/canvaskit-wasm/bin`
+under a path of your own, then pass that path:
+
+```ts
+import { createRenderer } from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/engine/browser";
+
+const renderer = await createRenderer({ ck: await loadCanvasKit("/canvaskit/0.41.1") });
+```
+
+Under a Content-Security-Policy, a page needs `script-src 'wasm-unsafe-eval'` and a
+`connect-src` that allows the CanvasKit URL. In a worker, `loadCanvasKit`
+fetches `canvaskit.js` and evaluates it, so the worker script's own response
+needs `script-src 'unsafe-eval'`, and `worker-src` must allow the worker.
+Studio's [server](../../apps/editor/server.ts) sends a policy that works.
 
 ## Renderer
 
