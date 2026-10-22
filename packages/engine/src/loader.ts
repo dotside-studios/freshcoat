@@ -11,10 +11,14 @@ export type LoaderPolicy = {
 /** The subset of `fetch` a loader needs; the global `fetch` fits. */
 export type LoaderFetch = (
 	url: string,
-) => Promise<Pick<Response, "ok" | "status" | "arrayBuffer">>;
+	init: { redirect: RequestRedirect },
+) => Promise<Pick<Response, "ok" | "status" | "arrayBuffer"> & RedirectInfo>;
+
+type RedirectInfo = Partial<Pick<Response, "headers" | "type" | "body">>;
 
 const BASE_SCHEMES = ["data:", "blob:", "https:"];
 const SCHEME = /^([a-z][a-z\d+.-]*:)/i;
+const MAX_REDIRECTS = 5;
 const policies = new WeakMap<ByteLoader, LoaderPolicy>();
 
 /**
@@ -30,8 +34,8 @@ export function assertLoadableUrl(
 	const allowed = policy.unsafeAllowHttp
 		? [...BASE_SCHEMES, "http:"]
 		: BASE_SCHEMES;
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: strips the control characters browsers ignore before a scheme
-	const trimmed = src.replace(/^[\u0000-\u0020]+/, "");
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: strips what URL parsing ignores: tab, LF and CR anywhere, and leading controls
+	const trimmed = src.replace(/[\t\n\r]/g, "").replace(/^[\u0000-\u0020]+/, "");
 	const scheme = SCHEME.exec(trimmed)?.[1]?.toLowerCase();
 	if (scheme) {
 		if (allowed.includes(scheme)) return trimmed;
@@ -47,8 +51,38 @@ export function assertLoadableUrl(
 	}
 	const url = new URL(trimmed, base);
 	// A page served over http (a dev server) resolves its own relative URLs to http.
-	if (url.protocol !== "http:") assertLoadableUrl(url.href, policy);
-	return url.href;
+	if (url.protocol === "http:" && url.origin === new URL(base).origin)
+		return url.href;
+	return assertLoadableUrl(url.href, policy);
+}
+
+/**
+ * Fetches `src` under `policy`, following up to 5 redirects and checking each
+ * `Location` the same way. Where `redirect: "manual"` gives an opaque redirect
+ * (a browser), the request is repeated with `redirect: "follow"` and the
+ * browser's own mixed-content rules apply.
+ */
+export async function fetchUnderPolicy<
+	R extends { status: number } & RedirectInfo,
+>(
+	src: string,
+	policy: LoaderPolicy,
+	fetcher: (url: string, redirect: RequestRedirect) => Promise<R>,
+): Promise<R> {
+	let url = assertLoadableUrl(src, policy);
+	for (let hops = 0; ; hops++) {
+		const res = await fetcher(url, "manual");
+		if (res.type === "opaqueredirect") return fetcher(url, "follow");
+		const location =
+			res.status >= 300 && res.status < 400
+				? res.headers?.get("location")
+				: null;
+		if (!location) return res;
+		await res.body?.cancel();
+		if (hops === MAX_REDIRECTS)
+			throw new Error(`fetch ${src}: more than ${MAX_REDIRECTS} redirects`);
+		url = assertLoadableUrl(new URL(location, url).href, policy);
+	}
 }
 
 /** A loader that decodes `data:` URLs and fetches the rest under `policy`. */
@@ -59,7 +93,9 @@ export function createFetchLoader(
 	const loader: ByteLoader = async (src) => {
 		const url = assertLoadableUrl(src, rest);
 		if (url.slice(0, 5).toLowerCase() === "data:") return dataUrlToBytes(url);
-		const res = await (fetcher ?? fetch)(url);
+		const res = await fetchUnderPolicy(url, rest, (u, redirect) =>
+			(fetcher ?? fetch)(u, { redirect }),
+		);
 		if (!res.ok) throw new Error(`fetch ${src} -> ${res.status}`);
 		return new Uint8Array(await res.arrayBuffer());
 	};

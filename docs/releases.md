@@ -28,6 +28,10 @@ old behaviour where that is possible.
 - **Supported runtimes.** The npm packages declare `"engines": { "node": ">=22" }`
   and run on Node 22 or later and Bun 1.3.13 or later. On Node 22, npm warns
   `EBADENGINE` for `hucre`, which declares Node 24; the warning is harmless.
+- **Stricter loader URL checks.** The default loader and font fetch ignore
+  tab, LF and CR when reading a scheme, allow a relative http URL only when it
+  is same-origin with the page, and check every redirect hop against the
+  policy (at most 5). See [safer defaults](security-defaults.md).
 
 ### SDK users
 

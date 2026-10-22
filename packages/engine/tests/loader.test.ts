@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { clearFontBytesCache, fontBytes } from "../src/font-bytes";
+import { clearFontBytesCache, fontBytes, policyFetch } from "../src/font-bytes";
 import {
 	assertLoadableUrl,
 	base64ToBytes,
@@ -39,6 +39,18 @@ function stubFetch() {
 		};
 	}) as unknown as typeof globalThis.fetch;
 	return urls;
+}
+
+function stubRedirects(hops: Record<string, string>) {
+	const calls: [string, RequestRedirect | undefined][] = [];
+	globalThis.fetch = (async (url: string, init?: RequestInit) => {
+		calls.push([url, init?.redirect]);
+		const to = hops[url];
+		return to
+			? new Response(null, { status: 302, headers: { location: to } })
+			: new Response(new Uint8Array([7]), { status: 200 });
+	}) as unknown as typeof globalThis.fetch;
+	return calls;
 }
 
 function stubLocation(href: string | undefined) {
@@ -237,6 +249,127 @@ describe("default font fetch", () => {
 		expect([...(bytes as Uint8Array)]).toEqual([5]);
 		expect(seen).toEqual(["http://mirror.local/a.ttf"]);
 		expect(fetch).toEqual([]);
+	});
+});
+
+describe("URL parsing quirks", () => {
+	test.each([
+		["tab", "ht\ttp://169.254.169.254/"],
+		["LF", "ht\ntp://169.254.169.254/"],
+		["CR", "ht\rtp://169.254.169.254/"],
+		["leading tab", "\thttp://169.254.169.254/"],
+	])("refuses http: with a %s inside the scheme", async (_, src) => {
+		const fetch = stubFetch();
+		stubLocation("https://studio.test/");
+		expect(() => assertLoadableUrl(src)).toThrow(/"http:"/);
+		await expect(fetchLoader(src)).rejects.toThrow(/"http:"/);
+		await expect(
+			policyFetch({})(src, {
+				headers: {},
+				signal: AbortSignal.timeout(1000),
+			}),
+		).rejects.toThrow(/"http:"/);
+		expect(fetch).toEqual([]);
+	});
+
+	test("refuses http: with a tab in the scheme on an http page", () => {
+		stubLocation("http://localhost:5173/");
+		expect(() => assertLoadableUrl("ht\ttp://169.254.169.254/")).toThrow(
+			/"http:"/,
+		);
+	});
+
+	test("allows a same-origin http URL on a dev server", () => {
+		stubLocation("http://localhost:5173/app/");
+		expect(assertLoadableUrl("a\t.png")).toBe(
+			"http://localhost:5173/app/a.png",
+		);
+	});
+
+	test("refuses a relative URL that resolves to another http origin", () => {
+		stubLocation("http://localhost:5173/");
+		expect(() => assertLoadableUrl("//169.254.169.254/latest")).toThrow(
+			/"http:"/,
+		);
+		expect(
+			assertLoadableUrl("//169.254.169.254/latest", { unsafeAllowHttp: true }),
+		).toBe("http://169.254.169.254/latest");
+	});
+});
+
+describe("redirects", () => {
+	const init = () => ({ headers: {}, signal: AbortSignal.timeout(1000) });
+
+	test("refuses an https to http redirect", async () => {
+		const calls = stubRedirects({
+			"https://a.test/x": "http://169.254.169.254/",
+		});
+		await expect(fetchLoader("https://a.test/x")).rejects.toThrow(/"http:"/);
+		await expect(policyFetch({})("https://a.test/x", init())).rejects.toThrow(
+			/"http:"/,
+		);
+		expect(calls).toEqual([
+			["https://a.test/x", "manual"],
+			["https://a.test/x", "manual"],
+		]);
+	});
+
+	test("follows https to https redirects", async () => {
+		const calls = stubRedirects({
+			"https://a.test/x": "https://b.test/y",
+			"https://b.test/y": "/z",
+		});
+		expect([...(await fetchLoader("https://a.test/x"))]).toEqual([7]);
+		expect(calls.map(([url]) => url)).toEqual([
+			"https://a.test/x",
+			"https://b.test/y",
+			"https://b.test/z",
+		]);
+		const res = await policyFetch({})("https://a.test/x", init());
+		expect(res.status).toBe(200);
+	});
+
+	test("allows an http hop only with unsafeAllowHttp", async () => {
+		stubRedirects({ "https://a.test/x": "http://b.test/y" });
+		const unsafe = createFetchLoader({ unsafeAllowHttp: true });
+		expect([...(await unsafe("https://a.test/x"))]).toEqual([7]);
+	});
+
+	test("stops after 5 redirects", async () => {
+		const calls = stubRedirects({
+			"https://a.test/1": "https://a.test/2",
+			"https://a.test/2": "https://a.test/1",
+		});
+		await expect(fetchLoader("https://a.test/1")).rejects.toThrow(
+			/more than 5 redirects/,
+		);
+		expect(calls).toHaveLength(6);
+	});
+
+	test("lets a browser follow an opaque redirect itself", async () => {
+		const calls: [string, RequestRedirect][] = [];
+		const own = createFetchLoader({
+			fetch: async (url, { redirect }) => {
+				calls.push([url, redirect]);
+				return redirect === "manual"
+					? {
+							ok: false,
+							status: 0,
+							type: "opaqueredirect",
+							arrayBuffer: async () => new ArrayBuffer(0),
+						}
+					: {
+							ok: true,
+							status: 200,
+							arrayBuffer: async () => new Uint8Array([8]).buffer,
+						};
+			},
+		});
+		expect([...(await own("https://a.test/x"))]).toEqual([8]);
+		expect(calls).toEqual([
+			["https://a.test/x", "manual"],
+			["https://a.test/x", "follow"],
+		]);
 	});
 });
 

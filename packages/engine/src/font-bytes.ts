@@ -1,8 +1,8 @@
 import {
-	assertLoadableUrl,
 	type ByteLoader,
 	dataUrlToBytes,
 	fetchLoader,
+	fetchUnderPolicy,
 	type LoaderPolicy,
 	loaderPolicy,
 } from "./loader";
@@ -251,9 +251,12 @@ function memoize<T>(
 	return p;
 }
 
-/** The global fetch, limited to the schemes `policy` allows. */
+/** The global fetch, limited to the schemes `policy` allows, redirects included. */
 export function policyFetch(policy: LoaderPolicy): FontFetch {
-	return (url, init) => fetch(assertLoadableUrl(url, policy), init);
+	return (url, init) =>
+		fetchUnderPolicy(url, policy, (u, redirect) =>
+			fetch(u, { ...init, redirect }),
+		);
 }
 
 // The global fetch is read per call so a host or test can replace it; a fetcher

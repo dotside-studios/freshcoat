@@ -25,9 +25,17 @@ location) a relative URL throws. In Node, `fileLoader` from
 `@freshcoat-js/engine/node` reads paths under a root before anything reaches
 `fetchLoader`.
 
-Redirects are not inspected: an `https:` URL that redirects to an internal
-address is followed by `fetch`. A host that needs more passes a loader that
-checks the resolved address.
+Tab, LF and CR are removed before the scheme is read, as URL parsing does, so
+`ht\ttp://...` is refused as `http:`. On an http page only a relative URL that
+resolves to the page's own origin may load over http.
+
+Redirects are checked: the default loader and font fetch follow up to 5
+redirects themselves, and each `Location` must pass the same policy, so an
+`https:` URL that redirects to `http:` is refused. In a browser, where a manual
+redirect is opaque, the request is repeated and the browser follows it under
+its own mixed-content rules. A redirect to an internal `https:` address is
+still followed; a host that needs more passes a loader that checks the
+resolved address.
 
 ## Migrating
 
