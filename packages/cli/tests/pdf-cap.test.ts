@@ -28,9 +28,10 @@ beforeAll(async () => {
 
 afterAll(() => box.cleanup());
 
-const REFUSAL = /freshcoat: .*6 pages, over the limit of 5.*--max-pdf-pages/s;
+const REFUSAL =
+	/freshcoat: this PDF renders 6 cards, over the limit of 5; every card is held in memory.*--max-pdf-cards/s;
 
-describe("PDF page cap", () => {
+describe("PDF card cap", () => {
 	test("a workspace PDF over the cap fails and writes no file", async () => {
 		const run = await box.run(
 			"render",
@@ -39,7 +40,7 @@ describe("PDF page cap", () => {
 			"p_pdf",
 			"--out",
 			"over.pdf",
-			"--max-pdf-pages",
+			"--max-pdf-cards",
 			"5",
 		);
 		expect(run.code).toBe(1);
@@ -57,12 +58,34 @@ describe("PDF page cap", () => {
 			"front",
 			"--out",
 			"batch-over.pdf",
-			"--max-pdf-pages",
+			"--max-pdf-cards",
 			"5",
 		);
 		expect(run.code).toBe(1);
 		expect(run.stderr).toMatch(REFUSAL);
 		expect(existsSync(box.path("batch-over.pdf"))).toBe(false);
+	});
+
+	test("a PDF on sheets is capped by cards and names its sheets", async () => {
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--data",
+			"people.csv",
+			"--frame",
+			"front",
+			"--sheets",
+			"a4",
+			"--out",
+			"sheets-over.pdf",
+			"--max-pdf-cards",
+			"5",
+		);
+		expect(run.code).toBe(1);
+		expect(run.stderr).toContain(
+			"this PDF renders 6 cards (1 sheet), over the limit of 5; every card is held in memory",
+		);
+		expect(existsSync(box.path("sheets-over.pdf"))).toBe(false);
 	});
 
 	test("raising the cap lets the PDF through", async () => {
@@ -73,7 +96,7 @@ describe("PDF page cap", () => {
 			"p_pdf",
 			"--out",
 			"raised.pdf",
-			"--max-pdf-pages",
+			"--max-pdf-cards",
 			"6",
 		);
 		expect(run.code).toBe(0);
@@ -90,7 +113,7 @@ describe("PDF page cap", () => {
 			"front",
 			"--out",
 			"unlimited.pdf",
-			"--max-pdf-pages",
+			"--max-pdf-cards",
 			"0",
 		);
 		expect(run.code).toBe(0);
@@ -130,12 +153,12 @@ describe("PDF page cap", () => {
 			"p_png",
 			"--out",
 			"x.zip",
-			"--max-pdf-pages",
+			"--max-pdf-cards",
 			"5",
 		);
 		expect(preset.code).toBe(1);
 		expect(preset.stderr).toContain(
-			"--max-pdf-pages applies only to a PDF preset",
+			"--max-pdf-cards applies only to a PDF preset",
 		);
 		const batch = await box.run(
 			"render",
@@ -144,7 +167,7 @@ describe("PDF page cap", () => {
 			"people.csv",
 			"--out",
 			"x.zip",
-			"--max-pdf-pages",
+			"--max-pdf-cards",
 			"5",
 		);
 		expect(batch.code).toBe(2);
@@ -159,7 +182,7 @@ describe("PDF page cap", () => {
 			"p_pdf",
 			"--out",
 			"y.pdf",
-			"--max-pdf-pages",
+			"--max-pdf-cards",
 			"many",
 		);
 		expect(run.code).toBe(2);

@@ -19,7 +19,7 @@ import {
 	parseLength,
 	parseMarks,
 	parseMaxEdge,
-	parseMaxPdfPages,
+	parseMaxPdfCards,
 	parseMaxRows,
 	parseMinDpi,
 	parseOffset,
@@ -32,7 +32,7 @@ import { inspect } from "./commands/inspect";
 import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
 import { validateCommand } from "./commands/validate";
-import { DEFAULT_MAX_PDF_PAGES } from "./commands/workspace";
+import { DEFAULT_MAX_PDF_CARDS } from "./commands/workspace";
 import { CliError, type Io, processIo, UsageError } from "./io";
 import { version } from "./version";
 
@@ -236,9 +236,9 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			).choices(["embed", "outline"] as const),
 		)
 		.option(
-			"--max-pdf-pages <n>",
-			`refuse a PDF with more pages, which are all held in memory until it is built; default ${DEFAULT_MAX_PDF_PAGES}, 0 for no limit`,
-			arg(parseMaxPdfPages),
+			"--max-pdf-cards <n>",
+			`refuse a PDF that renders more cards, one per card side, which are all held in memory until it is built; counted before sheets are laid out; default ${DEFAULT_MAX_PDF_CARDS}, 0 for no limit`,
+			arg(parseMaxPdfCards),
 		)
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(

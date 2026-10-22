@@ -32,7 +32,7 @@ const WORKSPACE_KEYS = [
 	"cutLines",
 	"cutSpot",
 	"minDpi",
-	"maxPdfPages",
+	"maxPdfCards",
 	"quiet",
 ];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
@@ -54,7 +54,7 @@ const PDF_OPTIONS = [
 	"outputIntentId",
 	"cutLines",
 	"cutSpot",
-	"maxPdfPages",
+	"maxPdfCards",
 ];
 const SHEET_OPTIONS = [
 	"orientation",
@@ -122,8 +122,8 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.cutLines ? { cutLines: rest.cutLines } : {}),
 				...(rest.cutSpot ? { cutSpot: rest.cutSpot } : {}),
 				...(rest.minDpi !== undefined ? { minDpi: rest.minDpi } : {}),
-				...(rest.maxPdfPages !== undefined
-					? { maxPdfPages: rest.maxPdfPages }
+				...(rest.maxPdfCards !== undefined
+					? { maxPdfCards: rest.maxPdfCards }
 					: {}),
 				out,
 				quiet: input.quiet,

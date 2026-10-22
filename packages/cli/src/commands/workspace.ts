@@ -37,8 +37,8 @@ import { version } from "../version";
 import { poolSize, startWorkerPool } from "../worker-pool";
 import { readWorkspace } from "../workspace-file";
 
-/** A PDF holds every rendered page in memory until it is assembled. */
-export const DEFAULT_MAX_PDF_PAGES = 2000;
+/** A PDF holds every rendered card in memory until it is assembled. */
+export const DEFAULT_MAX_PDF_CARDS = 2000;
 
 export type WorkspaceOptions = {
 	preset?: string;
@@ -53,7 +53,7 @@ export type WorkspaceOptions = {
 	cutLines?: true;
 	cutSpot?: CutSpots;
 	minDpi?: number;
-	maxPdfPages?: number;
+	maxPdfCards?: number;
 	quiet: boolean;
 };
 
@@ -105,9 +105,9 @@ export async function renderWorkspace(
 		throw new CliError(
 			`--cut-spot applies only to a PDF preset; "${preset.name}" writes images, which take --cut`,
 		);
-	if (options.maxPdfPages !== undefined && preset.format !== "pdf")
+	if (options.maxPdfCards !== undefined && preset.format !== "pdf")
 		throw new CliError(
-			`--max-pdf-pages applies only to a PDF preset; "${preset.name}" writes images`,
+			`--max-pdf-cards applies only to a PDF preset; "${preset.name}" writes images`,
 		);
 	await runPreset(
 		options.where ? withFilters(workspace, preset, options.where) : workspace,
@@ -117,8 +117,8 @@ export async function renderWorkspace(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
-			...(options.maxPdfPages !== undefined
-				? { maxPdfPages: options.maxPdfPages }
+			...(options.maxPdfCards !== undefined
+				? { maxPdfCards: options.maxPdfCards }
 				: {}),
 			...(options.save
 				? {
@@ -195,8 +195,8 @@ export async function runPreset(
 		out: string;
 		dryRun?: true;
 		jobs?: number;
-		/** the most pages a PDF may hold, default DEFAULT_MAX_PDF_PAGES; 0 for no limit */
-		maxPdfPages?: number;
+		/** the most cards a PDF may render, default DEFAULT_MAX_PDF_CARDS; 0 for no limit */
+		maxPdfCards?: number;
 		save?: (workspace: Workspace) => Promise<void>;
 		/** the sheet layout came from the command line */
 		layoutFlags?: true;
@@ -216,10 +216,11 @@ export async function runPreset(
 		throw new CliError(
 			`preset "${preset.name}": its template is not in the workspace`,
 		);
-	checkPdfPages(
+	checkPdfCards(
 		preset,
 		plan.length,
-		options.maxPdfPages ?? DEFAULT_MAX_PDF_PAGES,
+		readiness.sheets,
+		options.maxPdfCards ?? DEFAULT_MAX_PDF_CARDS,
 	);
 	checkCuts(preset, entry.template, log);
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
@@ -297,13 +298,29 @@ export async function runPreset(
 	}
 }
 
-/** Refuses a PDF with more pages than the limit, before anything is rendered
- *  or written, since every page is held in memory until the PDF is built. */
-function checkPdfPages(preset: ExportPreset, pages: number, max: number): void {
-	if (preset.format !== "pdf" || max === 0 || pages <= max) return;
+/** Refuses a PDF that renders more cards than the limit, before anything is
+ *  rendered or written, since every card is held in memory until the PDF is
+ *  built. On sheets many cards share a page, so cards are counted, not pages. */
+function checkPdfCards(
+	preset: ExportPreset,
+	cards: number,
+	sheets: SheetPlan | null,
+	max: number,
+): void {
+	if (preset.format !== "pdf" || max === 0 || cards <= max) return;
 	throw new CliError(
-		`the PDF would have ${pages} pages, over the limit of ${max}; every page is held in memory until the PDF is built. Export fewer records with --where, or raise the limit with --max-pdf-pages <n> (0 for none)`,
+		`this PDF renders ${cards} cards${onSheets(sheets)}, over the limit of ${max}; every card is held in memory until the PDF is built. Export fewer records with --where, or raise the limit with --max-pdf-cards <n> (0 for none)`,
 	);
+}
+
+function onSheets(sheets: SheetPlan | null): string {
+	const imposition = sheets?.imposition;
+	if (!imposition) return "";
+	const count = `${imposition.sheets} ${imposition.sheets === 1 ? "sheet" : "sheets"}`;
+	const pages = imposition.pages.length;
+	return pages === imposition.sheets
+		? ` (${count})`
+		: ` (${count}, ${pages} pages)`;
 }
 
 function planPreset(
