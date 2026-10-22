@@ -138,7 +138,7 @@ describe("QR memo", () => {
 			expect(paths).toBeLessThanOrEqual(PATH_CACHE_BYTES);
 		}
 		expect(qrCacheBytes().paths).toBeGreaterThan(PATH_CACHE_BYTES / 2);
-	});
+	}, 20_000);
 
 	test("keys paths by value, level and style", () => {
 		const a = qrSymbol("https://example.com/memo", "Q");

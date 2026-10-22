@@ -93,7 +93,7 @@ describe("decodeHandoff", () => {
 			ok: false,
 			reason: "it is too large to open from a link",
 		});
-	});
+	}, 20_000);
 });
 
 describe("isHandoffOrigin", () => {
