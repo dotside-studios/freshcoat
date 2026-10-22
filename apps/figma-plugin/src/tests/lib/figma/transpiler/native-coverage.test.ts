@@ -584,6 +584,42 @@ describe("in a transpiled card", () => {
 		});
 	});
 
+	it.each([
+		["GROUP", "LAYER_BLUR", "blur", "container"],
+		["FRAME", "LAYER_BLUR", "blur", "native-frame"],
+		["FRAME", "BACKGROUND_BLUR", "backdropBlur", "native-frame"],
+		["COMPONENT", "LAYER_BLUR", "blur", "native-frame"],
+		["COMPONENT", "BACKGROUND_BLUR", "backdropBlur", "native-frame"],
+		["INSTANCE", "LAYER_BLUR", "blur", "native-frame"],
+		["INSTANCE", "BACKGROUND_BLUR", "backdropBlur", "native-frame"],
+	] as const)("warns and traces a duplicate blur dropped on a %s with %s", async (type, figmaType, kind, decision) => {
+		const { elements, warnings, trace } = await transpileCard([
+			frame([rect()], {
+				type,
+				name: "blurry",
+				effects: [
+					{ type: figmaType, visible: true, radius: 4 },
+					{ type: figmaType, visible: true, radius: 8 },
+				],
+			}),
+		]);
+		expect(elements[0]).toMatchObject({
+			type: "frame",
+			effects: [{ type: kind, radius: 4 }],
+		});
+		expect(warnings).toContainEqual(
+			expect.objectContaining({
+				severity: "warn",
+				code: "duplicate_blur_dropped",
+				nodeId: "1:5",
+			}),
+		);
+		expect(trace.find((t) => t.nodeId === "1:5")).toMatchObject({
+			decision,
+			dropped: "duplicate_blur_dropped",
+		});
+	});
+
 	it("gives a group with noise a layer of its own, carrying the grain", async () => {
 		const group = frame([rect()], {
 			type: "GROUP",

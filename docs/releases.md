@@ -142,14 +142,35 @@ old behaviour where that is possible.
   `required: ["constructor"]` is no longer satisfied by an empty record.
   Substitution, visibility conditions and `validateValues` read own
   properties only.
-- **Unsafe field patterns are rejected (breaking).** A field `pattern` longer
-  than 512 characters, one that repeats a group that already repeats (such as
-  `(a+)+` or `^(\d+,)*\d+$`), or one with a backreference fails `validate`
-  with `unsafe_field_pattern` at `/fields/properties/<key>/pattern`. At render
-  time such a pattern imposes no constraint, and a value over 10,000
-  characters counts as `pattern_mismatch` without being tested. Dataset column
-  patterns follow the same rule, and Studio's pattern inputs say why a pattern
-  is refused.
+- **Unsafe field patterns are rejected (breaking).** These field patterns fail
+  `validate` with `unsafe_field_pattern` at
+  `/fields/properties/<key>/pattern`:
+  - longer than 512 characters;
+  - repeating a group that already repeats, such as `(a+)+` or
+    `^(\d+,)*\d+$`. `{n}`, `{n,}` and `{n,m}` count as repeats, so
+    `(.*a){20}` is refused too;
+  - repeating a group whose alternatives may overlap, such as `(a|aa)+` or
+    `(\w|\d)*`;
+  - chaining enough groups with overlapping alternatives to split a value more
+    than 1,024 ways, such as eleven `(?:.|a)` in a row;
+  - putting two variable quantifiers able to match the same character next to
+    each other, such as `\d*\d*` or `.*a.*` (`adjacent_quantifiers`);
+  - using an inline modifier group such as `(?i:...)`, which Node 22 cannot
+    compile;
+  - using a backreference.
+
+  Some patterns that look safe are refused by these rules, for example
+  `^\S+@\S+\.\S+$` and `^(\d+\.){3}\d+$`. Write
+  `^[^\s@]+@[^\s@]+\.[^\s@.]+$` and `^\d+\.\d+\.\d+\.\d+$` or
+  `^(\d{1,3}\.){3}\d{1,3}$` instead.
+
+  At render time a refused pattern imposes no constraint, and a value over
+  10,000 characters counts as `pattern_mismatch` without being tested. A
+  pattern accepted only because a bounded repeat keeps its backtracking small,
+  such as `^(\d{1,3}\.){3}\d{1,3}$`, tests at most 256 characters
+  (`PATTERN_GUARDED_INPUT_MAX_LENGTH`; `patternInputMaxLength(pattern)` returns
+  the cap). Dataset column patterns follow the same rules, and Studio's pattern
+  inputs say why a pattern is refused.
 - **Stricter format version parsing (breaking).** `format_version` must be
   `MAJOR` or `MAJOR.MINOR` in digits, surrounding spaces allowed. Values such
   as `1.7.3`, `1.0.0`, `1.7-beta` or `1.7garbage` used to be read as their

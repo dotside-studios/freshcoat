@@ -32,6 +32,12 @@ describe("catastrophic patterns are refused", () => {
 		["^.*a.*a.*a.*$", `${"a".repeat(2_000)}\n`, "adjacent_quantifiers"],
 		["^\\S+@\\S+\\.\\S+$", `a@${".".repeat(5_000)}`, "adjacent_quantifiers"],
 		["^[a-z]+[a-c]+$", `${"a".repeat(5_000)}!`, "adjacent_quantifiers"],
+		[`^${"(?:.|a)".repeat(30)}$`, "a".repeat(31), "ambiguous_alternatives"],
+		[`^${"(?:\\d|\\w)".repeat(30)}$`, "1".repeat(31), "ambiguous_alternatives"],
+		[`^${"(?:.|a){5}".repeat(6)}$`, "a".repeat(31), "ambiguous_alternatives"],
+		["^(?i:a|A)*$", `${"a".repeat(40)}!`, "modifier_group"],
+		["^(?-i:a|.)*$", `${"a".repeat(40)}!`, "modifier_group"],
+		["^(?ims:x)$", "x", "modifier_group"],
 	];
 
 	test.each(unsafe)("%p", (pattern, input, reason) => {
@@ -67,6 +73,9 @@ describe("common safe patterns are accepted", () => {
 		["^\\d{4}-\\d{2}-\\d{2}$", `${"1".repeat(9_000)}-`],
 		["^\\w+\\s\\w+$", `${"a".repeat(9_000)} !`],
 		["^[a-z]+\\d+$", `${"a".repeat(4_500)}${"1".repeat(4_500)}!`],
+		[`^${"(?:.|a)".repeat(10)}.*$`, `${"a".repeat(9_000)}\n`],
+		["^[^\\s@]+@[^\\s@]+\\.[^\\s@.]+$", `a@${".".repeat(9_000)}`],
+		["^\\d+\\.\\d+\\.\\d+\\.\\d+$", `${"1.".repeat(4_500)}x`],
 	];
 
 	test.each(safe)("%p", (pattern, input) => {

@@ -6,12 +6,17 @@ export type UnsafePatternReason =
 	| "too_long"
 	| "nested_quantifier"
 	| "adjacent_quantifiers"
+	| "ambiguous_alternatives"
+	| "modifier_group"
 	| "backreference";
 
 export const UNSAFE_PATTERN_MESSAGES: Record<UnsafePatternReason, string> = {
 	too_long: `Longer than ${PATTERN_MAX_LENGTH} characters`,
 	nested_quantifier: "Repeats a group that already repeats",
 	adjacent_quantifiers: "Repeats the same characters twice in a row",
+	ambiguous_alternatives:
+		"Chains too many alternatives that can match the same text",
+	modifier_group: "Uses an inline modifier group such as (?i:...)",
 	backreference: "Uses a backreference",
 };
 
@@ -34,6 +39,7 @@ type Info = {
 	nullable: boolean;
 	unbounded: boolean;
 	factor: number;
+	choices: number;
 	guarded: boolean;
 };
 
@@ -43,6 +49,7 @@ class Unsafe {
 
 const QUANTIFIER = /^(?:([*+?])|\{(\d+)(?:(,)(\d*))?\})\??/;
 const GROUP_PREFIX = /^\?(?:[:=!]|<[=!]|<[^>]*>)/;
+const MODIFIER_PREFIX = /^\?[ims-]+:/;
 const ESCAPE_TAIL = /^(?:u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|c[A-Za-z])/;
 const PLAIN = /^[^\\.[\]()|*+?{}^$]$/u;
 
@@ -113,6 +120,8 @@ function parse(pattern: string): Node[][] {
 		}
 		if (ch === "(") {
 			i++;
+			if (MODIFIER_PREFIX.test(pattern.slice(i)))
+				throw new Unsafe("modifier_group");
 			const prefix = GROUP_PREFIX.exec(pattern.slice(i));
 			const lookaround =
 				prefix !== null && /^\?<?[=!]/.test(prefix[0] as string);
@@ -221,6 +230,7 @@ function analyze(pattern: string): { guarded: boolean } {
 			nullable: true,
 			unbounded: false,
 			factor: 1,
+			choices: 1,
 			guarded: false,
 		};
 		let live = 0n;
@@ -237,8 +247,10 @@ function analyze(pattern: string): { guarded: boolean } {
 			out.nullable &&= n.nullable;
 			out.unbounded ||= n.unbounded;
 			out.factor *= n.factor;
+			out.choices *= n.choices;
 			out.guarded ||= n.guarded;
 		}
+		if (out.choices > SPLIT_BUDGET) throw new Unsafe("ambiguous_alternatives");
 		return out;
 	};
 
@@ -254,6 +266,7 @@ function analyze(pattern: string): { guarded: boolean } {
 			nullable: false,
 			unbounded: false,
 			factor: 1,
+			choices: 1,
 			guarded: false,
 		};
 		for (const n of infos) {
@@ -266,9 +279,13 @@ function analyze(pattern: string): { guarded: boolean } {
 			out.nullable ||= n.nullable;
 			out.unbounded ||= n.unbounded;
 			out.factor = Math.max(out.factor, n.factor);
+			out.choices = Math.max(out.choices, n.choices);
 			out.guarded ||= n.guarded;
 		}
-		if (ambiguous(alts)) out.factor *= alts.length;
+		if (ambiguous(alts)) {
+			out.factor *= alts.length;
+			out.choices *= alts.length;
+		}
 		return out;
 	};
 
@@ -285,6 +302,7 @@ function analyze(pattern: string): { guarded: boolean } {
 				nullable: false,
 				unbounded: false,
 				factor: 1,
+				choices: 1,
 				guarded: false,
 			};
 		}
@@ -299,6 +317,7 @@ function analyze(pattern: string): { guarded: boolean } {
 				nullable: true,
 				unbounded: false,
 				factor: 1,
+				choices: 1,
 				guarded: false,
 			};
 		if (node.kind === "group") {
@@ -341,6 +360,7 @@ function analyze(pattern: string): { guarded: boolean } {
 			nullable: min === 0 || inner.nullable,
 			unbounded: inner.unbounded || max === Number.POSITIVE_INFINITY,
 			factor: Number.isFinite(splits) ? splits : Number.POSITIVE_INFINITY,
+			choices: inner.choices === 1 ? 1 : inner.choices ** max,
 			guarded,
 		};
 	};
@@ -376,7 +396,9 @@ function verdict(pattern: string): Verdict {
  *  A conservative static check, not a proof. It refuses patterns that are too
  *  long, that use backreferences, that repeat a group which itself repeats or
  *  whose alternatives may overlap (`(a+)+`, `(a|aa)*`, `(\w|\d)*`,
- *  `(.*a){20}`), and that put two variable quantifiers able to match the same
+ *  `(.*a){20}`), that chain enough overlapping alternatives to split a value
+ *  more than 1024 ways (`(?:.|a)` eleven times), that use inline modifier
+ *  groups (`(?i:a|A)`), and that put two variable quantifiers able to match the same
  *  character next to each other (`\d*\d*`, `.*a.*`). */
 export function unsafePatternReason(
 	pattern: string,

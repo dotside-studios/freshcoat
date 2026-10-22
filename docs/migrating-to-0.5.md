@@ -26,7 +26,7 @@ every change.
 | `setCpuFinish`, `setLayerBounds` | `switches: { cpuFinish, layerBounds }` per paint |
 | `createPaintCache`, `PaintCache` | removed; a renderer makes its own from `cache` |
 | `format_version: "1.7.0"` and other three-part or suffixed versions | `"1.7"` |
-| a field `pattern` with nested repetition or a backreference | a pattern without them, or a check in your own code |
+| a field `pattern` with nested or overlapping repetition, adjacent overlapping quantifiers, or a backreference | a pattern without them, or a check in your own code |
 | images of any size | up to `maxImageDecodePixels` (200,000,000) on `createRenderer` |
 | spreadsheets of any size | up to the `readTable` limits, raised with `limits` |
 | CSV and TSV export writing `=SUM(A1)` as is | `'=SUM(A1)`; `writeTable(dataset, format, { escapeFormulas: false })` for the old output |
@@ -191,11 +191,32 @@ export warns when it is estimated past 1 GiB. Neither warning stops the job.
 `format_version` must be `MAJOR` or `MAJOR.MINOR`. A file with `"1.7.0"` or
 `"1.7-beta"` is `unsupported_format_version`; write `"1.7"`.
 
-A field `pattern` fails `validate` with `unsafe_field_pattern` when it is over
-512 characters, repeats a group that already repeats (`(a+)+`,
-`^(\d+,)*\d+$`) or uses a backreference. Rewrite it without the nested
-repetition, or check the value in your own code. At render time such a pattern
-imposes no constraint.
+A field `pattern` fails `validate` with `unsafe_field_pattern` when it:
+
+- is over 512 characters;
+- repeats a group that already repeats (`(a+)+`, `^(\d+,)*\d+$`,
+  `(.*a){20}`), counting `{n}`, `{n,}` and `{n,m}` as repeats;
+- repeats a group whose alternatives may overlap (`(\w|\d)*`);
+- chains enough groups with overlapping alternatives to split a value more
+  than 1,024 ways (eleven `(?:.|a)` in a row);
+- puts two variable quantifiers able to match the same character next to each
+  other (`\d*\d*`, `.*a.*`);
+- uses an inline modifier group (`(?i:...)`);
+- uses a backreference.
+
+Some common patterns are refused by these rules:
+
+| Refused | Accepted equivalent |
+| --- | --- |
+| `^\S+@\S+\.\S+$` | `^[^\s@]+@[^\s@]+\.[^\s@.]+$` |
+| `^(\d+\.){3}\d+$` | `^\d+\.\d+\.\d+\.\d+$` or `^(\d{1,3}\.){3}\d{1,3}$` |
+| `^(?i:abc)$` | `^[aA][bB][cC]$` |
+
+Rewrite the pattern, or check the value in your own code. At render time a
+refused pattern imposes no constraint. A pattern accepted only because a
+bounded repeat keeps its backtracking small, such as
+`^(\d{1,3}\.){3}\d{1,3}$`, tests at most 256 characters of a value
+(`PATTERN_GUARDED_INPUT_MAX_LENGTH`, `patternInputMaxLength()`).
 
 `{{constructor}}`, `{{toString}}` and `{{__proto__}}` render empty unless the
 values have them as their own keys, and an empty record no longer meets
