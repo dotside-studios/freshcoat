@@ -24,7 +24,7 @@ import {
 	parsePositive,
 	parseQuality,
 } from "./args";
-import { listenForCancel } from "./cancel";
+import { cancelCode } from "./cancel";
 import { inspect } from "./commands/inspect";
 import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
@@ -41,15 +41,23 @@ export async function main(
 	argv: string[],
 	io: Io = processIo(),
 ): Promise<number> {
+	return run(argv, io);
+}
+
+/** `main`, telling `onCommand` the name of the command about to run. */
+export async function run(
+	argv: string[],
+	io: Io,
+	onCommand?: (name: string) => void,
+): Promise<number> {
 	let running: string | undefined;
 	const all = argv.includes("--help-all");
-	const cancel = listenForCancel(io.signal);
-	const cancellable: Io = { ...io, signal: cancel.signal };
 	try {
 		await program(
-			cancellable,
+			io,
 			(name) => {
 				running = name;
+				onCommand?.(name);
 			},
 			all,
 		).parseAsync(
@@ -60,9 +68,9 @@ export async function main(
 		);
 		return 0;
 	} catch (error) {
-		if (cancel.signal.aborted) {
+		if (io.signal?.aborted) {
 			io.stderr("freshcoat: cancelled\n");
-			return cancel.code;
+			return cancelCode(io.signal);
 		}
 		if (error instanceof CommanderError) return error.exitCode === 0 ? 0 : 2;
 		const message = error instanceof Error ? error.message : String(error);
@@ -70,8 +78,6 @@ export async function main(
 		if (error instanceof UsageError && running)
 			io.stderr(`Run freshcoat ${running} --help for usage.\n`);
 		return error instanceof CliError ? error.exitCode : 1;
-	} finally {
-		cancel.dispose();
 	}
 }
 
@@ -325,7 +331,7 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		)
 		.addHelpText(
 			"after",
-			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when any item fails, and\n130 on Ctrl-C or 143 on SIGTERM, which cancels the export and removes a\npartly written .zip or .pdf; a second signal exits at once.",
+			"\nFonts a template declares are loaded from their sources; others are looked up\non Google Fonts by name. Relative image paths resolve against the file's\ndirectory; photos named in --data resolve against the data file's directory,\nand a workspace's dataset photos come from the workspace. Written paths, or an\nexport's summary, are printed on stdout. Exits 1 when any item fails, and\n130 on Ctrl-C or 143 on SIGTERM, which cancels the export and leaves an\nexisting .zip or .pdf as it was; a second signal exits at once.",
 		)
 		.addHelpText(
 			"after",

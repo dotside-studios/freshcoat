@@ -285,8 +285,11 @@ The engine and workspace also add:
   of any size; only `readTable`'s limits of 500 columns and 10,000 zip
   entries apply.
 - **Cancellation.** Ctrl-C (SIGINT) exits 130 and SIGTERM exits 143, after
-  removing the partial `.zip` or `.pdf` an export was writing and printing
-  `freshcoat: cancelled`. A second signal exits at once. Workspace saves
+  printing `freshcoat: cancelled`. A `.zip` or `.pdf` export writes a
+  temporary file and renames it over `--out` only on success, so a cancelled
+  export leaves any existing file untouched. A second signal exits at once,
+  and commands other than `render` exit on the first. `main()` installs no
+  signal handlers; hosts cancel it through `io.signal`. Workspace saves
   stream to a temporary file and rename it into place, so a large workspace is
   no longer held in memory and a failed save leaves the old file.
 - **Usage errors.** Options that conflict, such as `--output-intent` with

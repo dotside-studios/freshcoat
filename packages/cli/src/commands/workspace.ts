@@ -31,6 +31,7 @@ import {
 	sheetLayout,
 } from "@freshcoat-js/workspace/export";
 import { fileOutput, folderOutput } from "@freshcoat-js/workspace/node";
+import { pendingFiles } from "../cancel";
 import { fontFetch, withFetch } from "../font-cache";
 import { warnAboutFonts, warnAboutGlyphs } from "../fonts";
 import { CliError, createLog, type Io, type Log, UsageError } from "../io";
@@ -160,6 +161,7 @@ export async function saveWorkspace(
 	workspace: Workspace,
 ): Promise<void> {
 	const temporary = `${path}.${process.pid}.tmp`;
+	pendingFiles.add(temporary);
 	try {
 		await packWorkspace(
 			workspace,
@@ -171,6 +173,8 @@ export async function saveWorkspace(
 	} catch (err) {
 		await rm(temporary, { force: true });
 		throw err;
+	} finally {
+		pendingFiles.delete(temporary);
 	}
 }
 
@@ -233,13 +237,15 @@ export async function runPreset(
 		throw error;
 	}
 	const progress = progressReporter(log, sheetLayout(preset) !== null);
+	const target = file ? fileOutput(out) : undefined;
+	if (target) pendingFiles.add(target.temporary);
 	try {
 		const result = await exportWorkspace(workspace, preset, {
 			renderer,
 			fonts,
 			...(pool ? { pool } : {}),
 			...(signal ? { signal } : {}),
-			output: file ? fileOutput(out) : folderOutput(out),
+			output: target ?? folderOutput(out),
 			checkGlyphs: true,
 			onProgress: progress,
 			pdfCreator: `Freshcoat CLI ${version()}`,
@@ -255,10 +261,8 @@ export async function runPreset(
 		});
 		log.endProgress();
 		if (result.glyphs) warnAboutGlyphs(log, result.glyphs, "records");
-		if (result.cancelled || signal?.aborted) {
-			if (file) await rm(out, { force: true });
+		if (result.cancelled || signal?.aborted)
 			throw new CliError("the export was cancelled");
-		}
 		await options.save?.(result.workspace);
 		for (const item of result.items)
 			for (const warning of item.warnings ?? [])
@@ -279,6 +283,7 @@ export async function runPreset(
 				`${failed.length} ${failed.length === 1 ? "item" : "items"} failed`,
 			);
 	} finally {
+		if (target) pendingFiles.delete(target.temporary);
 		log.endProgress();
 		pool?.dispose();
 		renderer.dispose();
