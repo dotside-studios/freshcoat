@@ -23,6 +23,8 @@ import {
 	findPreset,
 	type JobProgress,
 	largestImagePixels,
+	PDF_CONFIRM_BYTES,
+	PDF_SAMPLE_PAGES,
 	type PresetReadiness,
 	presetReadiness,
 	type SheetPlan,
@@ -37,9 +39,6 @@ import { version } from "../version";
 import { poolSize, startWorkerPool } from "../worker-pool";
 import { readWorkspace } from "../workspace-file";
 
-/** A PDF holds every rendered card in memory until it is assembled. */
-export const DEFAULT_MAX_PDF_CARDS = 2000;
-
 export type WorkspaceOptions = {
 	preset?: string;
 	out: string;
@@ -53,7 +52,6 @@ export type WorkspaceOptions = {
 	cutLines?: true;
 	cutSpot?: CutSpots;
 	minDpi?: number;
-	maxPdfCards?: number;
 	quiet: boolean;
 };
 
@@ -105,10 +103,6 @@ export async function renderWorkspace(
 		throw new CliError(
 			`--cut-spot applies only to a PDF preset; "${preset.name}" writes images, which take --cut`,
 		);
-	if (options.maxPdfCards !== undefined && preset.format !== "pdf")
-		throw new CliError(
-			`--max-pdf-cards applies only to a PDF preset; "${preset.name}" writes images`,
-		);
 	await runPreset(
 		options.where ? withFilters(workspace, preset, options.where) : workspace,
 		chosen,
@@ -117,9 +111,6 @@ export async function renderWorkspace(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
-			...(options.maxPdfCards !== undefined
-				? { maxPdfCards: options.maxPdfCards }
-				: {}),
 			...(options.save
 				? {
 						save: async (next: Workspace) => {
@@ -195,8 +186,6 @@ export async function runPreset(
 		out: string;
 		dryRun?: true;
 		jobs?: number;
-		/** the most cards a PDF may render, default DEFAULT_MAX_PDF_CARDS; 0 for no limit */
-		maxPdfCards?: number;
 		save?: (workspace: Workspace) => Promise<void>;
 		/** the sheet layout came from the command line */
 		layoutFlags?: true;
@@ -204,8 +193,7 @@ export async function runPreset(
 	log: Log,
 	io: Io,
 ): Promise<void> {
-	if (options.dryRun)
-		return planPreset(workspace, preset, options.out, log, options.layoutFlags);
+	if (options.dryRun) return planPreset(workspace, preset, options, log, io);
 	const readiness = presetReadiness(workspace, preset);
 	checkView(readiness.viewProblems);
 	checkSheets(readiness.sheets, options.layoutFlags);
@@ -216,12 +204,6 @@ export async function runPreset(
 		throw new CliError(
 			`preset "${preset.name}": its template is not in the workspace`,
 		);
-	checkPdfCards(
-		preset,
-		plan.length,
-		readiness.sheets,
-		options.maxPdfCards ?? DEFAULT_MAX_PDF_CARDS,
-	);
 	checkCuts(preset, entry.template, log);
 	const { fonts, ...report } = await resolveTemplateFonts(entry.template, {
 		...withFetch(fontFetch(io)),
@@ -261,6 +243,11 @@ export async function runPreset(
 			checkGlyphs: true,
 			onProgress: progress,
 			pdfCreator: `Freshcoat CLI ${version()}`,
+			confirmLargePdf: async (bytes) => {
+				log.warn(largePdfWarning(bytes));
+				return true;
+			},
+			largePdfBytes: io.largeBytes?.pdf ?? PDF_CONFIRM_BYTES,
 		}).catch((error: unknown) => {
 			if (error instanceof SheetLayoutError)
 				throw new CliError(`cannot lay out the sheets: ${error.message}`);
@@ -298,42 +285,17 @@ export async function runPreset(
 	}
 }
 
-/** Refuses a PDF that renders more cards than the limit, before anything is
- *  rendered or written, since every card is held in memory until the PDF is
- *  built. On sheets many cards share a page, so cards are counted, not pages. */
-function checkPdfCards(
-	preset: ExportPreset,
-	cards: number,
-	sheets: SheetPlan | null,
-	max: number,
-): void {
-	if (preset.format !== "pdf" || max === 0 || cards <= max) return;
-	throw new CliError(
-		`this PDF renders ${cards} cards${onSheets(sheets)}, over the limit of ${max}; every card is held in memory until the PDF is built. Export fewer records with --where, or raise the limit with --max-pdf-cards <n> (0 for none)`,
-	);
-}
-
-function onSheets(sheets: SheetPlan | null): string {
-	const imposition = sheets?.imposition;
-	if (!imposition) return "";
-	const count = `${imposition.sheets} ${imposition.sheets === 1 ? "sheet" : "sheets"}`;
-	const pages = imposition.pages.length;
-	return pages === imposition.sheets
-		? ` (${count})`
-		: ` (${count}, ${pages} pages)`;
-}
-
-function planPreset(
+async function planPreset(
 	workspace: Workspace,
 	preset: ExportPreset,
-	out: string,
+	options: { root: string; out: string; layoutFlags?: true },
 	log: Log,
-	layoutFlags?: true,
-): void {
+	io: Io,
+): Promise<void> {
 	const readiness = presetReadiness(workspace, preset);
 	const { plan, sheets, viewProblems } = readiness;
 	checkView(viewProblems);
-	checkSheets(sheets, layoutFlags);
+	checkSheets(sheets, options.layoutFlags);
 	checkPieces(preset, readiness, log);
 	warnNotices(readiness, log);
 	if (preset.format !== "pdf") for (const item of plan) log.out(item.fileName);
@@ -341,8 +303,61 @@ function planPreset(
 		? `, ${sheetSummary(sheets.imposition)}`
 		: "";
 	log.out(
-		`${plan.length} ${plan.length === 1 ? "item" : "items"} would be exported to ${out}${layout}`,
+		`${plan.length} ${plan.length === 1 ? "item" : "items"} would be exported to ${options.out}${layout}`,
 	);
+	if (
+		preset.format !== "pdf" ||
+		plan.length <= PDF_SAMPLE_PAGES ||
+		!readiness.entry
+	)
+		return;
+	const estimate = await samplePdfBytes(
+		workspace,
+		preset,
+		readiness.entry.template,
+		options.root,
+		io,
+	);
+	if (estimate > (io.largeBytes?.pdf ?? PDF_CONFIRM_BYTES))
+		log.warn(largePdfWarning(estimate));
+}
+
+/** Renders the first pages of a PDF, as the export does before it warns,
+ *  and gives the size the whole PDF is estimated at. */
+async function samplePdfBytes(
+	workspace: Workspace,
+	preset: ExportPreset,
+	template: Template,
+	root: string,
+	io: Io,
+): Promise<number> {
+	const { fonts } = await resolveTemplateFonts(template, {
+		...withFetch(fontFetch(io)),
+		load: createLoader(io, root),
+	});
+	io.signal?.throwIfAborted();
+	const renderer = await openRenderer(io, { root, build: "full" });
+	let estimate = 0;
+	try {
+		await exportWorkspace(workspace, preset, {
+			renderer,
+			fonts,
+			...(io.signal ? { signal: io.signal } : {}),
+			confirmLargePdf: async (bytes) => {
+				estimate = bytes;
+				return false;
+			},
+			largePdfBytes: 0,
+		});
+	} finally {
+		renderer.dispose();
+	}
+	io.signal?.throwIfAborted();
+	return estimate;
+}
+
+function largePdfWarning(bytes: number): string {
+	return `this PDF is estimated at ${formatBytes(bytes)}, and it is held in memory until it is built; if the export runs out of memory, split it with --where`;
 }
 
 /** Refuses sheets that can't be laid out; a back offset given on the command
@@ -431,5 +446,6 @@ function progressReporter(
 function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+	if (bytes < 1024 ** 3) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+	return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }

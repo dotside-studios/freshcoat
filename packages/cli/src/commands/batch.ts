@@ -109,9 +109,6 @@ export type BatchOptions = {
 	cutLines?: true;
 	cutSpot?: CutSpots;
 	minDpi?: number;
-	maxPdfCards?: number;
-	/** 0 for no limit */
-	maxRows?: number;
 	/** an ICC file; false declares none */
 	outputIntent?: string | false;
 	outputIntentId?: string;
@@ -141,9 +138,6 @@ export async function renderBatch(
 			out: options.out,
 			...(options.dryRun ? { dryRun: true } : {}),
 			...(options.jobs ? { jobs: options.jobs } : {}),
-			...(options.maxPdfCards !== undefined
-				? { maxPdfCards: options.maxPdfCards }
-				: {}),
 			...(options.sheets ? { layoutFlags: true } : {}),
 		},
 		log,
@@ -186,13 +180,7 @@ export async function batchPreset(
 						{ id: "r_00000001", values: {}, status: "pending" as const },
 					],
 				}
-			: await readDataset(
-					io,
-					log,
-					template,
-					options.data,
-					tableLimits(options.maxRows),
-				);
+			: await readDataset(io, log, template, options.data);
 	if (options.data === undefined) checkValues(template, constants.values);
 	const dataset = { ...read, assets: [...read.assets, ...constants.assets] };
 
@@ -388,53 +376,36 @@ function checkName(template: Template, pattern: string): void {
 		);
 }
 
-/** The import limits for `--max-rows`: the row cap, and the byte and cell
- *  caps raised in proportion to it, so a longer file of the same shape fits. */
-export function tableLimits(maxRows: number | undefined): TableLimits {
-	const defaults = DEFAULT_TABLE_LIMITS;
-	if (maxRows === undefined) return { ...defaults };
-	if (maxRows === 0)
-		return {
-			...defaults,
-			maxBytes: Number.POSITIVE_INFINITY,
-			maxUncompressedBytes: Number.POSITIVE_INFINITY,
-			maxRows: Number.POSITIVE_INFINITY,
-			maxCells: Number.POSITIVE_INFINITY,
-		};
-	const scale = Math.max(maxRows / defaults.maxRows, 1);
-	return {
-		...defaults,
-		maxBytes: Math.ceil(defaults.maxBytes * scale),
-		maxUncompressedBytes: Math.ceil(defaults.maxUncompressedBytes * scale),
-		maxRows,
-		maxCells: Math.ceil(defaults.maxCells * scale),
-	};
-}
+/** The CLI reads a data file of any size and warns when it is large; only
+ *  the column and zip entry limits stay. */
+const CLI_TABLE_LIMITS: TableLimits = {
+	...DEFAULT_TABLE_LIMITS,
+	maxBytes: Number.POSITIVE_INFINITY,
+	maxUncompressedBytes: Number.POSITIVE_INFINITY,
+	maxRows: Number.POSITIVE_INFINITY,
+	maxCells: Number.POSITIVE_INFINITY,
+};
 
 async function readDataset(
 	io: Io,
 	log: Log,
 	template: Template,
 	file: string,
-	limits: TableLimits,
 ): Promise<Dataset> {
 	let sheets: Awaited<ReturnType<typeof readTable>>["sheets"];
 	try {
 		const { size } = await stat(resolve(io.cwd, file)).catch(() => ({
 			size: 0,
 		}));
-		if (size > limits.maxBytes)
-			throw new TableLimitError("bytes", size, limits.maxBytes, file);
+		if (size > (io.largeBytes?.data ?? DEFAULT_TABLE_LIMITS.maxBytes))
+			log.warn(
+				`${file} is ${(size / 1024 / 1024).toFixed(1)} MB, and reading it takes many times that in memory, a workbook more than a CSV; if it runs out of memory, split the file`,
+			);
 		({ sheets } = await readTable(await readBytes(io, file), file, {
-			limits,
+			limits: CLI_TABLE_LIMITS,
 		}));
 	} catch (error) {
-		if (error instanceof TableLimitError)
-			throw new CliError(
-				error.limit === "columns" || error.limit === "zip_entries"
-					? error.message
-					: `${error.message}; raise it with --max-rows <n>, 0 for no limit`,
-			);
+		if (error instanceof TableLimitError) throw new CliError(error.message);
 		if (error instanceof TabularError)
 			throw new CliError(`${file}: ${error.message}`);
 		throw error;

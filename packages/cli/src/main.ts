@@ -6,7 +6,6 @@ import {
 } from "@commander-js/extra-typings";
 import { PRINT_TARGETS } from "@freshcoat-js/for-print";
 import { PRESET_SCALE } from "@freshcoat-js/workspace";
-import { DEFAULT_TABLE_LIMITS } from "@freshcoat-js/workspace/tabular";
 import {
 	ArgumentError,
 	collect,
@@ -19,8 +18,6 @@ import {
 	parseLength,
 	parseMarks,
 	parseMaxEdge,
-	parseMaxPdfCards,
-	parseMaxRows,
 	parseMinDpi,
 	parseOffset,
 	parsePaper,
@@ -32,7 +29,6 @@ import { inspect } from "./commands/inspect";
 import { pack } from "./commands/pack";
 import { runRender } from "./commands/render-plan";
 import { validateCommand } from "./commands/validate";
-import { DEFAULT_MAX_PDF_CARDS } from "./commands/workspace";
 import { CliError, type Io, processIo, UsageError } from "./io";
 import { version } from "./version";
 
@@ -154,11 +150,6 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 			"--data <file>",
 			"CSV, TSV, Excel, .ods or JSON; the first row names the fields",
 		)
-		.option(
-			"--max-rows <n>",
-			`refuse a --data file with more records, not counting its header; default ${DEFAULT_TABLE_LIMITS.maxRows.toLocaleString("en-US")}, 0 for no limit. Raises the file size and cell caps in proportion`,
-			arg(parseMaxRows),
-		)
 		.option("--values <file>", "JSON file of field values")
 		.option(
 			"--set <key=value>",
@@ -234,11 +225,6 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 				"--pdf-text <mode>",
 				"how vector pages draw text: embed its fonts, or outline its glyphs; default embed",
 			).choices(["embed", "outline"] as const),
-		)
-		.option(
-			"--max-pdf-cards <n>",
-			`refuse a PDF that renders more cards, one per card side, which are all held in memory until it is built; counted before sheets are laid out; default ${DEFAULT_MAX_PDF_CARDS}, 0 for no limit`,
-			arg(parseMaxPdfCards),
 		)
 		.option("--cut-lines", "draw the cut lines over each page")
 		.option(

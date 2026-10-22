@@ -879,38 +879,6 @@ describe("render a template with --data", () => {
 		]);
 	});
 
-	test("explains a data file with too many records", async () => {
-		await box.write("huge.csv", `Name\n${"Ana\n".repeat(3)}`);
-		const run = await box.run(
-			"render",
-			"badge.json",
-			"--data",
-			"huge.csv",
-			"--max-rows",
-			"2",
-			"--out",
-			"huge.zip",
-		);
-		expect(run.code).toBe(1);
-		expect(run.stderr).toContain(
-			"huge.csv is too large to import: 3 records is over the limit of 2 records; raise it with --max-rows <n>, 0 for no limit",
-		);
-	});
-
-	test("takes a data file at the --max-rows cap", async () => {
-		const run = await box.run(
-			"render",
-			"badge.json",
-			"--data",
-			"people.csv",
-			"--max-rows",
-			"2",
-			"--out",
-			"capped.zip",
-		);
-		expect(run.code).toBe(0);
-	});
-
 	test("takes frames, a variant, a scale, a format and constants", async () => {
 		const run = await box.run(
 			"render",

@@ -93,24 +93,6 @@ export function parseJobs(entry: string): number {
 	return value;
 }
 
-export function parseMaxPdfCards(entry: string): number {
-	const value = Number(entry);
-	if (!Number.isInteger(value) || value < 0)
-		throw new ArgumentError(
-			"Expected a whole number of cards, 0 or more; 0 for no limit.",
-		);
-	return value;
-}
-
-export function parseMaxRows(entry: string): number {
-	const value = Number(entry);
-	if (!Number.isInteger(value) || value < 0)
-		throw new ArgumentError(
-			"Expected a whole number of records, 0 or more; 0 for no limit.",
-		);
-	return value;
-}
-
 export function parsePositive(entry: string): number {
 	const value = Number(entry);
 	if (!Number.isFinite(value) || value <= 0)
