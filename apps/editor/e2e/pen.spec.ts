@@ -24,6 +24,8 @@ test("the pen draws a closed shape from clicks", async ({ page }) => {
 		"data-selected",
 		"true",
 	);
+	// Mod turns snapping off: x 100 is within reach of the badge text's edge.
+	await page.keyboard.down(mod);
 	for (const [x, y] of [
 		[100, 100],
 		[300, 100],
@@ -32,6 +34,7 @@ test("the pen draws a closed shape from clicks", async ({ page }) => {
 		const p = await artboardPoint(page, x, y);
 		await page.mouse.click(p.x, p.y);
 	}
+	await page.keyboard.up(mod);
 	await expect(page.getByTestId("pen-draft")).toHaveAttribute(
 		"data-points",
 		"3",

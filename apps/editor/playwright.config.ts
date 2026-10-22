@@ -6,6 +6,31 @@ const port = Number(process.env.FRESHCOAT_PORT ?? 3010);
 // should measure: React's development build costs several times as much.
 const preview = !!process.env.FRESHCOAT_PREVIEW;
 
+const BENCH = /bench\.spec\.ts$/;
+const TIMING = /data-scale\.spec\.ts$/;
+// FRESHCOAT_SMOKE=1 narrows desktop to the subset e2e:smoke runs, so one
+// server serves it and the cross-browser projects.
+const SMOKE = [
+	"smoke",
+	"inspector",
+	"workspace",
+	"data",
+	"export",
+	"starters",
+	"barcode",
+	"sheets",
+	"url",
+	"handoff",
+].map((name) => `${name}.spec.ts`);
+const chromium = {
+	...devices["Desktop Chrome"],
+	viewport: { width: 1440, height: 900 },
+	launchOptions: {
+		...(executablePath ? { executablePath } : {}),
+		args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+	},
+};
+
 export default defineConfig({
 	testDir: "./e2e",
 	timeout: 60_000,
@@ -24,14 +49,24 @@ export default defineConfig({
 	projects: [
 		{
 			name: "desktop",
-			use: {
-				...devices["Desktop Chrome"],
-				viewport: { width: 1440, height: 900 },
-				launchOptions: {
-					...(executablePath ? { executablePath } : {}),
-					args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
-				},
-			},
+			...(process.env.FRESHCOAT_SMOKE ? { testMatch: SMOKE } : {}),
+			testIgnore: [BENCH, TIMING],
+			use: chromium,
+		},
+		// Main-thread budgets, which hold only with the machine to themselves:
+		// after desktop, one test at a time.
+		{
+			name: "desktop-timing",
+			testMatch: TIMING,
+			dependencies: ["desktop"],
+			workers: 1,
+			use: chromium,
+		},
+		// Timings for e2e:bench: slow and machine-bound, so not in desktop.
+		{
+			name: "bench",
+			testMatch: BENCH,
+			use: chromium,
 		},
 		{
 			name: "firefox",

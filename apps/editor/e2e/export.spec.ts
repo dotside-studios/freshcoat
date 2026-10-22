@@ -215,6 +215,34 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 		.getByRole("radiogroup", { name: "Format" })
 		.getByRole("radio", { name: "PNG" })
 		.click();
+	// A zip file whose writes wait until released, so the job is still
+	// running when Cancel is pressed however fast it renders.
+	await page.evaluate(() => {
+		const w = window as unknown as {
+			showSaveFilePicker: unknown;
+			__releaseWrites: () => void;
+		};
+		const held: (() => void)[] = [];
+		let released = false;
+		w.__releaseWrites = () => {
+			released = true;
+			for (const resolve of held.splice(0)) resolve();
+		};
+		w.showSaveFilePicker = async () => ({
+			createWritable: async () =>
+				new WritableStream({
+					write: () =>
+						released
+							? undefined
+							: new Promise<void>((resolve) => held.push(resolve)),
+				}),
+		});
+	});
+	await settingsTab(page, "Files");
+	await page
+		.getByRole("radiogroup", { name: "Destination" })
+		.getByRole("radio", { name: "Zip file" })
+		.click();
 	let downloads = 0;
 	page.on("download", () => downloads++);
 	await page.getByRole("button", { name: "Export 80 files" }).click();
@@ -239,6 +267,9 @@ test("bind, preview, export a zip and a PDF, change statuses, cancel", async ({
 		.getByTestId("export-job")
 		.getByRole("button", { name: "Cancel" })
 		.click();
+	await page.evaluate(() =>
+		(window as unknown as { __releaseWrites: () => void }).__releaseWrites(),
+	);
 	await expect(page.getByTestId("export-job")).toHaveAttribute(
 		"data-state",
 		"cancelled",

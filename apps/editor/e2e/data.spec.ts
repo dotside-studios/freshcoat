@@ -1009,7 +1009,10 @@ test("column filter chips narrow the records beside the status filter", async ({
 	await page.getByRole("option", { name: "points" }).click();
 	await popover.getByRole("button", { name: /Test/ }).click();
 	await page.getByRole("option", { name: "is empty" }).click();
+	// Escape closes the popover once focus is back in it from the listbox.
+	await expect(popover.getByRole("button", { name: /Test/ })).toBeFocused();
 	await page.keyboard.press("Escape");
+	await expect(popover).toBeHidden();
 	await expect.poll(() => columnTexts(page, "name")).toEqual(["Alan"]);
 
 	await page

@@ -61,7 +61,7 @@ import {
 	SHEETS_NEED_TEMPLATE_SIZE,
 	type SheetPlan,
 } from "@freshcoat-js/workspace/export";
-import { Fragment, type ReactNode, useRef, useState } from "react";
+import { Fragment, type ReactNode, useMemo, useRef, useState } from "react";
 import {
 	Disclosure,
 	DisclosurePanel,
@@ -316,7 +316,10 @@ export function ExportSettings({
 			input?.setSelectionRange(start + text.length, start + text.length);
 		});
 	};
-	const recordCount = new Set(plan.map((item) => item.recordId)).size;
+	const recordCount = useMemo(
+		() => new Set(plan.map((item) => item.recordId)).size,
+		[plan],
+	);
 
 	return (
 		<div

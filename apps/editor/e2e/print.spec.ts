@@ -31,6 +31,10 @@ async function download(page: Page, start: () => Promise<void>) {
 	return new Uint8Array(await readFile(await file.path()));
 }
 
+// The sample's small text and hairlines, which the print checks of #227
+// report in the warnings column whether print is on or off.
+const PRINT_CHECKS = '("[^"]* at print size, below [^"]*")?';
+
 type Export = { pngs: Record<string, Uint8Array>; report: string[] };
 
 async function exportZip(page: Page): Promise<Export> {
@@ -141,9 +145,8 @@ test("a printing PNG export carries the finish, and the report says so", async (
 	expect(plain.report[0]).toBe(
 		"file,record,side,status,error,print,gamut,unfilled,warnings",
 	);
-	expect(plain.report.slice(1).every((l) => l.endsWith(",ok,,off,,,"))).toBe(
-		true,
-	);
+	for (const line of plain.report.slice(1))
+		expect(line).toMatch(new RegExp(`,ok,,off,,,${PRINT_CHECKS}$`));
 
 	await choosePrintTarget(page);
 	expect(
@@ -164,7 +167,7 @@ test("a printing PNG export carries the finish, and the report says so", async (
 	const printed = await exportZip(page);
 	expect(Object.keys(printed.pngs)).toEqual(Object.keys(plain.pngs));
 	for (const line of printed.report.slice(1))
-		expect(line).toMatch(/,ok,,on,(\d+%)?,,$/);
+		expect(line).toMatch(new RegExp(`,ok,,on,(\\d+%)?,,${PRINT_CHECKS}$`));
 	for (const name of Object.keys(plain.pngs)) {
 		const a = plain.pngs[name] as Uint8Array;
 		const b = printed.pngs[name] as Uint8Array;
@@ -259,7 +262,7 @@ test("a print profile imports, shows, changes the output, and a malformed one is
 
 	const profiled = await exportZip(page);
 	for (const line of profiled.report.slice(1))
-		expect(line).toMatch(/,ok,,on,(\d+%)?,,$/);
+		expect(line).toMatch(new RegExp(`,ok,,on,(\\d+%)?,,${PRINT_CHECKS}$`));
 	for (const name of Object.keys(noProfile.pngs))
 		expect(
 			await differingPixels(
@@ -352,7 +355,10 @@ test("a photo pulled into printer range says how much, in the preview and the re
 
 	const out = await exportZip(page);
 	expect(out.report).toHaveLength(2);
-	expect(out.report[1]).toMatch(/,ok,,on,\d+%,,$/);
+	// Studio checks a minimum of 300 DPI since #244, which the small photo misses.
+	expect(out.report[1]).toMatch(
+		/,ok,,on,\d+%,,"Image prints at \d+ DPI, under 300: photo"$/,
+	);
 });
 
 /** The PNG with every color channel scaled, as a photo exposed below the

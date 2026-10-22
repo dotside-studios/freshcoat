@@ -148,19 +148,22 @@ test("bench: watermark 200 photos", async ({ page }, info) => {
 	}
 });
 
-// A 100,000-record CSV of 20 columns, read and imported as the wizard does
-// it: in the import worker, and on the page for comparison.
-test("bench: import a 100k-record CSV", async ({ page }, info) => {
+// The largest CSV of 20 columns the 100,000-row import limit of #255 takes,
+// header included, read and imported as the wizard does it: in the import
+// worker, and on the page for comparison.
+const IMPORT_RECORDS = 99_999;
+
+test("bench: import a 99,999-record CSV", async ({ page }, info) => {
 	test.setTimeout(300_000);
 	await page.goto("/");
 	await page.waitForLoadState("networkidle");
 	const probe = (inPage: boolean) =>
 		page.evaluate(
-			async ({ path, inPage }) => {
+			async ({ path, inPage, records }) => {
 				const mod = await import(/* @vite-ignore */ path);
-				return mod.runImportProbe(100_000, { inPage });
+				return mod.runImportProbe(records, { inPage });
 			},
-			{ path: probePath("import-probe"), inPage },
+			{ path: probePath("import-probe"), inPage, records: IMPORT_RECORDS },
 		) as Promise<{
 			bytes: number;
 			records: number;
@@ -175,8 +178,8 @@ test("bench: import a 100k-record CSV", async ({ page }, info) => {
 		body: JSON.stringify(result, null, 2),
 		contentType: "application/json",
 	});
-	expect(worker.records).toBe(100_000);
-	expect(inPage.records).toBe(100_000);
+	expect(worker.records).toBe(IMPORT_RECORDS);
+	expect(inPage.records).toBe(IMPORT_RECORDS);
 	expect(worker.read.longestTaskMs).toBeLessThan(200);
 	expect(worker.import.longestTaskMs).toBeLessThan(200);
 });

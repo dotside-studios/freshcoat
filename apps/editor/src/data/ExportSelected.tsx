@@ -172,8 +172,6 @@ export function DataJobBar({ onShowFailed }: { onShowFailed: () => void }) {
 	if (!job || job.id === dismissed) return null;
 	return (
 		<JobBar
-			jobs={jobs}
-			snapshot={jobs.snapshot}
 			preset={presets?.find((p) => p.id === job.presetId)}
 			count={0}
 			blocked={null}
