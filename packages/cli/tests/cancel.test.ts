@@ -19,6 +19,12 @@ beforeAll(async () => {
 	const rows = Array.from({ length: 80 }, (_, i) => `Person ${i}`);
 	await box.write("offline.json", JSON.stringify(card({ fonts: [] })));
 	await box.write("people.csv", `name\n${rows.join("\n")}\n`);
+	await box.write("pair.csv", `name\n${rows.slice(0, 2).join("\n")}\n`);
+	await box.write("crew.coatworkspace", await crew(rows));
+	await box.write("pair.coatworkspace", await crew(rows.slice(0, 2)));
+});
+
+function crew(rows: string[]): Promise<Uint8Array> {
 	const workspace = workspaceOf(card());
 	const [dataset] = workspace.datasets;
 	if (dataset)
@@ -27,8 +33,8 @@ beforeAll(async () => {
 			values: { name },
 			status: "pending" as const,
 		}));
-	await box.write("crew.coatworkspace", await workspaceBytes(workspace));
-});
+	return workspaceBytes(workspace);
+}
 
 afterAll(() => box.cleanup());
 
@@ -126,7 +132,7 @@ describe("cancellation", () => {
 			"render",
 			"badge.json",
 			"--data",
-			"people.csv",
+			"pair.csv",
 			"--out",
 			"done.zip",
 			"-q",
@@ -235,7 +241,7 @@ describe("existing output", () => {
 		await box.write("replaced.pdf", "old");
 		const run = await box.run(
 			"render",
-			"crew.coatworkspace",
+			"pair.coatworkspace",
 			"--preset",
 			"p_pdf",
 			"--out",
