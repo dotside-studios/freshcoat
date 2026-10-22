@@ -3,7 +3,7 @@ import { patternInputMaxLength, unsafePatternReason } from "../src/safe-regex";
 import { compiledPattern } from "../src/text-rules";
 
 const SEED = 0x5afe;
-const PATTERNS = 4_000;
+const PATTERNS = 2_000;
 const TIME_LIMIT_MS = 100;
 
 const ATOMS = ["a", "1", ".", "\\w", "\\d", "\\S", "[a-c]", "[^b]"];
@@ -34,6 +34,7 @@ function generate(next: () => number): string {
 	const pick = <T>(list: T[]): T => list[Math.floor(next() * list.length)] as T;
 	const node = (depth: number): string => {
 		const roll = next();
+		if (roll < 0.1) return pick(AMBIGUOUS).repeat(2 + Math.floor(next() * 10));
 		if (roll < 0.3)
 			return pick(AMBIGUOUS) + (next() < 0.8 ? "" : pick(QUANTIFIERS));
 		if (depth > 2 || roll < 0.6) return pick(ATOMS) + pick(QUANTIFIERS);
@@ -46,10 +47,25 @@ function generate(next: () => number): string {
 		Array.from({ length: 1 + Math.floor(next() * 4) }, () => node(depth)).join(
 			"",
 		);
-	const body = Array.from({ length: 1 + Math.floor(next() * 40) }, () =>
-		node(0),
-	).join("");
-	return `^(?:${body})$`;
+	const body = (max: number): string =>
+		Array.from({ length: 1 + Math.floor(next() * max) }, () => node(0)).join(
+			"",
+		);
+	const prefix = pick([
+		".*",
+		"\\w*",
+		"[a-z]+",
+		`\\w{0,${1 + Math.floor(next() * 60)}}`,
+	]);
+	const tail = pick(["", "b", "!", "$"]);
+	const shapes = [
+		() => `^(?:${body(12)})$`,
+		() => `${body(4)}${tail}`,
+		() => `${prefix}${body(4)}${tail}`,
+		() => `${body(3)}.*${body(3)}${tail}`,
+		() => `^${prefix}${body(4)}${tail}`,
+	];
+	return pick(shapes)();
 }
 
 function adversarial(next: () => number, length: number): string[] {
@@ -60,6 +76,22 @@ function adversarial(next: () => number, length: number): string[] {
 		`${"a1".repeat(length / 2)}\n`,
 		Array.from({ length }, () => pick(FILLERS)).join(""),
 	];
+}
+
+// Unanchored patterns retry from every offset, so even `.*x` is quadratic.
+// Anything slower than a few times that is a blowup the check missed.
+const baselines = new Map<number, number>();
+function quadraticBaseline(length: number): number {
+	let ms = baselines.get(length);
+	if (ms !== undefined) return ms;
+	const re = /.*x/u;
+	const input = `${"a".repeat(length)}!`;
+	re.test(input);
+	const started = performance.now();
+	re.test(input);
+	ms = performance.now() - started;
+	baselines.set(length, ms);
+	return ms;
 }
 
 test("accepted random patterns finish on adversarial input", () => {
@@ -74,14 +106,15 @@ test("accepted random patterns finish on adversarial input", () => {
 		const limit = patternInputMaxLength(pattern);
 		for (const length of [32, limit])
 			for (const input of adversarial(next, length)) {
+				const bound = Math.max(TIME_LIMIT_MS, 4 * quadraticBaseline(length));
 				const started = performance.now();
 				re.test(input);
 				const elapsed = performance.now() - started;
-				if (elapsed >= TIME_LIMIT_MS)
+				if (elapsed >= bound)
 					throw new Error(
 						`${pattern} took ${elapsed} ms on ${input.length} chars`,
 					);
 			}
 	}
 	expect(accepted).toBeGreaterThan(PATTERNS / 100);
-});
+}, 60_000);

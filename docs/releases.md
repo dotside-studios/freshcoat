@@ -152,7 +152,12 @@ old behaviour where that is possible.
   - repeating a group whose alternatives may overlap, such as `(a|aa)+` or
     `(\w|\d)*`;
   - chaining enough groups with overlapping alternatives to split a value more
-    than 1,024 ways, such as eleven `(?:.|a)` in a row;
+    than 1,024 ways, such as eleven `(?:.|a)` in a row. A variable quantifier
+    before the chain that can stop on the chain's first characters counts as
+    256 ways, so `.*(?:.|a)(?:.|a)(?:.|a)b` is refused
+    (`adjacent_quantifiers`). In a pattern that does not start with `^`, a
+    variable quantifier after the chain also counts as 256 ways, so
+    `(?:.|a)(?:.|a)(?:.|a).*b` is refused;
   - putting two variable quantifiers able to match the same character next to
     each other, such as `\d*\d*` or `.*a.*` (`adjacent_quantifiers`);
   - using an inline modifier group such as `(?i:...)`, which Node 22 cannot
@@ -167,7 +172,8 @@ old behaviour where that is possible.
   At render time a refused pattern imposes no constraint, and a value over
   10,000 characters counts as `pattern_mismatch` without being tested. A
   pattern accepted only because a bounded repeat keeps its backtracking small,
-  such as `^(\d{1,3}\.){3}\d{1,3}$`, tests at most 256 characters
+  such as `^(\d{1,3}\.){3}\d{1,3}$`, or one with a group whose alternatives
+  may overlap, such as `^(?:\d+|\.\d+)fr$`, tests at most 256 characters
   (`PATTERN_GUARDED_INPUT_MAX_LENGTH`; `patternInputMaxLength(pattern)` returns
   the cap). Dataset column patterns follow the same rules, and Studio's pattern
   inputs say why a pattern is refused.

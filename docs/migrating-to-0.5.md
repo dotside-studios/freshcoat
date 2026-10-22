@@ -198,7 +198,10 @@ A field `pattern` fails `validate` with `unsafe_field_pattern` when it:
   `(.*a){20}`), counting `{n}`, `{n,}` and `{n,m}` as repeats;
 - repeats a group whose alternatives may overlap (`(\w|\d)*`);
 - chains enough groups with overlapping alternatives to split a value more
-  than 1,024 ways (eleven `(?:.|a)` in a row);
+  than 1,024 ways (eleven `(?:.|a)` in a row). A variable quantifier before
+  the chain that can stop on the chain's first characters counts as 256 ways
+  (`.*(?:.|a)(?:.|a)(?:.|a)b`), and so does a variable quantifier after the
+  chain when the pattern does not start with `^` (`(?:.|a)(?:.|a)(?:.|a).*b`);
 - puts two variable quantifiers able to match the same character next to each
   other (`\d*\d*`, `.*a.*`);
 - uses an inline modifier group (`(?i:...)`);
@@ -215,7 +218,8 @@ Some common patterns are refused by these rules:
 Rewrite the pattern, or check the value in your own code. At render time a
 refused pattern imposes no constraint. A pattern accepted only because a
 bounded repeat keeps its backtracking small, such as
-`^(\d{1,3}\.){3}\d{1,3}$`, tests at most 256 characters of a value
+`^(\d{1,3}\.){3}\d{1,3}$`, or one with a group whose alternatives may
+overlap, such as `^(?:\d+|\.\d+)fr$`, tests at most 256 characters of a value
 (`PATTERN_GUARDED_INPUT_MAX_LENGTH`, `patternInputMaxLength()`).
 
 `{{constructor}}`, `{{toString}}` and `{{__proto__}}` render empty unless the
