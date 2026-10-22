@@ -46,6 +46,11 @@ and print workflows. If that sounds like your kind of work, see the
 
 ## Quick start
 
+The npm packages run on Node 22 or later and Bun 1.3.13 or later. On Node 22,
+npm prints an `EBADENGINE` warning for `hucre`, the spreadsheet dependency,
+which declares Node 24; spreadsheet import and export work on Node 22, so the
+warning is safe to ignore.
+
 From a terminal, install the command line and render a template. To try it
 without a template of your own, download
 [`minimal-card.json`](packages/coatfile/fixtures/minimal-card.json) and pack
