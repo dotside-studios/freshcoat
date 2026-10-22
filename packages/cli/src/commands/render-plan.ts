@@ -142,6 +142,8 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		rest.format !== "png"
 	)
 		throw new UsageError("--png-alpha needs --format png");
+	if (rest.maxRows !== undefined && rest.data === undefined)
+		throw new UsageError("--max-rows needs --data");
 	if (rest.where !== undefined && rest.data === undefined)
 		throw new UsageError("--where needs --data or a .coatworkspace file");
 	if (rest.printProfile !== undefined && rest.printTarget === "none")

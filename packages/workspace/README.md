@@ -81,17 +81,27 @@ await readTable(bytes, "people.xlsx", { limits: { maxRows: 500_000 } });
 
 | Option | `limit` | Default | Counts |
 | --- | --- | --- | --- |
-| `maxBytes` | `bytes` | 64 MiB | the file's bytes (characters, for a string) |
+| `maxBytes` | `bytes` | 128 MiB | the file's bytes (characters, for a string) |
 | `maxUncompressedBytes` | `uncompressed_bytes` | 512 MiB | a workbook zip's declared uncompressed size, summed over entries, and the inflated size of any one entry |
 | `maxZipEntries` | `zip_entries` | 10,000 | entries in a workbook zip |
-| `maxRows` | `rows` | 100,000 | rows of one sheet, before empty trailing rows are trimmed |
+| `maxRows` | `rows` | 500,000 | records of one sheet: the rows after the first, which is the header, before empty trailing rows are trimmed; a JSON list of objects counts its objects |
 | `maxColumns` | `columns` | 500 | columns of one sheet, before empty trailing columns are trimmed |
-| `maxCells` | `cells` | 5,000,000 | rows times columns of one sheet |
+| `maxCells` | `cells` | 10,000,000 | records times columns of one sheet |
 
 `DEFAULT_TABLE_LIMITS` holds the defaults. CSV and TSV stop at the row and
 column caps while parsing; JSON and NDJSON check the row count before building
 rows. Binary `.xls` has no zip, so only the byte, row, column and cell limits
 reach it.
+
+Memory follows cells more than records. A CSV runs about 11 bytes a cell, its
+parsed rows about 60 and a dataset held in Studio about 30, so the defaults
+keep a 10,000,000-cell import near 2 GB in a browser tab, with room for an
+export. A workbook takes two to three times a CSV's memory to read.
+
+Text longer than a JavaScript string can be, about 512 MB in Node and
+Chromium, cannot be read whatever the limits. `readTable()` refuses it with a
+`bytes` limit error whose `max` is `MAX_TEXT_LENGTH`, where Node would throw
+`ERR_STRING_TOO_LONG` and Chromium would decode it to nothing. Bun reads it.
 
 ## The shape of a workspace
 

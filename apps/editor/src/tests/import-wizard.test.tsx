@@ -1,5 +1,6 @@
 import type { Dataset } from "@freshcoat-js/workspace";
 import * as ws from "@freshcoat-js/workspace";
+import { DEFAULT_TABLE_LIMITS } from "@freshcoat-js/workspace/tabular";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ControllerProvider } from "../app/context";
@@ -365,7 +366,8 @@ describe("Import wizard", { timeout: 30_000 }, () => {
 
 describe("Import wizard: limits", () => {
 	it("says which limit a file is over", async () => {
-		const rows = `name\n${"P\n".repeat(100_000)}`;
+		const max = DEFAULT_TABLE_LIMITS.maxRows;
+		const rows = `name\n${"P\n".repeat(max + 1)}`;
 		render(
 			<ControllerProvider controller={controller}>
 				<ImportWizard
@@ -378,10 +380,26 @@ describe("Import wizard: limits", () => {
 				/>
 			</ControllerProvider>,
 		);
+		const count = (n: number) => n.toLocaleString("en-US");
 		expect(
 			await screen.findByText(
-				"huge.csv is too large to import: 100,001 rows is over the limit of 100,000 rows",
+				`huge.csv is too large to import: ${count(max + 1)} records is over the limit of ${count(max)} records`,
 			),
 		).toBeTruthy();
+	});
+
+	it("states the limits before a file is chosen", () => {
+		render(
+			<ControllerProvider controller={controller}>
+				<ImportWizard
+					target={{ datasetId: "d_people" }}
+					onClose={() => {}}
+					onImported={() => {}}
+				/>
+			</ControllerProvider>,
+		);
+		expect(screen.getByTestId("import-limits").textContent).toBe(
+			`Up to ${DEFAULT_TABLE_LIMITS.maxRows.toLocaleString("en-US")} records below the header, 500 columns and 128 MB`,
+		);
 	});
 });

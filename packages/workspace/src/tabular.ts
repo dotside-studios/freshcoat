@@ -47,21 +47,23 @@ export type TableLimits = {
 	maxUncompressedBytes: number;
 	/** Entries in a workbook zip. */
 	maxZipEntries: number;
-	/** Rows of one sheet, before empty trailing rows are trimmed. */
+	/** Data records of one sheet: rows after the first, which is the header,
+	 *  counted before empty trailing rows are trimmed. A JSON list of objects
+	 *  counts its objects. */
 	maxRows: number;
 	/** Columns of one sheet, before empty trailing columns are trimmed. */
 	maxColumns: number;
-	/** Cells of one sheet, rows times columns. */
+	/** Cells of one sheet, records times columns. */
 	maxCells: number;
 };
 
 export const DEFAULT_TABLE_LIMITS: Readonly<TableLimits> = {
-	maxBytes: 64 * 1024 * 1024,
+	maxBytes: 128 * 1024 * 1024,
 	maxUncompressedBytes: 512 * 1024 * 1024,
 	maxZipEntries: 10_000,
-	maxRows: 100_000,
+	maxRows: 500_000,
 	maxColumns: 500,
-	maxCells: 5_000_000,
+	maxCells: 10_000_000,
 };
 
 export type ReadTableOptions = { limits?: Partial<TableLimits> };
@@ -70,7 +72,7 @@ const LIMIT_LABELS: Record<TableLimitKind, { label: string; size: boolean }> = {
 	bytes: { label: "bytes", size: true },
 	uncompressed_bytes: { label: "uncompressed bytes", size: true },
 	zip_entries: { label: "zip entries", size: false },
-	rows: { label: "rows", size: false },
+	rows: { label: "records", size: false },
 	columns: { label: "columns", size: false },
 	cells: { label: "cells", size: false },
 };
@@ -94,8 +96,10 @@ export class TableLimitError extends TabularError {
 		fileName: string,
 	) {
 		const { label, size } = LIMIT_LABELS[limit];
+		const exact =
+			size && actual !== undefined && sizeText(actual) === sizeText(max);
 		const show = (n: number) =>
-			size ? sizeText(n) : `${n.toLocaleString("en-US")} ${label}`;
+			size && !exact ? sizeText(n) : `${n.toLocaleString("en-US")} ${label}`;
 		super(
 			"limit_exceeded",
 			`${fileName} is too large to import: ${actual === undefined ? "it" : show(actual)} is over the limit of ${show(max)}`,
@@ -132,17 +136,39 @@ function extensionOf(fileName: string): string {
 	return dot === -1 ? "" : fileName.slice(dot + 1).toLowerCase();
 }
 
+/** The longest string V8 makes, the limit on text in Node and Chromium. */
+export const MAX_TEXT_LENGTH = 0x1fffffe8;
+
+function isTooLong(err: unknown): boolean {
+	return (
+		err instanceof RangeError ||
+		(err as { code?: string } | null)?.code === "ERR_STRING_TOO_LONG"
+	);
+}
+
 // A file saved by Excel on Windows is often not UTF-8; reading it as UTF-8
-// would turn every accented letter into a replacement character.
-function decodeText(input: Uint8Array | string): string {
+// would turn every accented letter into a replacement character. Text longer
+// than a string can be makes Node throw and Chromium return "", so both call
+// `tooLong`; only a lone byte order mark decodes to "" otherwise.
+function decodeText(input: Uint8Array | string, tooLong: () => never): string {
 	let text: string;
 	if (typeof input === "string") text = input;
 	else {
+		const decode = (label: string, fatal: boolean) => {
+			try {
+				return new TextDecoder(label, { fatal }).decode(input);
+			} catch (err) {
+				if (isTooLong(err)) tooLong();
+				throw err;
+			}
+		};
 		try {
-			text = new TextDecoder("utf-8", { fatal: true }).decode(input);
-		} catch {
-			text = new TextDecoder("windows-1252").decode(input);
+			text = decode("utf-8", true);
+		} catch (err) {
+			if (err instanceof TableLimitError) throw err;
+			text = decode("windows-1252", false);
 		}
+		if (text === "" && input.length > 3) tooLong();
 	}
 	return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
@@ -244,7 +270,7 @@ function splitDelimited(
 		startCode = text.charCodeAt(start);
 		if (code !== sepCode) {
 			rows.push(row);
-			if (rows.length > limits.maxRows) fail("rows", rows.length);
+			if (rows.length - 1 > limits.maxRows) fail("rows", rows.length - 1);
 			row = [];
 		}
 	};
@@ -319,7 +345,8 @@ function readJson(
 			"Expected an array, or an object with records, rows or data",
 		);
 	}
-	if (items.length > limits.maxRows) fail("rows", items.length);
+	const records = items.every(Array.isArray) ? items.length - 1 : items.length;
+	if (records > limits.maxRows) fail("rows", records);
 	return objectsToRows(items);
 }
 
@@ -329,7 +356,7 @@ function readNdjson(
 	fail: (limit: "rows", actual: number) => never,
 ): string[][] {
 	const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
-	if (lines.length > limits.maxRows) fail("rows", lines.length);
+	if (lines.length - 1 > limits.maxRows) fail("rows", lines.length);
 	const items = lines.map(parseJson);
 	return items.length === 0 ? [] : objectsToRows(items);
 }
@@ -363,17 +390,24 @@ export async function readTable(
 	}
 	const ext = extensionOf(fileName);
 	const base = fileName.replace(/\.[^.]*$/, "") || "Sheet1";
+	const tooLong = () => fail("bytes", input.length, MAX_TEXT_LENGTH);
 	let sheets: TableSheet[];
 	if (ext === "json") {
 		sheets = [
-			{ name: base, rows: readJson(decodeText(input), limits, failShape) },
+			{
+				name: base,
+				rows: readJson(decodeText(input, tooLong), limits, failShape),
+			},
 		];
 	} else if (ext === "ndjson" || ext === "jsonl") {
 		sheets = [
-			{ name: base, rows: readNdjson(decodeText(input), limits, failShape) },
+			{
+				name: base,
+				rows: readNdjson(decodeText(input, tooLong), limits, failShape),
+			},
 		];
 	} else if (TEXT_FORMATS.has(ext)) {
-		const text = decodeText(input);
+		const text = decodeText(input, tooLong);
 		sheets =
 			text.trim() === ""
 				? []
@@ -415,7 +449,7 @@ export async function readTable(
 		try {
 			sheets = await codec.read(input, ext, {
 				maxDecompressedBytes: limits.maxUncompressedBytes,
-				maxTotalCells: limits.maxCells,
+				maxTotalCells: limits.maxCells + limits.maxColumns,
 			});
 		} catch (err) {
 			const name = (err as { name?: string }).name;
@@ -423,11 +457,10 @@ export async function readTable(
 			if (name === "ZipError" && /zip bomb/.test(message)) {
 				fail("uncompressed_bytes", undefined, limits.maxUncompressedBytes);
 			}
-			const spans = /^Sheet .* spans \d+ rows x \d+ columns \((\d+) cells/.exec(
-				message,
-			);
+			const spans = /^Sheet .* spans (\d+) rows x (\d+) columns/.exec(message);
 			if (name === "ParseError" && spans) {
-				fail("cells", Number(spans[1]), limits.maxCells);
+				const [height, width] = [Number(spans[1]), Number(spans[2])];
+				fail("cells", Math.max(height - 1, 0) * width, limits.maxCells);
 			}
 			throw new TabularError("invalid_file", message);
 		}
@@ -438,13 +471,13 @@ export async function readTable(
 		);
 	}
 	for (const sheet of sheets) {
-		const height = sheet.rows.length;
-		if (height > limits.maxRows) failShape("rows", height);
+		const records = Math.max(sheet.rows.length - 1, 0);
+		if (records > limits.maxRows) failShape("rows", records);
 		let width = 0;
 		for (const row of sheet.rows) width = Math.max(width, row.length);
 		if (width > limits.maxColumns) failShape("columns", width);
-		if (height * width > limits.maxCells) {
-			fail("cells", height * width, limits.maxCells);
+		if (records * width > limits.maxCells) {
+			fail("cells", records * width, limits.maxCells);
 		}
 	}
 	const nonEmpty = sheets

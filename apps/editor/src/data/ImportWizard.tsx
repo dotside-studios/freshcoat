@@ -28,6 +28,7 @@ import {
 	uniqueName,
 } from "@freshcoat-js/workspace";
 import { emptyDataset, replaceDataset } from "@freshcoat-js/workspace/dataset";
+import { DEFAULT_TABLE_LIMITS } from "@freshcoat-js/workspace/tabular";
 import {
 	type DragEvent,
 	type ReactNode,
@@ -57,6 +58,9 @@ export type ImportTarget = ({ datasetId: string } | { newDataset: true }) & {
 type Loaded = { name: string; table: OpenedTable };
 
 const NO_ROWS: string[][] = [];
+
+const count = (n: number) => n.toLocaleString("en-US");
+const LIMITS_TEXT = `Up to ${count(DEFAULT_TABLE_LIMITS.maxRows)} records below the header, ${count(DEFAULT_TABLE_LIMITS.maxColumns)} columns and ${Math.round(DEFAULT_TABLE_LIMITS.maxBytes / (1024 * 1024))} MB`;
 
 export function ImportWizard({
 	target,
@@ -425,6 +429,12 @@ export function ImportWizard({
 									: file
 										? file.name
 										: "Drop a CSV, TSV, Excel, ODS, Numbers or JSON file"}
+							</p>
+							<p
+								data-testid="import-limits"
+								className="text-[11px] text-fc-muted"
+							>
+								{LIMITS_TEXT}
 							</p>
 							<Button onPress={() => void choose()} isDisabled={loading}>
 								{file ? "Choose another file…" : "Choose file…"}
