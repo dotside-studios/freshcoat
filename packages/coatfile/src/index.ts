@@ -176,8 +176,10 @@ export {
 	qrIssues,
 } from "./qr-checks";
 export {
+	PATTERN_GUARDED_INPUT_MAX_LENGTH,
 	PATTERN_INPUT_MAX_LENGTH,
 	PATTERN_MAX_LENGTH,
+	patternInputMaxLength,
 	type UnsafePatternReason,
 	unsafePatternReason,
 } from "./safe-regex";

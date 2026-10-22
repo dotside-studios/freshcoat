@@ -59,7 +59,7 @@ export function parseSymbology(name: string): Symbology | undefined {
 	const key = nameKey(name);
 	return (
 		SYMBOLOGIES.find((s) => s === key || nameKey(LABELS[s]) === key) ??
-		ALIASES[key]
+		(Object.hasOwn(ALIASES, key) ? ALIASES[key] : undefined)
 	);
 }
 

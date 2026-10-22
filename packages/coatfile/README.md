@@ -1239,10 +1239,19 @@ Patterns are checked before they compile, so a pattern cannot stall validation:
 
 - A pattern over 512 characters (`PATTERN_MAX_LENGTH`) is refused.
 - A pattern that repeats a group which itself repeats, such as `(a+)+`,
-  `(a*)*` or `(a|aa)+`, is refused.
+  `(a*)*` or `(.*a){20}`, is refused. `{n}`, `{n,}` and `{n,m}` count as
+  repeats.
+- A pattern that repeats a group whose alternatives may overlap, such as
+  `(a|aa)+` or `(\w|\d)*`, is refused. Any alternative that is not plain text
+  (a class, `.` or an escape) counts as overlapping.
+- A pattern that puts two variable quantifiers able to match the same
+  character next to each other, such as `\d*\d*` or `.*a.*`, is refused.
 - A pattern with a backreference (`\1`, `\k<name>`) is refused.
 - A value over 10,000 characters (`PATTERN_INPUT_MAX_LENGTH`) never matches a
-  pattern.
+  pattern. A pattern accepted only because a bounded repeat keeps its
+  backtracking small, such as `^(\d{1,3}\.){3}\d{1,3}$`, has a lower cap of
+  256 characters (`PATTERN_GUARDED_INPUT_MAX_LENGTH`);
+  `patternInputMaxLength(pattern)` returns the cap for a pattern.
 
 `validate` reports a refused pattern as `unsafe_field_pattern` on
 `/fields/properties/<key>/pattern`. In `validateValues` and workspace column
