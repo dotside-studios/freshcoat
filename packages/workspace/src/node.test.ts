@@ -145,6 +145,60 @@ describe("exportWorkspace with fileOutput", () => {
 		expect(existsSync(out)).toBe(false);
 	});
 
+	it("keeps an existing zip when cancelled", async () => {
+		const out = join(dir, "kept.zip");
+		await writeFile(out, "old");
+		const controller = new AbortController();
+		const output = fileOutput(out);
+		const result = await exportWorkspace(workspace, small, {
+			renderer,
+			fonts,
+			output,
+			signal: controller.signal,
+			onProgress: (p) => {
+				if (p.bytes) controller.abort();
+			},
+		});
+		expect(result.cancelled).toBe(true);
+		expect(await readFile(out, "utf8")).toBe("old");
+		expect(existsSync(output.temporary)).toBe(false);
+	});
+
+	it("keeps an existing PDF when cancelled", async () => {
+		const out = join(dir, "kept.pdf");
+		await writeFile(out, "old");
+		const controller = new AbortController();
+		controller.abort();
+		const output = fileOutput(out);
+		const result = await exportWorkspace(
+			workspace,
+			{ ...small, format: "pdf" },
+			{ renderer, fonts, output, signal: controller.signal },
+		);
+		expect(result.cancelled).toBe(true);
+		expect(await readFile(out, "utf8")).toBe("old");
+		expect(existsSync(output.temporary)).toBe(false);
+	});
+
+	it("replaces an existing file once the export succeeds", async () => {
+		const out = join(dir, "replaced.zip");
+		await writeFile(out, "old");
+		const output = fileOutput(out);
+		await exportWorkspace(workspace, small, { renderer, fonts, output });
+		expect(unzipSync(new Uint8Array(await readFile(out)))).toHaveProperty(
+			REPORT_FILE_NAME,
+		);
+		expect(existsSync(output.temporary)).toBe(false);
+	});
+
+	it("discards nothing it did not write", async () => {
+		const out = join(dir, "untouched.pdf");
+		await writeFile(out, "old");
+		const output = fileOutput(out);
+		await output.discard?.();
+		expect(await readFile(out, "utf8")).toBe("old");
+	});
+
 	it("finds a preset by id", async () => {
 		await expect(
 			exportWorkspace(workspace, "p_missing", { renderer, fonts }),

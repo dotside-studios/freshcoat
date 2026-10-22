@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { listenForCancel } from "../src/cancel";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { listenForCancel, pendingFiles } from "../src/cancel";
 import { main } from "../src/main";
 import {
 	card,
@@ -137,43 +137,116 @@ describe("cancellation", () => {
 });
 
 describe("listenForCancel", () => {
+	const counts = () => [
+		process.listenerCount("SIGINT"),
+		process.listenerCount("SIGTERM"),
+	];
+
 	test("aborts on SIGTERM with 143 and removes its listeners", () => {
-		const before = [
-			process.listenerCount("SIGINT"),
-			process.listenerCount("SIGTERM"),
-		];
+		const before = counts();
 		const cancel = listenForCancel();
+		cancel.cancellable = true;
 		expect(process.listenerCount("SIGTERM")).toBe(before[1]! + 1);
 		process.emit("SIGTERM");
 		expect(cancel.signal.aborted).toBe(true);
-		expect(cancel.code).toBe(143);
+		expect(cancel.signal.reason.code).toBe(143);
 		cancel.dispose();
-		expect([
-			process.listenerCount("SIGINT"),
-			process.listenerCount("SIGTERM"),
-		]).toEqual(before);
+		expect(counts()).toEqual(before);
 	});
 
 	test("aborts on SIGINT with 130", () => {
 		const cancel = listenForCancel();
+		cancel.cancellable = true;
 		process.emit("SIGINT");
 		expect(cancel.signal.aborted).toBe(true);
-		expect(cancel.code).toBe(130);
+		expect(cancel.signal.reason.code).toBe(130);
 		cancel.dispose();
 	});
 
-	test("follows an outer signal", () => {
-		const outer = new AbortController();
-		const cancel = listenForCancel(outer.signal);
-		outer.abort();
-		expect(cancel.signal.aborted).toBe(true);
-		cancel.dispose();
+	test("exits at once while not cancellable, removing pending files", () => {
+		const exit = process.exit;
+		const codes: (number | undefined)[] = [];
+		process.exit = ((code?: number) => {
+			codes.push(code);
+		}) as typeof process.exit;
+		const pending = box.path("pending.tmp");
+		writeFileSync(pending, "partial");
+		pendingFiles.add(pending);
+		const cancel = listenForCancel();
+		try {
+			process.emit("SIGINT");
+		} finally {
+			process.exit = exit;
+			cancel.dispose();
+			pendingFiles.delete(pending);
+		}
+		expect(codes).toEqual([130]);
+		expect(existsSync(pending)).toBe(false);
 	});
 
-	test("main leaves no listeners behind", async () => {
-		const before = process.listenerCount("SIGINT");
+	test("main adds no process listeners", async () => {
+		const before = counts();
+		const during: number[][] = [];
+		const controller = new AbortController();
+		const code = await main(["--version"], {
+			stdout() {
+				during.push(counts());
+			},
+			stderr() {},
+			cwd: box.dir,
+			signal: controller.signal,
+		});
+		expect(code).toBe(0);
+		expect(during).toEqual([before]);
 		await box.run("--version");
-		expect(process.listenerCount("SIGINT")).toBe(before);
+		expect(counts()).toEqual(before);
+	});
+});
+
+describe("existing output", () => {
+	const cases = [
+		["a workspace zip", "kept.zip", "crew.coatworkspace", "--preset", "p_png"],
+		["a workspace pdf", "kept.pdf", "crew.coatworkspace", "--preset", "p_pdf"],
+		["a batch zip", "kept-batch.zip", "badge.json", "--data", "people.csv"],
+		["a batch pdf", "kept-batch.pdf", "badge.json", "--data", "people.csv"],
+	] as const;
+
+	for (const [name, out, file, ...args] of cases)
+		test(`survives cancelling ${name}`, async () => {
+			await box.write(out, "old");
+			const run = await box.runCancelled(
+				/rendered/,
+				"render",
+				file,
+				...args,
+				"--out",
+				out,
+				"--jobs",
+				"1",
+			);
+			expect(run.code).toBe(130);
+			expect(readFileSync(box.path(out), "utf8")).toBe("old");
+			expect(readdirSync(box.dir).filter((f) => f.endsWith(".tmp"))).toEqual(
+				[],
+			);
+		});
+
+	test("is replaced by a finished export", async () => {
+		await box.write("replaced.pdf", "old");
+		const run = await box.run(
+			"render",
+			"crew.coatworkspace",
+			"--preset",
+			"p_pdf",
+			"--out",
+			"replaced.pdf",
+			"-q",
+		);
+		expect(run.code).toBe(0);
+		expect(
+			readFileSync(box.path("replaced.pdf")).subarray(0, 5).toString(),
+		).toBe("%PDF-");
+		expect(readdirSync(box.dir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
 	});
 });
 
@@ -211,5 +284,45 @@ describe("signals", () => {
 		expect(sent).toBe(true);
 		expect(code).toBe(130);
 		expect(existsSync(box.path("signalled.zip"))).toBe(false);
+	}, 60_000);
+});
+
+describe("forced exit", () => {
+	test("a second SIGINT removes the temporary file", async () => {
+		await box.write("forced.zip", "old");
+		const child = spawn(
+			process.execPath,
+			[
+				new URL("../src/bin.ts", import.meta.url).pathname,
+				"render",
+				"offline.json",
+				"--data",
+				"people.csv",
+				"--out",
+				"forced.zip",
+				"--jobs",
+				"1",
+				"--no-cache",
+			],
+			{ cwd: box.dir, stdio: ["ignore", "ignore", "pipe"] },
+		);
+		const exited = new Promise<number | null>((done) =>
+			child.on("exit", (code) => done(code)),
+		);
+		let stderr = "";
+		let sent = false;
+		child.stderr.on("data", (chunk) => {
+			stderr += chunk;
+			if (!sent && /rendered/.test(stderr)) {
+				sent = true;
+				child.kill("SIGINT");
+				child.kill("SIGINT");
+			}
+		});
+		const code = await exited;
+		expect(sent).toBe(true);
+		expect(code).toBe(130);
+		expect(readFileSync(box.path("forced.zip"), "utf8")).toBe("old");
+		expect(readdirSync(box.dir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
 	}, 60_000);
 });
