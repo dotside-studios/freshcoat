@@ -18,6 +18,7 @@ import { createHeadlessEnv } from "./helpers/headless";
 import {
 	type Config,
 	config,
+	FLAT,
 	fuzzImages,
 	mutate,
 	rng,
@@ -123,6 +124,7 @@ describe("PaintCache against uncached paints", () => {
 			FIRST_SEED,
 			{
 				size: { width: 1060, height: 500 },
+				style: FLAT,
 				scale: 2,
 				supersample: 1,
 				cache: { maxImagePixels: 50_000_000 },
