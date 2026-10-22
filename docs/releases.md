@@ -202,8 +202,9 @@ in the renderer or the importer.
   `TableLimitError` (code `limit_exceeded`, with `limit`, `actual` and `max`)
   from `@freshcoat-js/workspace/tabular`. A JSON list of objects counts its
   objects. Pass `limits` to `readTable` to raise one, or
-  `Number.POSITIVE_INFINITY` to lift it; `DEFAULT_TABLE_LIMITS` holds the
-  defaults. The limits were sized from measured peak memory, about 2 GB in a
+  `Number.POSITIVE_INFINITY` to lift the byte, zip entry or record limit;
+  the uncompressed, column and cell limits can be raised but not lifted, and
+  infinity takes their default. `DEFAULT_TABLE_LIMITS` holds the defaults. The limits were sized from measured peak memory, about 2 GB in a
   browser tab at the cell limit. Text too long for a JavaScript string, about
   512 MB in Node and Chromium, is refused with a size limit error rather than
   a raw Node error or Studio's "is empty". A workbook zip whose central
@@ -212,10 +213,10 @@ in the renderer or the importer.
 #### Output
 
 - **CSV and TSV export escape formula triggers (output change).** `writeTable`
-  prefixes `'` to a text cell that starts with `=`, `+`, `-`, `@`, a tab or a
-  carriage return, so a spreadsheet does not run it as a formula, and to one
-  that starts with `'` and then a trigger. Number values and image cells are
-  left alone. Phone numbers and signed amounts stored as text, such as
+  prefixes `'` to a text or image cell that starts with `=`, `+`, `-`, `@`, a
+  tab or a carriage return, so a spreadsheet does not run it as a formula, and
+  to one that starts with `'` and then a trigger. Number values are left
+  alone. Phone numbers and signed amounts stored as text, such as
   `+63 912 345 6789` or `-1,200.00`, show the `'` in a spreadsheet.
   `writeTable(dataset, format, { escapeFormulas: false })` writes them as
   before. `readTable` drops the first `'` from a CSV or TSV cell that starts
@@ -317,8 +318,9 @@ The engine and workspace also add:
   PDF is held in memory until it is built and goes on. `render --data` warns for
   a data file over 128 MiB and goes on. `--dry-run` gives both warnings, and
   renders the first 3 items of a PDF to do so. `render --data` reads a file
-  of any size; only `readTable`'s limits of 500 columns and 10,000 zip
-  entries apply.
+  of any size or number of records; `readTable`'s other limits apply, and a
+  file past 10,000,000 cells or 512 MiB uncompressed is refused with a
+  message to split it into files of fewer rows.
 - **Cancellation.** Ctrl-C (SIGINT) exits 130 and SIGTERM exits 143, after
   printing `freshcoat: cancelled`. A `.zip` or `.pdf` export writes a
   temporary file and renames it over `--out` only on success, so a cancelled

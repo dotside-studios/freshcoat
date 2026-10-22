@@ -14,3 +14,4 @@ export {
 	webpVp8l,
 	webpVp8x,
 } from "./images";
+export { cornerCells, workbookBomb } from "./xlsx";
