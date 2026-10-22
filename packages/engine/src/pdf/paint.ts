@@ -557,8 +557,9 @@ function spotsIn(
 		if (cmd.stroke?.spot)
 			out.push({ ...on, spot: cmd.stroke.spot.name, paint: "stroke" });
 	}
-	if (cmd.op === "drawGroup")
+	if (cmd.op === "drawGroup" || cmd.op === "drawMasked")
 		for (const c of cmd.children) out.push(...spotsIn(c, layer));
+	if (cmd.op === "drawMasked") out.push(...spotsIn(cmd.mask, layer));
 	return out;
 }
 
