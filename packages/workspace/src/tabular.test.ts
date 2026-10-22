@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import { readXlsx } from "hucre/xlsx";
 import { describe, expect, it } from "vitest";
 import oracle from "./fixtures/delimited-sheetjs.json" with { type: "json" };
+import { applyMapping, importDefaults } from "./mapping";
 import { readTable, TabularError, writeTable } from "./tabular";
 import { deepFreeze, members } from "./test-fixtures";
-import type { Dataset } from "./types";
+import type { Column, Dataset, DatasetAsset } from "./types";
 
 const dataset: Dataset = deepFreeze(members);
 const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
@@ -322,15 +323,25 @@ describe("writeTable", () => {
 			expect(csv[1]).toBe("'-5,,,,,,'+3");
 		});
 
-		it("escapes headers", async () => {
-			const columns = [
-				{ key: "=HYPERLINK", type: "text" },
-				{ key: "plain", type: "text" },
-			] as Dataset["columns"];
-			const csv = await body(withValues({ plain: "x" }, columns), "csv");
-			expect(csv[0]).toBe("'=HYPERLINK,plain");
-			const tsv = await body(withValues({ plain: "x" }, columns), "tsv");
-			expect(tsv[0]).toBe("'=HYPERLINK\tplain");
+		it("leaves image cells alone", async () => {
+			const data = {
+				...withValues({ photo: `ws:${dataset.assets[0]?.sha256}` }),
+				assets: [
+					{ ...(dataset.assets[0] as DatasetAsset), name: "-front.png" },
+				],
+			};
+			expect((await body(data, "csv"))[1]).toBe(",,,-front.png,,,");
+		});
+
+		it("doubles a quote before a trigger, in image cells too", async () => {
+			const csv = await body(
+				withValues({ name: "'=x", tier: "''-y", photo: "'@z.png" }),
+				"csv",
+			);
+			expect(csv[1]).toBe("''=x,,'''-y,''@z.png,,,");
+			expect((await body(withValues({ name: "'x" }), "csv"))[1]).toBe(
+				"'x,,,,,,",
+			);
 		});
 
 		it("escapes before quoting", async () => {
@@ -339,22 +350,84 @@ describe("writeTable", () => {
 		});
 
 		it("leaves cells unchanged when escapeFormulas is false", async () => {
-			const columns = [{ key: "=h", type: "text" }] as Dataset["columns"];
-			const data = withValues({ "=h": "@x" }, columns);
+			const columns = [{ key: "h", type: "text" }] as Dataset["columns"];
+			const data = withValues({ h: "@x" }, columns);
 			for (const format of ["csv", "tsv"] as const) {
 				expect(await body(data, format, { escapeFormulas: false })).toEqual([
-					"=h",
+					"h",
 					"@x",
 					"",
 				]);
 			}
 		});
 
-		it("keeps the quote when the file is read back", async () => {
+		it("reads every text value back as written", async () => {
+			const values = ["=1+1", "'=1+1", "''@x", "'x", "-", "'", "\tx", "\rx"];
 			for (const format of ["csv", "tsv"] as const) {
-				const out = await writeTable(withValues({ name: "=1+1" }), format);
+				for (const name of values) {
+					const out = await writeTable(withValues({ name }), format);
+					const { sheets } = await readTable(out.bytes, `x.${format}`);
+					expect(sheets[0]?.rows[1]?.[0], `${format}: ${name}`).toBe(name);
+				}
+			}
+		});
+
+		it("keeps the quote when unescapeFormulas is false", async () => {
+			const out = await writeTable(withValues({ name: "=1+1" }), "csv");
+			const { sheets } = await readTable(out.bytes, "x.csv", {
+				unescapeFormulas: false,
+			});
+			expect(sheets[0]?.rows[1]?.[0]).toBe("'=1+1");
+		});
+
+		it("does not unescape workbooks or JSON", async () => {
+			const { sheets } = await readTable('[{"a":"\'=x"}]', "x.json");
+			expect(sheets[0]?.rows[1]).toEqual(["'=x"]);
+		});
+
+		it("round-trips phone numbers, signed amounts and photo names", async () => {
+			const asset = {
+				...(dataset.assets[0] as DatasetAsset),
+				name: "-front.png",
+			};
+			const columns: Column[] = [
+				{ key: "phone", type: "text", pattern: "^\\+[0-9 ]+$", maxLength: 16 },
+				{ key: "amount", type: "text", maxLength: 9 },
+				{ key: "photo", type: "image" },
+			];
+			const source: Dataset = {
+				...dataset,
+				columns,
+				assets: [asset],
+				records: [
+					{
+						id: "r_1",
+						status: "pending",
+						values: {
+							phone: "+63 912 345 6789",
+							amount: "-1,200.00",
+							photo: `ws:${asset.sha256}`,
+						},
+					},
+				],
+			};
+			for (const format of ["csv", "tsv"] as const) {
+				const out = await writeTable(source, format);
 				const { sheets } = await readTable(out.bytes, `x.${format}`);
-				expect(sheets[0]?.rows[1]?.[0]).toBe("'=1+1");
+				const rows = sheets[0]?.rows ?? [];
+				expect(rows[1]).toEqual([
+					"+63 912 345 6789",
+					"-1,200.00",
+					"-front.png",
+				]);
+				const plan = importDefaults(sheets, columns);
+				const { dataset: back, issues } = applyMapping(
+					{ ...source, records: [] },
+					rows,
+					{ ...plan, mode: "replace" },
+				);
+				expect(issues).toEqual([]);
+				expect(back.records[0]?.values).toEqual(source.records[0]?.values);
 			}
 		});
 	});

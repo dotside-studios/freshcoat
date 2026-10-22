@@ -185,16 +185,21 @@ in the renderer or the importer.
   defaults. The limits were sized from measured peak memory, about 2 GB in a
   browser tab at the cell limit. Text too long for a JavaScript string, about
   512 MB in Node and Chromium, is refused with a size limit error rather than
-  a raw Node error or Studio's "is empty".
+  a raw Node error or Studio's "is empty". A workbook zip whose central
+  directory cannot be read is refused with `invalid_file`.
 
 #### Output
 
 - **CSV and TSV export escape formula triggers (output change).** `writeTable`
-  prefixes `'` to a text cell or header that starts with `=`, `+`, `-`, `@`,
-  a tab or a carriage return, so a spreadsheet does not run it as a formula.
-  Number values are left alone. `writeTable(dataset, format, { escapeFormulas:
-  false })` writes them as before. JSON, NDJSON and XLSX are unchanged, and
-  so is import: a round trip keeps the `'`.
+  prefixes `'` to a text cell that starts with `=`, `+`, `-`, `@`, a tab or a
+  carriage return, so a spreadsheet does not run it as a formula, and to one
+  that starts with `'` and then a trigger. Number values and image cells are
+  left alone. Phone numbers and signed amounts stored as text, such as
+  `+63 912 345 6789` or `-1,200.00`, show the `'` in a spreadsheet.
+  `writeTable(dataset, format, { escapeFormulas: false })` writes them as
+  before. `readTable` drops the first `'` from a CSV or TSV cell that starts
+  with `'` and a trigger, so a file Freshcoat wrote reads back exactly; pass
+  `unescapeFormulas: false` to keep it. JSON, NDJSON and XLSX are unchanged.
 - **PDF strings and trailer (output change).** Text strings in PDF metadata
   and names that are not printable ASCII are written as UTF-16BE with a byte
   order mark, where they used to become `?`. The trailer has an `/ID`, the MD5

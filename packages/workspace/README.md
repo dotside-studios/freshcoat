@@ -64,6 +64,25 @@ new library can add a format, without touching `tabular`. Codecs turn cells
 into text with the shared `cellText()`, so every library reads dates, booleans
 and numbers alike.
 
+### Formula escaping
+
+`writeTable()` puts a `'` before a CSV or TSV text cell that starts with `=`,
+`+`, `-`, `@`, a tab or a carriage return, so a spreadsheet does not run it as
+a formula. A cell that starts with `'` and then one of those gets one more
+`'`. Numbers are left alone, and so are image cells, which hold file names.
+Text that looks like a number gets the prefix: a phone number such as
+`+63 912 345 6789` or a signed amount such as `-1,200.00` stored as text shows
+as `'+63 912 345 6789` in a spreadsheet. Pass `escapeFormulas: false` to
+write them as they are.
+
+`readTable()` undoes this for CSV and TSV: a cell that starts with `'` and
+then a trigger loses its first `'`, so a file Freshcoat wrote reads back
+exactly. A cell that really starts with `'=` was written as `''=`, so it
+reads back as `'=`. A file from elsewhere with a cell starting `'=` reads as
+`=`, the value a spreadsheet would show. Pass `unescapeFormulas: false` to
+read a file written with `escapeFormulas: false`, or to keep every `'`.
+Workbooks, JSON and NDJSON are never escaped or unescaped.
+
 ### Import limits
 
 `readTable()` refuses oversized files with a `TableLimitError`, exported from
@@ -71,9 +90,12 @@ and numbers alike.
 is `limit_exceeded`). It carries `limit` (which cap), `actual` (the size
 found, or `undefined` when a reader stopped at the cap without measuring) and
 `max`, and its `message` reads for a person. The input size and a workbook
-zip's central directory are checked before anything is decoded or inflated,
-and a zip is also capped as it inflates, since a directory can understate its
-sizes. Limits apply to every format and are overridden per call:
+zip's central directory are checked before anything is decoded or inflated.
+The directory is found the way hucre finds it, from the entry count and
+offset, and a zip file whose directory cannot be read is refused with
+`invalid_file`. A directory can understate its sizes, so each entry is also
+capped as it inflates; hucre has no cap on the total it inflates. Limits
+apply to every format and are overridden per call:
 
 ```ts
 await readTable(bytes, "people.xlsx", { limits: { maxRows: 500_000 } });

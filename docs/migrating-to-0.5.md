@@ -30,6 +30,7 @@ every change.
 | images of any size | up to `maxImageDecodePixels` (200,000,000) on `createRenderer` |
 | spreadsheets of any size | up to the `readTable` limits, raised with `limits` |
 | CSV and TSV export writing `=SUM(A1)` as is | `'=SUM(A1)`; `writeTable(dataset, format, { escapeFormulas: false })` for the old output |
+| CSV and TSV import keeping a leading `'` | `'=x` reads as `=x`; `readTable(bytes, name, { unescapeFormulas: false })` to keep it |
 
 Symbols that are no longer exported anywhere are listed in the
 [release notes](releases.md#errors-and-api). Most were implementation details
@@ -216,8 +217,13 @@ differ:
 - Cut lines stroke in overprinting `/Separation` spots (`CutContour`,
   `KissCut`, `Crease`, `Perfcut`) instead of DeviceRGB. They look the
   same; `cutSpots` or `--cut-spot` renames the spots.
-- CSV and TSV cells starting with `=`, `+`, `-`, `@`, a tab or a carriage
-  return get a leading `'`. Machine consumers can pass `escapeFormulas: false`
-  to `writeTable`; Studio always escapes.
+- CSV and TSV text cells starting with `=`, `+`, `-`, `@`, a tab or a
+  carriage return get a leading `'`, and so do cells starting with `'` and
+  then one of those. Image cells are left alone. Phone numbers and signed
+  amounts stored as text, such as `+63 912 345 6789` or `-1,200.00`, show the
+  `'` in a spreadsheet. Machine consumers can pass `escapeFormulas: false` to
+  `writeTable`; Studio always escapes. `readTable` drops the first `'` from a
+  CSV or TSV cell that starts with `'` and a trigger, so the file reads back
+  as written; pass `unescapeFormulas: false` to keep it.
 - In Figma, a layer with several blurs of one kind keeps the first visible
   one and warns with `duplicate_blur_dropped`.
