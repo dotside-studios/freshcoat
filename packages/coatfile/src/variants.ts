@@ -1,3 +1,4 @@
+import { CoatError } from "./errors";
 import { resizeFrames } from "./relayout";
 import { allElements } from "./tree";
 import type {
@@ -227,7 +228,8 @@ export function applyVariant(
 	opts: ApplyVariantOptions = {},
 ): Template {
 	const variant = t.variants?.find((v) => v.id === variantId);
-	if (!variant) throw new Error(`unknown_variant: ${variantId}`);
+	if (!variant)
+		throw new CoatError("unknown_variant", `unknown variant: ${variantId}`);
 	const dropHidden = (opts.hidden ?? "drop") === "drop";
 	const base = variantBase(t, variantId);
 

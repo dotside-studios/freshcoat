@@ -31,6 +31,7 @@ import {
 } from "@freshcoat-js/for-print";
 import { canvasKitPathOp, type PathOp } from "./boolean";
 import { compile } from "./compile";
+import { CoatError } from "./errors";
 import {
 	type ImageDpiWarning,
 	type ImageSizeMemo,
@@ -227,7 +228,10 @@ function resolvePiece(
 	pathOp: PathOp,
 ): { side: string; spec: PieceSpec } {
 	if ((options.frameNames?.length ?? 0) > 1)
-		throw new Error("a piece is cut from one side; name one in frameNames");
+		throw new CoatError(
+			"multiple_piece_sides",
+			"a piece is cut from one side; name one in frameNames",
+		);
 	const side = options.frameNames?.[0] ?? template.template_data[0]?.name ?? "";
 	const slices = resolveSlices(template, {
 		frameName: side,
@@ -239,11 +243,13 @@ function resolvePiece(
 		(s) => s.name === options.piece || s.id === options.piece,
 	);
 	if (!slice)
-		throw new Error(
+		throw new CoatError(
+			"unknown_slice",
 			`no slice "${options.piece}" on side "${side}" (has: ${slices.map((s) => s.name).join(", ") || "none"})`,
 		);
 	if (hasOpenSubpath(slice.path))
-		throw new Error(
+		throw new CoatError(
+			"open_slice",
 			`slice "${options.piece}" is an open path, which is a cut line and not a piece`,
 		);
 	return { side, spec: pieceSpec(renderer.ck, slice) };
@@ -305,7 +311,11 @@ export async function renderCompiled<O extends Output = DefaultOutput>(
 			(src) => renderer.loadBytes(src, options.images),
 			{ maxDim: 256 },
 		);
-		if (!pixels) throw new Error(`print analyze: could not sample ${node.src}`);
+		if (!pixels)
+			throw new CoatError(
+				"image_sample_failed",
+				`print analyze: could not sample ${node.src}`,
+			);
 		return pixels;
 	};
 	const analyzeOptions: PrintPlanOptions = {

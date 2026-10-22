@@ -19,6 +19,7 @@ import {
 	transformPath,
 	viewBoxMatrix,
 } from "@freshcoat-js/engine/svg";
+import { CoatError, errorMessage } from "./errors";
 import type {
 	Element,
 	Fill,
@@ -112,12 +113,17 @@ function union(boxes: Box[]): Box | null {
 }
 
 /** Converts SVG markup to one frame of editable layers in design px. Throws
- *  SvgError for markup that is not an SVG document. */
+ *  an `invalid_svg` CoatError for markup that is not an SVG document. */
 export function svgToElements(
 	markup: string,
 	options: SvgToElementsOptions = {},
 ): SvgElements {
-	const drawing = parseSvg(markup);
+	let drawing: ReturnType<typeof parseSvg>;
+	try {
+		drawing = parseSvg(markup);
+	} catch (err) {
+		throw new CoatError("invalid_svg", errorMessage(err), { cause: err });
+	}
 	const fit = options.maxSize
 		? Math.min(
 				1,

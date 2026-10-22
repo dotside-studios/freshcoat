@@ -268,7 +268,7 @@ describe("applyVariant", () => {
 
 	test("throws on an unknown variant", () => {
 		expect(() => applyVariant(template, "ghost")).toThrow(
-			"unknown_variant: ghost",
+			expect.objectContaining({ code: "unknown_variant", name: "CoatError" }),
 		);
 	});
 });
@@ -857,7 +857,7 @@ describe("sized variants", () => {
 		expect(compiled.height).toBe(200);
 		expect(() =>
 			compile(pinned, {}, { width: 100, height: 60, variantId: "portrait" }),
-		).toThrow(/aspect ratio mismatch/);
+		).toThrow(expect.objectContaining({ code: "aspect_mismatch" }));
 	});
 
 	test("resizeTemplate keeps a sized variant as it is", () => {

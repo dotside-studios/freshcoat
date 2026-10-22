@@ -13,6 +13,7 @@
 // for its uploaded URL and drops `assets`.
 
 import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/engine";
+import { CoatError } from "./errors";
 import type { InlineAsset, Template } from "./types";
 
 export { base64ToBytes, bytesToBase64 };
@@ -117,7 +118,7 @@ export function readAssets(template: Template): PendingAsset[] {
 /**
  * Swap every `asset:` src for its uploaded URL and drop the carried bytes.
  *
- * Throws `unresolved_asset: <sha>` if the map is missing a hash the template
+ * Throws a `CoatError` with code `unresolved_asset` if the map is missing a hash the template
  * still references, rather than emit a template that has silently lost an
  * image.
  */
@@ -354,7 +355,8 @@ const strictRewrite: AssetSrcRewriter = (src, urlByHash) => {
 	const sha = parseAssetUri(src);
 	if (sha === null) return src;
 	const resolved = urlByHash.get(sha);
-	if (resolved === undefined) throw new Error(`unresolved_asset: ${sha}`);
+	if (resolved === undefined)
+		throw new CoatError("unresolved_asset", `unresolved asset: ${sha}`);
 	return resolved;
 };
 

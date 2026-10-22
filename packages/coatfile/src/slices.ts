@@ -13,6 +13,7 @@ import {
 } from "@freshcoat-js/engine/svg";
 import { resolveInsets, rotatedBox } from "./bleed";
 import { applyBooleans, type PathOp } from "./boolean";
+import { CoatError } from "./errors";
 import { fieldContext, prepareTemplate } from "./prepare";
 import { allElements } from "./tree";
 import type { Element, Sides, Template } from "./types";
@@ -133,7 +134,8 @@ function shownElements(template: Template, options: ResolveSlicesOptions) {
 		options.frameName === undefined
 			? prepared.template_data[0]
 			: prepared.template_data.find((f) => f.name === options.frameName);
-	if (!frame) throw new Error(`no side named "${options.frameName}"`);
+	if (!frame)
+		throw new CoatError("unknown_side", `no side named "${options.frameName}"`);
 
 	const shown = pruneHiddenElements(
 		frame.elements,

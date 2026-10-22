@@ -300,7 +300,7 @@ describe("saveTemplate", () => {
 	test("writes a package and JSON that read back as the same template", async () => {
 		const template = fixtures.minimalCard;
 		const coat = await saveTemplate(template, "coat");
-		const json = saveTemplate(template, "json");
+		const json = await saveTemplate(template, "json");
 		expect(coat.ok && json.ok).toBe(true);
 		if (!coat.ok || !json.ok) return;
 		const fromCoat = await decodeTemplate(coat.data);
@@ -321,14 +321,14 @@ describe("saveTemplate", () => {
 		} as Template;
 		const written = writableTemplate(template);
 		expect(written.assets?.some((a) => a.sha256 === "unused")).toBe(false);
-		const json = saveTemplate(template, "json");
+		const json = await saveTemplate(template, "json");
 		expect(json.ok && JSON.parse(json.data).assets).toHaveLength(2);
 	});
 
 	test("returns the errors of a template that does not validate", async () => {
 		const bad = { ...fixtures.minimalCard, width: -1 } as Template;
 		const coat = await saveTemplate(bad, "coat");
-		const json = saveTemplate(bad, "json");
+		const json = await saveTemplate(bad, "json");
 		expect(coat.ok).toBe(false);
 		expect(json.ok).toBe(false);
 		expect(!coat.ok && coat.errors.length).toBeGreaterThan(0);
@@ -337,7 +337,7 @@ describe("saveTemplate", () => {
 	test("maps a refused write to an error on /format_version", async () => {
 		const newer = { ...fixtures.minimalCard, format_version: "1.99" };
 		const coat = await saveTemplate(newer, "coat");
-		const json = saveTemplate(newer, "json");
+		const json = await saveTemplate(newer, "json");
 		for (const result of [coat, json]) {
 			expect(result.ok).toBe(false);
 			if (result.ok) continue;
@@ -345,9 +345,41 @@ describe("saveTemplate", () => {
 			expect(result.errors[0]?.code).toBe("newer_format_version");
 		}
 	});
+
+	test("returns JSON as a promise", async () => {
+		const pending = saveTemplate(fixtures.minimalCard, "json");
+		expect(pending).toBeInstanceOf(Promise);
+		const json = await pending;
+		expect(json.ok && JSON.parse(json.data)).toEqual(fixtures.minimalCard);
+	});
+
+	test("reports a failed pack at the template root, not /format_version", async () => {
+		const template = await withAssets();
+		const broken = {
+			...template,
+			assets: template.assets?.map((a) => ({ ...a, base64: "@@@@" })),
+		};
+		const coat = await saveTemplate(broken, "coat");
+		expect(coat.ok).toBe(false);
+		if (coat.ok) return;
+		expect(coat.errors[0]).toMatchObject({ path: "", code: "write_failed" });
+	});
 });
 
 describe("decodeTemplate", () => {
+	test("reports a failed hash as hash_failed, not invalid_json", async () => {
+		const read = await decodeTemplate(await packTemplate(await withAssets()), {
+			sha256: () => Promise.reject(new Error("no digest")),
+		});
+		expect(read.ok).toBe(false);
+		expect(!read.ok && read.code).toBe("hash_failed");
+	});
+
+	test("reports unparsable JSON as invalid_json", async () => {
+		const read = await decodeTemplate("{not json");
+		expect(!read.ok && read.code).toBe("invalid_json");
+	});
+
 	test("reads JSON text, JSON bytes and packages alike", async () => {
 		const text = JSON.stringify(fixtures.minimalCard);
 		const fromText = await decodeTemplate(text);

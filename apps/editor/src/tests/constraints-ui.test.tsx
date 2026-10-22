@@ -323,7 +323,7 @@ describe("Resize with constraints", () => {
 		await user.click(
 			screen.getByRole("button", { name: "Link safe area sides" }),
 		);
-		const saved = saveJson(c.template as Template);
+		const saved = await saveJson(c.template as Template);
 		if (!saved.ok) throw new Error("not saved");
 		const t = JSON.parse(saved.data) as Template;
 		expect(t.bleed).toEqual(even);
