@@ -1,10 +1,10 @@
 import {
-	type GradientStop,
 	insertStop,
 	moveStop,
 	removeStop,
 	sortedStops,
 } from "@freshcoat-js/coatfile/fills";
+import type { GradientStop } from "@freshcoat-js/engine";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { cn } from "@freshcoat-js/ui/lib/cn";
 import { NumberField } from "@freshcoat-js/ui/number-field";

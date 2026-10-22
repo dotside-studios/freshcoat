@@ -12,12 +12,10 @@ import {
 	createFrame,
 	createGroup,
 	createImage,
-	createPaintCache,
 	createPath,
 	createRect,
 	createText,
 	encodePng,
-	type PaintCache,
 } from "../src/index";
 import {
 	cachedLutImage,
@@ -26,6 +24,7 @@ import {
 	freeLutImages,
 } from "../src/lut-images";
 import type { Node } from "../src/node";
+import { createPaintCache, type PaintCache } from "../src/paint-cache";
 import {
 	DEFAULT_MAX_BACKGROUND_PIXELS,
 	paintCacheState,

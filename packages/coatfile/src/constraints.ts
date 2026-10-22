@@ -4,10 +4,11 @@
 // re-places its children the same way. The result is an ordinary template at
 // the new size, so compile, the editor and anything else read it unchanged.
 
+import type { Size } from "@freshcoat-js/engine";
 import { CoatError } from "./errors";
 import { resizeBackground, resizeFrames, sameSize } from "./relayout";
 import { walkElements } from "./tree";
-import type { Element, Size, Template, Variant } from "./types";
+import type { Element, Template, Variant } from "./types";
 import { applyVariant, type VariantElementDelta } from "./variants";
 
 export {

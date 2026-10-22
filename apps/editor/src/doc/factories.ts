@@ -1,13 +1,12 @@
 import {
-	barcodeBox,
 	type Element,
-	ellipsePath,
-	isEllipsePath,
 	isLinearSymbology,
 	isSquareSymbology,
 	type Symbology,
 	type Template,
 } from "@freshcoat-js/coatfile";
+import { barcodeBox } from "@freshcoat-js/coatfile/internal";
+import { ellipsePath, isEllipsePath } from "@freshcoat-js/engine/internal";
 import { uniqueId } from "./ids";
 
 export type ElementKind =

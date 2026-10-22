@@ -16,9 +16,9 @@ import {
 	type Node,
 	type PaintCacheStats,
 	type Renderer,
-	resolveExportScale,
 	type SurfaceCanvas,
 } from "@freshcoat-js/engine";
+import { resolveExportScale } from "@freshcoat-js/engine/internal";
 import type { CanvasKit } from "canvaskit-wasm";
 
 export type RenderInput<G> = {

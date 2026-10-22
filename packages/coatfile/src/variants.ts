@@ -1,3 +1,4 @@
+import type { Size } from "@freshcoat-js/engine";
 import { CoatError } from "./errors";
 import { resizeFrames } from "./relayout";
 import { allElements } from "./tree";
@@ -5,7 +6,6 @@ import type {
 	Background,
 	BooleanOperandElement,
 	Element,
-	Size,
 	Template,
 	TemplateFrame,
 	Variant,

@@ -12,11 +12,9 @@
 // `detachAssets` is the step that ends that state: it swaps each `asset:` src
 // for its uploaded URL and drops `assets`.
 
-import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/engine";
+import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/engine/internal";
 import { CoatError } from "./errors";
 import type { InlineAsset, Template } from "./types";
-
-export { base64ToBytes, bytesToBase64 };
 
 export const ASSET_URI_PREFIX = "asset:";
 

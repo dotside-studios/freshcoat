@@ -351,7 +351,7 @@ describe("validate", () => {
 });
 
 describe("a template module", () => {
-	const source = `import { defineTemplate } from "${import.meta.resolve("@freshcoat-js/coatfile/define")}";
+	const source = `import { defineTemplate } from "${import.meta.resolve("@freshcoat-js/coatfile")}";
 const base = ${JSON.stringify(card())};
 console.log("building");
 export default defineTemplate(async () => ({ ...base, name: "Scripted" }));

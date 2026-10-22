@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { bytesToBase64 } from "@freshcoat-js/engine/internal";
 import {
 	assetDataUri,
 	assetUri,
 	attachAssets,
-	bytesToBase64,
 	collectAssetRefs,
 	detachAssets,
 	inlineAssetUrls,

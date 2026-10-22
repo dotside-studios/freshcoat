@@ -5,8 +5,8 @@ import {
 	type Template,
 	validate,
 } from "@freshcoat-js/coatfile";
-import { base64ToBytes } from "@freshcoat-js/coatfile/assets";
 import { packTemplate } from "@freshcoat-js/coatfile/coat";
+import { base64ToBytes } from "@freshcoat-js/engine/internal";
 import { sha256 } from "js-sha256";
 import { describe, expect, it, vi } from "vitest";
 import {

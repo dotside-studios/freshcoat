@@ -5,13 +5,13 @@
 // absolute tree before compiling therefore prepares once and compiles with
 // `prepared: true`; these tests pin both halves of that contract.
 import { describe, expect, test } from "bun:test";
+import { prepareScene } from "../src/compile-scene";
 import {
 	approxEngine,
 	compileScene,
 	createGroup,
 	createRect,
 	type Node,
-	prepareScene,
 } from "../src/index";
 
 const measure = approxEngine.measureText;

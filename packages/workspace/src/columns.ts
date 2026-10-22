@@ -1,4 +1,4 @@
-import { textRuleBreaks } from "@freshcoat-js/coatfile";
+import { textRuleBreaks } from "@freshcoat-js/coatfile/internal";
 import { findAssetByName, hasAssetSha, parseAssetRef } from "./assets";
 import { newId } from "./ids";
 import type {

@@ -1,5 +1,5 @@
-import { linearGradientAngle } from "@freshcoat-js/coatfile";
 import type { Gradient } from "@freshcoat-js/coatfile/fills";
+import { linearGradientAngle } from "@freshcoat-js/engine/internal";
 import { describe, expect, test } from "vitest";
 import {
 	boxToWorld,

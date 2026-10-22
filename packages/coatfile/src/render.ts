@@ -13,11 +13,13 @@ import {
 	type PdfFrame,
 	type PdfTextMode,
 	type Renderer,
+	sampleImageNode,
+} from "@freshcoat-js/engine";
+import {
 	resolveExportScale,
 	resolveSupersample,
-	sampleImageNode,
 	withExportScale,
-} from "@freshcoat-js/engine";
+} from "@freshcoat-js/engine/internal";
 import {
 	type AnalysisCache,
 	type ChannelBalance,

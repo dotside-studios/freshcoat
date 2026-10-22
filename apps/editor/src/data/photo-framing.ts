@@ -3,9 +3,9 @@ import {
 	type Element,
 	parseImageFocus,
 	type Template,
-	type Vec2,
 } from "@freshcoat-js/coatfile";
 import { wholeToken } from "@freshcoat-js/coatfile/mustache";
+import type { Vec2 } from "@freshcoat-js/engine";
 import {
 	type Binding,
 	type DataRecord,

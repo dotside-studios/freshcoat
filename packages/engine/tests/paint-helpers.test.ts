@@ -5,7 +5,7 @@ import {
 	insetCorner,
 	skipInkSegments,
 	strokeInset,
-} from "../src";
+} from "../src/paint-helpers";
 
 describe("paint-helpers", () => {
 	test("fitRect cover centers the crop", () => {

@@ -1,15 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { createRenderer, decodePixels } from "@freshcoat-js/engine";
-import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { parseTrimValue, resolveStrokeTrim } from "../src/stroke-trim";
 import type {
 	Command,
 	DrawCommand,
 	DrawPathCommand,
 	DrawRectCommand,
-	Element,
-	Template,
-} from "../src/types";
+} from "@freshcoat-js/engine";
+import { createRenderer, decodePixels } from "@freshcoat-js/engine";
+import { loadCanvasKit } from "@freshcoat-js/test-utils";
+import { parseTrimValue, resolveStrokeTrim } from "../src/stroke-trim";
+import type { Element, Template } from "../src/types";
 import { validate } from "../src/validate";
 import { compileToCommands } from "./helpers/compile-commands";
 

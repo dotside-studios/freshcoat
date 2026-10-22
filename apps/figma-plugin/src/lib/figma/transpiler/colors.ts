@@ -1,8 +1,5 @@
-import {
-	type Fill,
-	type Gradient,
-	linearGradientAngle,
-} from "@freshcoat-js/coatfile";
+import type { Fill, Gradient } from "@freshcoat-js/coatfile";
+import { linearGradientAngle } from "@freshcoat-js/engine/internal";
 import type {
 	FigmaNode,
 	FigmaPaint,

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Command, GroupNode, Node } from "@freshcoat-js/engine";
 import { fixtures } from "../fixtures";
 import { compile } from "../src/compile";
 import {
@@ -11,12 +12,9 @@ import {
 	resizeVectorPath,
 } from "../src/constraints";
 import type {
-	Command,
 	Constraint,
 	Element,
 	FrameElement,
-	GroupNode,
-	Node,
 	Template,
 	VectorElement,
 } from "../src/types";

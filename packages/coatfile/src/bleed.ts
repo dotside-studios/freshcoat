@@ -3,8 +3,8 @@ import {
 	CR80_LONG_MM,
 	CR80_SAFE_MM,
 	MM_PER_INCH,
-	rotatedFootprint,
 } from "@freshcoat-js/engine";
+import { rotatedFootprint } from "@freshcoat-js/engine/internal";
 import type { Element, Insets, Sides, Template } from "./types";
 
 export const NO_INSETS: Sides = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -63,14 +63,6 @@ export function bleedSize(t: Pick<Template, "width" | "height" | "bleed">): {
 		height: t.height + b.top + b.bottom,
 	};
 }
-
-export {
-	CR80_CORNER_MM,
-	CR80_LONG_MM,
-	CR80_SAFE_MM,
-	CR80_SHORT_MM,
-	MM_PER_INCH,
-} from "@freshcoat-js/engine";
 
 export type CardSizeMm = { widthMm: number; heightMm: number };
 

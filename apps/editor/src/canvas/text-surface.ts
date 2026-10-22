@@ -1,4 +1,4 @@
-import { toColor } from "@freshcoat-js/engine";
+import { toColor } from "@freshcoat-js/engine/internal";
 import type { CanvasKit, Surface } from "canvaskit-wasm";
 import { EditableText, type TextProps } from "./text-layout";
 

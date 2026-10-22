@@ -1,8 +1,9 @@
-import { bytesToBase64, validate } from "@freshcoat-js/coatfile";
+import { validate } from "@freshcoat-js/coatfile";
 import {
 	LEGACY_TKIT_MEDIA_TYPE,
 	unpackTemplate,
 } from "@freshcoat-js/coatfile/coat";
+import { bytesToBase64 } from "@freshcoat-js/engine/internal";
 import { iccProfile, jpegHeader } from "@freshcoat-js/test-utils";
 import {
 	strFromU8,

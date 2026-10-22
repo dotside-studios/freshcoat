@@ -1,11 +1,7 @@
-import {
-	activeVariantId,
-	compile,
-	type Renderer,
-	type Template,
-	variantSize,
-} from "@freshcoat-js/coatfile";
+import { compile, type Template, variantSize } from "@freshcoat-js/coatfile";
+import { activeVariantId } from "@freshcoat-js/coatfile/internal";
 import { findMissingGlyphs } from "@freshcoat-js/coatfile/render";
+import type { Renderer } from "@freshcoat-js/engine";
 import type { ExportItem } from "../types";
 
 export type GlyphCheckItem = Pick<

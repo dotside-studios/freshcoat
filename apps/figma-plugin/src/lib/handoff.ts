@@ -8,7 +8,7 @@
 // The link format itself lives in `@freshcoat-js/coatfile/handoff`.
 
 import type { Template } from "@freshcoat-js/coatfile";
-import { subtleSha256 } from "@freshcoat-js/coatfile/assets";
+import { subtleSha256 } from "@freshcoat-js/coatfile";
 import { COAT_MEDIA_TYPE, packTemplate } from "@freshcoat-js/coatfile/coat";
 import {
 	encodeHandoff,

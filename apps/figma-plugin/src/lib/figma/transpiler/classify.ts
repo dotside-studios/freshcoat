@@ -1,4 +1,4 @@
-import type { BlendMode } from "@freshcoat-js/coatfile";
+import type { BlendMode } from "@freshcoat-js/engine";
 import { type BindingResolver, resolveNodeBinding } from "../binding";
 import type {
 	FigmaBlendMode,

@@ -1,19 +1,21 @@
 import { describe, expect, test } from "bun:test";
+import type {
+	Command,
+	DrawCommand,
+	DrawRectCommand,
+	GroupNode,
+	Node,
+	TextNode,
+} from "@freshcoat-js/engine";
 import { compile } from "../src/compile";
 import { effectsOf } from "../src/effects";
 import { generateMatrix } from "../src/qr";
 import type {
-	Command,
 	CompileOptions,
-	DrawCommand,
-	DrawRectCommand,
 	FrameElement,
-	GroupNode,
-	Node,
 	RectElement,
 	Template,
 	TextElement,
-	TextNode,
 } from "../src/types";
 import { validate } from "../src/validate";
 import { compileToCommands } from "./helpers/compile-commands";

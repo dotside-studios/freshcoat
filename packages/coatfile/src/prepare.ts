@@ -1,7 +1,8 @@
+import type { Size } from "@freshcoat-js/engine";
 import { inlineAssetUrls, resolveAssetSrcs } from "./assets";
 import { resizeTemplate } from "./constraints";
 import { CoatError } from "./errors";
-import type { Size, Template } from "./types";
+import type { Template } from "./types";
 import { validate } from "./validate";
 import { applyVariant } from "./variants";
 

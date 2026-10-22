@@ -5,14 +5,15 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import type { DrawTextCommand } from "@freshcoat-js/engine";
 import {
 	createRenderer,
 	type FontVMetrics,
 	type Renderer,
-	readFontMetrics,
 } from "@freshcoat-js/engine";
+import { readFontMetrics } from "@freshcoat-js/engine/internal";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
-import type { DrawTextCommand, Template } from "../src/types";
+import type { Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 
 const FONT_PATH = testFontPath("Geist-Regular.ttf");

@@ -1,4 +1,4 @@
-import { googleCss2Url } from "@freshcoat-js/coatfile";
+import { googleCss2Url } from "@freshcoat-js/engine";
 
 /** The css2 stylesheet URLs to try for a family: 400 and 700 first, then
  *  whatever weights the family has (for single-weight families). */

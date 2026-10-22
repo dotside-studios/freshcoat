@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bytesToBase64 } from "@freshcoat-js/engine/internal";
 import { strToU8, unzipSync, zipSync } from "fflate";
 import { fixtures } from "../fixtures";
 import {
 	assetUri,
-	bytesToBase64,
 	collectAssetRefs,
 	rehashAssets,
 	subtleSha256,

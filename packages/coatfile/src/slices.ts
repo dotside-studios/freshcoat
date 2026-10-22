@@ -3,7 +3,7 @@ import {
 	outlineSvg,
 	rectShape,
 	roundCorners,
-} from "@freshcoat-js/engine";
+} from "@freshcoat-js/engine/internal";
 import {
 	normalizePath,
 	parseTransform,

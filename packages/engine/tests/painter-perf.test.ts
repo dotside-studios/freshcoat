@@ -7,7 +7,6 @@ import { drawableBounds, makeBin, paintScene } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
 import { createSharedFontProvider } from "../src/font-collection";
 import { deriveFontMetrics } from "../src/font-metrics";
-import { createPaintCache, type PaintCache } from "../src/index";
 import {
 	createFrame,
 	createImage,
@@ -15,6 +14,7 @@ import {
 	createText,
 	type Node,
 } from "../src/node";
+import { createPaintCache, type PaintCache } from "../src/paint-cache";
 import { paintCacheState } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import { encodePng } from "../src/png";

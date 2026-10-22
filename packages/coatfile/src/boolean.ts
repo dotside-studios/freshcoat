@@ -3,13 +3,13 @@
 // rebuilt from the operands that are shown, after visibility, variants and
 // relayout have changed them.
 
+import type { Renderer } from "@freshcoat-js/engine";
 import {
 	type BooleanOp,
 	type BooleanOperand,
 	type BooleanShape,
 	combineShapes,
-	type Renderer,
-} from "@freshcoat-js/engine";
+} from "@freshcoat-js/engine/internal";
 import type { BooleanOperandElement, Element } from "./types";
 
 type CanvasKit = Renderer["ck"];

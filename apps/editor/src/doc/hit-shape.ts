@@ -1,21 +1,21 @@
 import {
 	type Element,
-	isEllipsePath,
-	resolveStrokeTrim,
 	strokeSides,
 	widestStroke,
 } from "@freshcoat-js/coatfile";
+import { resolveStrokeTrim } from "@freshcoat-js/coatfile/internal";
+import type { ShapeMask } from "@freshcoat-js/engine";
 import {
+	isEllipsePath,
 	outlinePath,
 	rectShape,
 	roundCorners,
-	type ShapeMask,
 	type StrokeTrim,
 	sideStrokeGeometry,
 	strokeInset,
 	strokeTrim,
 	trimPath,
-} from "@freshcoat-js/engine";
+} from "@freshcoat-js/engine/internal";
 import type { CanvasKit, Path } from "canvaskit-wasm";
 import type { LayerBox, Point } from "./geometry";
 

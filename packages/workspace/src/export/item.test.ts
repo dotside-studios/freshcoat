@@ -1,4 +1,5 @@
-import { fitDesignSize, MAX_EXPORT_DIMENSION } from "@freshcoat-js/coatfile";
+import { fitDesignSize } from "@freshcoat-js/coatfile";
+import { MAX_EXPORT_DIMENSION } from "@freshcoat-js/engine";
 import { describe, expect, it } from "vitest";
 import { planExport } from "../plan";
 import {

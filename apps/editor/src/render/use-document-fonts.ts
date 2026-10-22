@@ -1,9 +1,9 @@
 import {
 	collectFontRequests,
-	fontRequestKey,
 	resolveTemplateFonts,
 	type Template,
 } from "@freshcoat-js/coatfile";
+import { fontRequestKey } from "@freshcoat-js/engine";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fontCache } from "./font-cache";
 

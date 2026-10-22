@@ -3,7 +3,6 @@ import type {
 	BooleanOperandElement,
 	Element,
 	FieldDefinition,
-	FontDescriptor,
 	Insets,
 	Template,
 	TemplateFrame,
@@ -14,7 +13,6 @@ import {
 	applyVariant,
 	assetUri,
 	backgroundSwatch,
-	bytesToBase64,
 	checkVariants,
 	DEFAULT_VARIANT_ID,
 	elementFieldRefs,
@@ -35,6 +33,8 @@ import {
 	widestStroke,
 } from "@freshcoat-js/coatfile";
 import { FIELD_ID, renameToken } from "@freshcoat-js/coatfile/mustache";
+import type { FontDescriptor } from "@freshcoat-js/engine";
+import { bytesToBase64 } from "@freshcoat-js/engine/internal";
 import type { CanvasKit } from "canvaskit-wasm";
 import { BOOLEAN, INSETS, KEY_RULE, plural, VARIANT_COPY } from "~/app/copy";
 import { type Draft, produce } from "~/state/immer";

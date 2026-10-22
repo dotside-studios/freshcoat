@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { clearFontBytesCache, type FontFetch } from "@freshcoat-js/engine";
+import type { FontFetch } from "@freshcoat-js/engine";
+import { clearFontBytesCache } from "@freshcoat-js/engine/internal";
 import { fontUsage } from "../src/font-usage";
 import { type FontFallback, resolveTemplateFonts } from "../src/fonts";
 import type { Template } from "../src/types";

@@ -1,7 +1,5 @@
 import {
-	applyBooleans,
 	type BooleanOperandElement,
-	cachePathOp,
 	childElements,
 	type Element,
 	type PathOp,
@@ -9,12 +7,13 @@ import {
 	type Template,
 	type VectorElement,
 } from "@freshcoat-js/coatfile";
+import { applyBooleans, cachePathOp } from "@freshcoat-js/coatfile/internal";
 import {
 	type BooleanOp,
 	type BooleanOperand,
 	type BooleanShape,
 	combineShapes as combineOperands,
-} from "@freshcoat-js/engine";
+} from "@freshcoat-js/engine/internal";
 import type { CanvasKit } from "canvaskit-wasm";
 import { round2 } from "./factories";
 import { rotatePoint } from "./geometry";

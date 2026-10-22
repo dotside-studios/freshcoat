@@ -5,14 +5,13 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import {
 	approxEngine,
-	type BitmapRole,
-	type Command,
 	compileScene,
 	createBitmap,
 	createFrame,
 	decodePixels,
-	validateCommands,
 } from "../src/index";
+import type { BitmapRole, Command } from "../src/types";
+import { validateCommands } from "../src/validate-commands";
 import { createHeadlessEnv } from "./helpers/headless";
 
 let ck: any;

@@ -1,11 +1,12 @@
+import type { FontRequest } from "@freshcoat-js/engine";
 import {
 	type ByteLoader,
 	type FontFetch,
 	fontBytes,
 	fontRequestKey,
 	googleCss2Url,
-	resolveFontRequest,
 } from "@freshcoat-js/engine";
+import { resolveFontRequest } from "@freshcoat-js/engine/internal";
 import {
 	barcodeFontFamily,
 	defaultFontFamily,
@@ -13,7 +14,7 @@ import {
 	withVariants,
 } from "./font-usage";
 import { walkElements } from "./tree";
-import type { FontRequest, Template } from "./types";
+import type { Template } from "./types";
 
 // The FontRequests a template needs, gathered exactly as compileFrame does: every
 // family referenced by a text element (walking nested frames and backgrounds,

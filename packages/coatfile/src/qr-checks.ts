@@ -1,4 +1,4 @@
-import { parseColor } from "@freshcoat-js/engine";
+import { parseColor } from "@freshcoat-js/engine/internal";
 import { hasToken } from "./mustache";
 import { DEFAULT_QR_STYLE, MAX_QR_LOGO_SIZE, qrSymbol } from "./qr";
 import type { QrCodeElement } from "./types";

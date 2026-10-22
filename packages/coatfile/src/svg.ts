@@ -1,4 +1,5 @@
-import { linearGradientAngle } from "@freshcoat-js/engine";
+import type { FontWeight } from "@freshcoat-js/engine";
+import { linearGradientAngle } from "@freshcoat-js/engine/internal";
 import {
 	type Box,
 	estimateTextWidth,
@@ -23,7 +24,6 @@ import { CoatError, errorMessage } from "./errors";
 import type {
 	Element,
 	Fill,
-	FontWeight,
 	FrameElement,
 	Gradient,
 	ImageElement,

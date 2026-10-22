@@ -3,15 +3,14 @@ import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { drawableBounds, makeBin } from "../src/canvaskit";
 import {
 	approxEngine,
-	type Command,
 	compileScene,
 	createFrame,
 	createGroup,
 	createPath,
 	decodePixels,
-	type SnapGrid,
-	validateCommands,
 } from "../src/index";
+import type { Command, SnapGrid } from "../src/types";
+import { validateCommands } from "../src/validate-commands";
 import { createHeadlessEnv } from "./helpers/headless";
 
 let ck: any;

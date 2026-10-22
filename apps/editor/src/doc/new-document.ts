@@ -1,9 +1,6 @@
-import type {
-	FontDescriptor,
-	LengthUnit,
-	Template,
-} from "@freshcoat-js/coatfile";
+import type { LengthUnit, Template } from "@freshcoat-js/coatfile";
 import { FORMAT_VERSION, unitToPx } from "@freshcoat-js/coatfile";
+import type { FontDescriptor } from "@freshcoat-js/engine";
 import { DEFAULT_DPI } from "@freshcoat-js/workspace";
 
 export type Preset = {

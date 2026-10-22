@@ -66,12 +66,6 @@ import type {
 	VisibilityConditionSchema,
 } from "./schemas";
 
-// The render vocabulary (geometry primitives, the Frame/Command IR, the resolved
-// style types, and the paint runtime contract) lives in freshcoat. Re-export
-// it so `@freshcoat-js/coatfile` consumers keep importing those types from the barrel,
-// and so this module's own `./types` importers resolve them unchanged.
-export type * from "@freshcoat-js/engine";
-
 // ── Authoring types (zod-inferred from ./schemas) ────────────────────────────
 
 export type FieldFormat = NonNullable<

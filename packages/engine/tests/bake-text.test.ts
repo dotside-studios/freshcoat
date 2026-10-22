@@ -3,8 +3,9 @@
 // deterministic stub engine (every glyph = font.size wide, char-count wrap)
 // makes the placement math exact, and a registered cap-height fixes the baseline.
 import { describe, expect, test } from "bun:test";
+import { bakeText } from "../src/bake-text";
 import type { TextEngine } from "../src/index";
-import { bakeText, createText } from "../src/index";
+import { createText } from "../src/index";
 import type { FontVMetrics, ResolvedFont } from "../src/types";
 
 // capHeight 0.7 → with leadingTrim (default), baseline = 0.7 * size.

@@ -4,7 +4,6 @@
 // works in a variant without knowing about variants.
 
 import {
-	activeVariantId,
 	allElements,
 	applyVariant,
 	type Background,
@@ -21,6 +20,7 @@ import {
 	type VariantElementDelta,
 	variantBase,
 } from "@freshcoat-js/coatfile";
+import { activeVariantId } from "@freshcoat-js/coatfile/internal";
 import type { LayerGeometry } from "./geometry";
 import { childEntries, isBooleanVector, walkLayers } from "./path";
 

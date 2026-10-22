@@ -1,13 +1,14 @@
-import { applyCase, type TextElement } from "@freshcoat-js/coatfile";
+import type { TextElement } from "@freshcoat-js/coatfile";
 import { parseMustache } from "@freshcoat-js/coatfile/mustache";
 import {
+	applyCase,
 	createSharedFontProvider,
 	makeParagraphBuilder,
 	resolveDirection,
 	type SharedFontProvider,
 	spanTextStyle,
 	toColor,
-} from "@freshcoat-js/engine";
+} from "@freshcoat-js/engine/internal";
 import type {
 	Canvas,
 	CanvasKit,

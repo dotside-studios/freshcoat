@@ -1,4 +1,5 @@
 import {
+	attachAssets,
 	checkVariants,
 	FORMAT_VERSION,
 	type Template,
@@ -6,7 +7,6 @@ import {
 	type ValidationError,
 	validate,
 } from "@freshcoat-js/coatfile";
-import { attachAssets } from "@freshcoat-js/coatfile/assets";
 import { parseImageInfo } from "@freshcoat-js/engine/image";
 import type { FigmaPick, NodeTrace } from "~/lib/figma/transpiler";
 import { transpile } from "~/lib/figma/transpiler";

@@ -4,10 +4,12 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { createRenderer, FALLBACK_LINE_HEIGHT } from "@freshcoat-js/engine";
+import type { DrawTextCommand, Node, TextNode } from "@freshcoat-js/engine";
+import { createRenderer } from "@freshcoat-js/engine";
+import { FALLBACK_LINE_HEIGHT } from "@freshcoat-js/engine/internal";
 import { loadCanvasKit, testFontPath } from "@freshcoat-js/test-utils";
 import { compile } from "../src/compile";
-import type { DrawTextCommand, Node, Template, TextNode } from "../src/types";
+import type { Template } from "../src/types";
 import { validate } from "../src/validate";
 import { compileToCommands } from "./helpers/compile-commands";
 

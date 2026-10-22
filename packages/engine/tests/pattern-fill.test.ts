@@ -3,16 +3,17 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import type { Node, PatternKind, ResolvedFill } from "../src/index";
+import type { Node } from "../src/index";
 import {
 	createPath,
 	createRect,
 	createText,
 	PATTERN_KINDS,
 	patternFill,
-	validateCommands,
 } from "../src/index";
 import { patternMean } from "../src/pattern";
+import type { PatternKind, ResolvedFill } from "../src/types";
+import { validateCommands } from "../src/validate-commands";
 import { renderSceneToPng } from "./helpers/headless";
 
 const SIZE = 80;

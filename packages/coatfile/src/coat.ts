@@ -15,10 +15,9 @@
 // EPUB and OpenDocument use, so the media type sits at a fixed offset for
 // anything that sniffs a file by its leading bytes.
 
+import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/engine/internal";
 import { strFromU8, strToU8, type Unzipped, unzipSync, zipSync } from "fflate";
 import {
-	base64ToBytes,
-	bytesToBase64,
 	collectAssetRefs,
 	mediaExtension,
 	parseAssetUri,

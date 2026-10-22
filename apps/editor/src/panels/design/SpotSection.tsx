@@ -1,5 +1,5 @@
 import type { LayerSpot, SpotColor } from "@freshcoat-js/coatfile";
-import { parseColor } from "@freshcoat-js/engine";
+import { parseColor } from "@freshcoat-js/engine/internal";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { Menu, MenuItem } from "@freshcoat-js/ui/menu";

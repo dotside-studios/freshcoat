@@ -1,12 +1,6 @@
-import {
-	base64ToBytes,
-	type DrawCommand,
-	fitRect,
-	type ImageCrop,
-	type Size,
-	type Vec2,
-} from "@freshcoat-js/engine";
+import type { DrawCommand, ImageCrop, Size, Vec2 } from "@freshcoat-js/engine";
 import { orientedSize, parseImageInfo } from "@freshcoat-js/engine/image";
+import { base64ToBytes, fitRect } from "@freshcoat-js/engine/internal";
 import { parseAssetUri } from "./assets";
 import { parseImageFocus } from "./image-focus";
 import { hasToken } from "./mustache";

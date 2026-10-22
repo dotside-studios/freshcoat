@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import type { RectNode } from "@freshcoat-js/engine";
 import {
 	linearGradientAngle,
 	linearGradientPoints,
-} from "@freshcoat-js/engine";
+} from "@freshcoat-js/engine/internal";
 import { compile } from "../src/compile";
 import { templateJsonSchema } from "../src/json-schema";
-import type { Fill, RectNode, Template } from "../src/types";
+import type { Fill, Template } from "../src/types";
 import { validate } from "../src/validate";
 
 function withFill(fill: Fill, nested = false): Template {

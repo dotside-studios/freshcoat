@@ -1,5 +1,5 @@
-import type { FontDescriptor } from "@freshcoat-js/coatfile";
-import { bytesToBase64 } from "@freshcoat-js/coatfile/assets";
+import type { FontDescriptor } from "@freshcoat-js/engine";
+import { bytesToBase64 } from "@freshcoat-js/engine/internal";
 import { once } from "~/app/lazy";
 import url from "./fonts/VendSans-Variable-latin.woff2?url";
 

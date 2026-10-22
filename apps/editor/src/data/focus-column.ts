@@ -3,8 +3,8 @@ import {
 	fieldTitle,
 	formatImageFocus,
 	type Template,
-	type Vec2,
 } from "@freshcoat-js/coatfile";
+import type { Vec2 } from "@freshcoat-js/engine";
 import {
 	type Dataset,
 	uniqueKey,

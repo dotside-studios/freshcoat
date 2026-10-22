@@ -1,33 +1,37 @@
 import {
-	activeVariantId,
 	applyVariant,
 	canvasKitPathOp,
 	compile,
 	DEFAULT_MIN_IMAGE_DPI,
-	exportPixelSize,
 	type FrameWarning,
 	fitDesignSize,
 	hasInsets,
-	MAX_EXPORT_DIMENSION,
 	type PrintCheckOptions,
-	pieceSpec,
-	type Renderer,
 	resizeTemplate,
-	resolveExportScale,
 	resolveSlices,
 	type Sides,
-	sliceLayers,
 	type Template,
 	templateBleed,
 	variantSize,
 } from "@freshcoat-js/coatfile";
+import {
+	activeVariantId,
+	pieceSpec,
+	sliceLayers,
+} from "@freshcoat-js/coatfile/internal";
 import {
 	describeWarning,
 	type ImageDpiCheck,
 	renderCompiled,
 	renderCompiledPdf,
 } from "@freshcoat-js/coatfile/render";
+import {
+	exportPixelSize,
+	MAX_EXPORT_DIMENSION,
+	type Renderer,
+} from "@freshcoat-js/engine";
 import { orientedSize } from "@freshcoat-js/engine/image";
+import { resolveExportScale } from "@freshcoat-js/engine/internal";
 import { assetRef } from "../assets";
 import { crc32 } from "../crc";
 import { type ItemCuts, itemCuts } from "../cut";
