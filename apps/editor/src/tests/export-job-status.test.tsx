@@ -20,6 +20,11 @@ vi.mock("@freshcoat-js/ui/toast", async (importOriginal) => ({
 	toast: vi.fn(),
 }));
 
+vi.mock("~/app/autosave", async (importOriginal) => ({
+	...(await importOriginal<typeof import("~/app/autosave")>()),
+	writeAutosave: vi.fn(async () => {}),
+}));
+
 afterEach(() => {
 	cleanup();
 	vi.mocked(toast).mockClear();
