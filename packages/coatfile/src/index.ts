@@ -142,6 +142,7 @@ export {
 	wholeToken,
 } from "./mustache";
 export {
+	type FreeIdOptions,
 	type HealOptions,
 	healElementIds,
 	type IdSeparator,
