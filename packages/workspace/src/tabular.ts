@@ -66,7 +66,13 @@ export const DEFAULT_TABLE_LIMITS: Readonly<TableLimits> = {
 	maxCells: 10_000_000,
 };
 
-export type ReadTableOptions = { limits?: Partial<TableLimits> };
+export type ReadTableOptions = {
+	limits?: Partial<TableLimits>;
+	/** Drop the `'` that `writeTable` puts before a CSV or TSV cell starting
+	 *  with a formula trigger. Defaults to true; set it to false for a file
+	 *  written with `escapeFormulas: false`. */
+	unescapeFormulas?: boolean;
+};
 
 const LIMIT_LABELS: Record<TableLimitKind, { label: string; size: boolean }> = {
 	bytes: { label: "bytes", size: true },
@@ -209,6 +215,9 @@ function trim(rows: string[][]): string[][] {
 
 const SEPARATORS = [",", "\t", ";", "|"];
 
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+const ESCAPED_FORMULA = /^'+[=+\-@\t\r]/;
+
 /** The separator used most outside quotes in the first 1024 characters,
  *  ties going to the earlier one in `SEPARATORS`, and a comma when none is. */
 function guessSeparator(text: string): string {
@@ -238,6 +247,7 @@ function guessSeparator(text: string): string {
 function splitDelimited(
 	input: string,
 	separator: string | undefined,
+	unescapeFormulas: boolean,
 	limits: TableLimits,
 	fail: (limit: "rows" | "columns", actual: number) => never,
 ): string[][] {
@@ -263,6 +273,13 @@ function splitDelimited(
 		if (cell.charCodeAt(cell.length - 1) === 13) cell = cell.slice(0, -1);
 		if (cell.charCodeAt(0) === 34 && cell.charCodeAt(cell.length - 1) === 34) {
 			cell = cell.slice(1, -1).replaceAll('""', '"');
+		}
+		if (
+			unescapeFormulas &&
+			cell.charCodeAt(0) === 39 &&
+			ESCAPED_FORMULA.test(cell)
+		) {
+			cell = cell.slice(1);
 		}
 		row.push(cell);
 		if (row.length > limits.maxColumns) fail("columns", row.length);
@@ -356,7 +373,10 @@ function readNdjson(
 	fail: (limit: "rows", actual: number) => never,
 ): string[][] {
 	const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
-	if (lines.length - 1 > limits.maxRows) fail("rows", lines.length);
+	const records = lines.every((line) => line.trimStart().startsWith("["))
+		? lines.length - 1
+		: lines.length;
+	if (records > limits.maxRows) fail("rows", records);
 	const items = lines.map(parseJson);
 	return items.length === 0 ? [] : objectsToRows(items);
 }
@@ -368,7 +388,9 @@ function readNdjson(
  * `invalid_file` when the contents do not parse, and a `TableLimitError`
  * (`limit_exceeded`) when the file is past `DEFAULT_TABLE_LIMITS` or the
  * `options.limits` that override them. Size limits are checked before any
- * untrusted bytes are decoded or inflated.
+ * untrusted bytes are decoded or inflated. A CSV or TSV cell that starts with
+ * `'` and then `=`, `+`, `-`, `@`, tab or CR loses that `'`, undoing
+ * `writeTable`'s formula escaping, unless `options.unescapeFormulas` is false.
  */
 export async function readTable(
 	input: Uint8Array | string,
@@ -417,6 +439,7 @@ export async function readTable(
 							rows: splitDelimited(
 								text,
 								ext === "tsv" ? "\t" : undefined,
+								options.unescapeFormulas ?? true,
 								limits,
 								failShape,
 							),
@@ -431,13 +454,16 @@ export async function readTable(
 				throw new TabularError("invalid_file", `Not a .${ext} file`);
 			}
 			const directory = readZipDirectory(input);
-			if (directory && directory.entries > limits.maxZipEntries) {
+			if (!directory) {
+				throw new TabularError(
+					"invalid_file",
+					`${fileName} is damaged: its zip directory cannot be read`,
+				);
+			}
+			if (directory.entries > limits.maxZipEntries) {
 				fail("zip_entries", directory.entries, limits.maxZipEntries);
 			}
-			if (
-				directory &&
-				directory.uncompressedBytes > limits.maxUncompressedBytes
-			) {
+			if (directory.uncompressedBytes > limits.maxUncompressedBytes) {
 				fail(
 					"uncompressed_bytes",
 					directory.uncompressedBytes,
@@ -461,6 +487,12 @@ export async function readTable(
 			if (name === "ParseError" && spans) {
 				const [height, width] = [Number(spans[1]), Number(spans[2])];
 				fail("cells", Math.max(height - 1, 0) * width, limits.maxCells);
+			}
+			if (
+				name === "ParseError" &&
+				/^Sheet spans \d+ cells, over the/.test(message)
+			) {
+				fail("cells", undefined, limits.maxCells);
 			}
 			throw new TabularError("invalid_file", message);
 		}
@@ -515,8 +547,6 @@ function exportValue(
 	return value;
 }
 
-const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
-
 function delimited(
 	dataset: Dataset,
 	separator: string,
@@ -526,17 +556,20 @@ function delimited(
 		text.includes(separator) || /["\r\n]/.test(text)
 			? `"${text.replace(/"/g, '""')}"`
 			: text;
-	const guard = (text: string, value: CellValue | undefined) =>
-		escapeFormulas && typeof value !== "number" && FORMULA_TRIGGER.test(text)
+	const guard = (text: string, column: Column, value: CellValue | undefined) =>
+		escapeFormulas &&
+		typeof value !== "number" &&
+		(ESCAPED_FORMULA.test(text) ||
+			(column.type !== "image" && FORMULA_TRIGGER.test(text)))
 			? `'${text}`
 			: text;
 	const lines = [
-		dataset.columns.map((c) => quote(guard(c.key, c.key))).join(separator),
+		dataset.columns.map((c) => quote(c.key)).join(separator),
 		...dataset.records.map((record) =>
 			dataset.columns
 				.map((c) => {
 					const value = record.values[c.key];
-					return quote(guard(exportText(dataset, c, value), value));
+					return quote(guard(exportText(dataset, c, value), c, value));
 				})
 				.join(separator),
 		),
@@ -596,11 +629,13 @@ async function workbookBytes(
 /**
  * The dataset as a file. The header row is the column keys.
  *
- * In CSV and TSV, string cells and headers starting with `=`, `+`, `-`, `@`,
- * tab or CR get a leading `'` so spreadsheets do not run them as formulas;
- * numbers are left alone. Set `escapeFormulas: false` for machine consumers.
- * Reading the file back keeps the `'`, because it cannot be told apart from a
- * value that began with one.
+ * In CSV and TSV, text cells starting with `=`, `+`, `-`, `@`, tab or CR get a
+ * leading `'` so spreadsheets do not run them as formulas, and so do text
+ * cells starting with `'` and then one of those, so the escape can be undone.
+ * Numbers and image cells, which hold file names, are left alone, apart from
+ * that second rule. `readTable` drops one leading `'` from a cell that starts
+ * with `'` and a trigger, so the file reads back as written. Set
+ * `escapeFormulas: false` for machine consumers.
  */
 export async function writeTable(
 	dataset: Dataset,

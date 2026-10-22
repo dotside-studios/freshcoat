@@ -413,8 +413,8 @@ export type TableSheet = { name: string; rows: string[][] };
 export type TableFormat = "csv" | "tsv" | "xlsx" | "json" | "ndjson";
 
 export type WriteTableOptions = {
-	/** Prefix `'` to CSV/TSV text cells that start with a formula trigger.
-	 *  Defaults to true. */
+	/** Prefix `'` to CSV/TSV text cells that start with a formula trigger,
+	 *  or with `'` and a trigger, other than image cells. Defaults to true. */
 	escapeFormulas?: boolean;
 };
 

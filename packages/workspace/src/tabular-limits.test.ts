@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { zipSync } from "fflate";
 import { writeXlsx } from "hucre/xlsx";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -209,6 +210,26 @@ describe("readTable: limits", () => {
 		expect(err).toMatchObject({ limit: "rows", actual: 6, max: 5 });
 	});
 
+	it("stops ndjson one record over the cap before parsing", async () => {
+		const lines = `${'{"id":1}\n'.repeat(5)}not json`;
+		const err = await limitOf(
+			readTable(lines, "rows.ndjson", { limits: { maxRows: 5 } }),
+		);
+		expect(err).toMatchObject({ limit: "rows", actual: 6, max: 5 });
+	});
+
+	it("does not count an ndjson header row of arrays", async () => {
+		const lines = (n: number) => `["id"]\n${"[1]\n".repeat(n)}`;
+		const { sheets } = await readTable(lines(5), "x.ndjson", {
+			limits: { maxRows: 5 },
+		});
+		expect(sheets[0]?.rows).toHaveLength(6);
+		const err = await limitOf(
+			readTable(lines(6), "x.ndjson", { limits: { maxRows: 5 } }),
+		);
+		expect(err).toMatchObject({ limit: "rows", actual: 6, max: 5 });
+	});
+
 	it("counts rows before trailing empty rows are trimmed", async () => {
 		const err = await limitOf(
 			readTable(`a\n1\n${"\n".repeat(30)}`, "x.csv", {
@@ -325,6 +346,80 @@ describe("readTable: workbook limits", () => {
 		);
 	});
 
+	const centralDirectoryEnd = (zip: Uint8Array) => {
+		const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+		for (let at = zip.length - 22; at >= 0; at--) {
+			if (view.getUint32(at, true) === 0x06054b50) return { view, at };
+		}
+		throw new Error("no end of central directory");
+	};
+
+	it("checks a real xlsx whose directory size field is zero", async () => {
+		const xlsx = await workbook([["a"], ["b"]]);
+		const { view, at } = centralDirectoryEnd(xlsx);
+		view.setUint32(at + 12, 0, true);
+		expect(readZipDirectory(xlsx)?.entries).toBeGreaterThan(1);
+		const err = await limitOf(
+			readTable(xlsx, "patched.xlsx", { limits: { maxZipEntries: 1 } }),
+		);
+		expect(err.limit).toBe("zip_entries");
+		const { sheets } = await readTable(xlsx, "patched.xlsx");
+		expect(sheets[0]?.rows).toEqual([["a"], ["b"]]);
+	});
+
+	it("checks a real xlsx whose directory size field is too small", async () => {
+		const xlsx = await workbook([["a"], ["b"]]);
+		const { view, at } = centralDirectoryEnd(xlsx);
+		view.setUint32(at + 12, 50, true);
+		const err = await limitOf(
+			readTable(xlsx, "patched.xlsx", {
+				limits: { maxUncompressedBytes: 100 },
+			}),
+		);
+		expect(err.limit).toBe("uncompressed_bytes");
+	});
+
+	it("rejects a zip whose directory cannot be read", async () => {
+		const xlsx = await workbook([["a"], ["b"]]);
+		const { view, at } = centralDirectoryEnd(xlsx);
+		view.setUint32(at + 16, view.getUint32(at + 16, true) + 1, true);
+		expect(readZipDirectory(xlsx)).toBeNull();
+		const err = await caught(readTable(xlsx, "broken.xlsx"));
+		expect(err).toBeInstanceOf(TabularError);
+		expect((err as TabularError).code).toBe("invalid_file");
+	});
+
+	it("rejects a zip with no end of central directory", async () => {
+		const err = await caught(
+			readTable(new Uint8Array([0x50, 0x4b, 3, 4, 0, 0]), "short.xlsx"),
+		);
+		expect((err as TabularError).code).toBe("invalid_file");
+	});
+
+	it("rejects a zip64 marker with no zip64 record", async () => {
+		const xlsx = await workbook([["a"], ["b"]]);
+		const { view, at } = centralDirectoryEnd(xlsx);
+		view.setUint32(at + 16, 0xffffffff, true);
+		const err = await caught(readTable(xlsx, "zip64.xlsx"));
+		expect((err as TabularError).code).toBe("invalid_file");
+	});
+
+	it.each([
+		"xls",
+		"ods",
+	])("reports a .%s sheet over the cell cap as a limit", async (ext) => {
+		const bytes = new Uint8Array(
+			readFileSync(new URL(`./fixtures/members.${ext}`, import.meta.url)),
+		);
+		const err = await limitOf(
+			readTable(bytes, `members.${ext}`, {
+				limits: { maxCells: 2, maxColumns: 2 },
+			}),
+		);
+		expect(err).toMatchObject({ limit: "cells", max: 2 });
+		expect(err.actual).toBeUndefined();
+	});
+
 	it("rejects a zip with too many entries", async () => {
 		const files: Record<string, Uint8Array> = {};
 		for (let i = 0; i < 30; i++) files[`f${i}.xml`] = encode("<a/>");
@@ -392,6 +487,35 @@ describe("readZipDirectory", () => {
 	it("sums the declared sizes of a zip's entries", () => {
 		const zip = zipSync({ "a.txt": encode("hello"), "b.txt": encode("hi") });
 		expect(readZipDirectory(zip)).toEqual({ entries: 2, uncompressedBytes: 7 });
+	});
+
+	it("reads the entry count and offset from a zip64 record", () => {
+		const zip = zipSync({ "a.txt": encode("hello"), "b.txt": encode("hi") });
+		const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+		const eocd = zip.length - 22;
+		const start = view.getUint32(eocd + 16, true);
+		const size = view.getUint32(eocd + 12, true);
+		const out = new Uint8Array(zip.length + 56 + 20);
+		out.set(zip.subarray(0, eocd));
+		const record = eocd;
+		const o = new DataView(out.buffer);
+		o.setUint32(record, 0x06064b50, true);
+		o.setBigUint64(record + 4, 44n, true);
+		o.setBigUint64(record + 24, 2n, true);
+		o.setBigUint64(record + 32, 2n, true);
+		o.setBigUint64(record + 40, BigInt(size), true);
+		o.setBigUint64(record + 48, BigInt(start), true);
+		const locator = record + 56;
+		o.setUint32(locator, 0x07064b50, true);
+		o.setBigUint64(locator + 8, BigInt(record), true);
+		o.setUint32(locator + 16, 1, true);
+		const end = locator + 20;
+		o.setUint32(end, 0x06054b50, true);
+		o.setUint16(end + 8, 0xffff, true);
+		o.setUint16(end + 10, 0xffff, true);
+		o.setUint32(end + 12, 0xffffffff, true);
+		o.setUint32(end + 16, 0xffffffff, true);
+		expect(readZipDirectory(out)).toEqual({ entries: 2, uncompressedBytes: 7 });
 	});
 
 	it("returns null for bytes with no directory", () => {
