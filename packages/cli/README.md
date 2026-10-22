@@ -172,14 +172,16 @@ named in an image field's column is read from the data file's directory. Files
 are named `<template id>-<row>-<frame>`, with the scale as a suffix for
 anything but 1x, unless `--name` says otherwise.
 
-A data file of any size is read. Past 128 MiB it warns, for example
-`warning: people.csv is 300.0 MB, and reading it takes many times that in
-memory, a workbook more than a CSV; if it runs out of memory, split the file`,
-and goes on. Memory grows with cells: a 500,000 by 20 file peaks near 2 GB
-while it is read, and a workbook takes two to three times a CSV's memory. A
-workbook over 500 columns or 10,000 zip entries is refused. Under Node a text
-file over about 512 MB is refused with a size limit message, as it is longer
-than a JavaScript string can be.
+A data file of any size or number of rows is read. Past 128 MiB it warns, for
+example `warning: people.csv is 300.0 MB, and reading it takes many times that
+in memory, a workbook more than a CSV; if it runs out of memory, split the
+file`, and goes on. Memory grows with cells: a 500,000 by 20 file peaks near
+2 GB while it is read, and a workbook takes two to three times a CSV's memory.
+A file over 10,000,000 cells or 500 columns, or a workbook that inflates past
+512 MiB or holds over 10,000 zip entries, is refused. Past the cell or
+inflated size limit the message ends `split it into files of fewer rows and
+render each`. Under Node a text file over about 512 MB is refused with a size
+limit message, as it is longer than a JavaScript string can be.
 
 `--where` keeps the rows that match, by field key, as for a workspace below.
 

@@ -48,6 +48,7 @@ import {
 	DEFAULT_TABLE_LIMITS,
 	readTable,
 	TableLimitError,
+	type TableLimitKind,
 	type TableLimits,
 	TabularError,
 } from "@freshcoat-js/workspace/tabular";
@@ -376,15 +377,15 @@ function checkName(template: Template, pattern: string): void {
 		);
 }
 
-/** The CLI reads a data file of any size and warns when it is large; only
- *  the column and zip entry limits stay. */
+/** The CLI reads a data file of any size or row count and warns when it is
+ *  large. The limits on what a workbook inflates to stay. */
 const CLI_TABLE_LIMITS: TableLimits = {
 	...DEFAULT_TABLE_LIMITS,
 	maxBytes: Number.POSITIVE_INFINITY,
-	maxUncompressedBytes: Number.POSITIVE_INFINITY,
 	maxRows: Number.POSITIVE_INFINITY,
-	maxCells: Number.POSITIVE_INFINITY,
 };
+
+const SPLIT = new Set<TableLimitKind>(["uncompressed_bytes", "cells"]);
 
 async function readDataset(
 	io: Io,
@@ -405,7 +406,13 @@ async function readDataset(
 			limits: CLI_TABLE_LIMITS,
 		}));
 	} catch (error) {
-		if (error instanceof TableLimitError) throw new CliError(error.message);
+		if (error instanceof TableLimitError) {
+			throw new CliError(
+				SPLIT.has(error.limit)
+					? `${error.message}; split it into files of fewer rows and render each`
+					: error.message,
+			);
+		}
 		if (error instanceof TabularError)
 			throw new CliError(`${file}: ${error.message}`);
 		throw error;
