@@ -111,7 +111,21 @@ await readTable(bytes, "people.xlsx", { limits: { maxRows: 500_000 } });
 | `maxColumns` | `columns` | 500 | columns of one sheet, before empty trailing columns are trimmed |
 | `maxCells` | `cells` | 10,000,000 | records times columns of one sheet |
 
-`DEFAULT_TABLE_LIMITS` holds the defaults. CSV and TSV stop at the row and
+`DEFAULT_TABLE_LIMITS` holds the defaults. A limit given as `NaN`, a
+negative number or anything but a number takes its default. `maxBytes` and
+`maxRows` can be lifted with `Infinity`. The other four bound how much a
+workbook inflates in memory, so they can be raised but not lifted: a value
+past its ceiling in `TABLE_LIMIT_CEILINGS` takes the ceiling, and `Infinity`
+takes the default. A `TableLimitError` reports the limit in effect as `max`.
+
+| Option | Ceiling |
+| --- | --- |
+| `maxUncompressedBytes` | 2 GiB, hucre's own default |
+| `maxZipEntries` | 65,535 |
+| `maxColumns` | 16,384, the widest xlsx sheet |
+| `maxCells` | 20,000,000, hucre's own default |
+
+CSV and TSV stop at the row and
 column caps while parsing; JSON and NDJSON check the row count before building
 rows. Binary `.xls` has no zip, so only the byte, row, column and cell limits
 reach it.
@@ -260,7 +274,8 @@ an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to `<path>.<pid>.tmp` beside the path, the zip as it renders, and renames
 that over the path once the job succeeds, so a cancelled or failed job leaves
 an existing file as it was and removes only the temporary file. A symlinked
-path keeps its link: the file it points to is replaced. The replaced file's
+path keeps its link: the file it points to is replaced, or created when the
+link dangles. A symlink loop throws. The replaced file's
 mode carries over. An `ExportOutput` of the host's own follows the same
 contract: after the last `sink()` write or `save()`, `exportWorkspace` calls
 `commit()` once the job finishes, even with failed items, to make the output

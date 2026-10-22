@@ -202,9 +202,12 @@ in the renderer or the importer.
   `TableLimitError` (code `limit_exceeded`, with `limit`, `actual` and `max`)
   from `@freshcoat-js/workspace/tabular`. A JSON list of objects counts its
   objects. Pass `limits` to `readTable` to raise one, or
-  `Number.POSITIVE_INFINITY` to lift the byte, zip entry or record limit;
-  the uncompressed, column and cell limits can be raised but not lifted, and
-  infinity takes their default. `DEFAULT_TABLE_LIMITS` holds the defaults. The limits were sized from measured peak memory, about 2 GB in a
+  `Number.POSITIVE_INFINITY` to lift the byte or record limit. The
+  uncompressed, zip entry, column and cell limits can be raised up to
+  `TABLE_LIMIT_CEILINGS` (2 GiB, 65,535 entries, 16,384 columns and
+  20,000,000 cells) but not lifted: a larger value takes the ceiling and
+  infinity the default. A limit given as `NaN`, a negative number or not a
+  number takes its default. `DEFAULT_TABLE_LIMITS` holds the defaults. The limits were sized from measured peak memory, about 2 GB in a
   browser tab at the cell limit. Text too long for a JavaScript string, about
   512 MB in Node and Chromium, is refused with a size limit error rather than
   a raw Node error or Studio's "is empty". A workbook zip whose central
@@ -253,7 +256,9 @@ in the renderer or the importer.
   Presets take `cutSpots`, the CLI `--cut-spot`, and Studio's Output tab a
   name per kind to rename them. `All` and `None`, which PDF reserves for every
   or no plate, are refused in any case by the CLI and Studio; a saved preset
-  naming one opens with that kind on its default name and a warning. PDFs
+  naming one opens with that kind on its default name and a warning. A `#`
+  in a name is written literally, so `PMS #12A` keeps its name and `#41ll`
+  cannot spell `All`. PDFs
   without cut lines are unchanged, and so are SVG and DXF cut files.
 - **Template spot colours (format 1.7).** A `rect` or `vector` can print its
   fill or stroke in a named spot ink with `spot`, for white ink, foil or

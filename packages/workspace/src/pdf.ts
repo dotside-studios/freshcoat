@@ -175,7 +175,7 @@ export async function assemblePdf(
 			ref = doc.context.register(
 				doc.context.obj([
 					PDFName.of("Separation"),
-					PDFName.of(ink),
+					literalName(lib, ink),
 					PDFName.of("DeviceRGB"),
 					{
 						FunctionType: 2,
@@ -364,6 +364,19 @@ export async function assemblePdf(
 	}
 	await finishDocument(lib, doc, intent, profiles);
 	return saveWithId(lib, doc, date);
+}
+
+/** `name` as a PDF name holding its UTF-8 bytes as written. `PDFName.of`
+ *  decodes `#XX` escapes and writes characters past U+00FF as code units,
+ *  so every byte it would treat specially is escaped first. */
+function literalName(lib: PdfLib, name: string) {
+	let escaped = "";
+	for (const b of new TextEncoder().encode(name))
+		escaped +=
+			b < 0x21 || b > 0x7e || "()<>[]{}/%#".includes(String.fromCharCode(b))
+				? `#${b.toString(16).toUpperCase().padStart(2, "0")}`
+				: String.fromCharCode(b);
+	return lib.PDFName.of(escaped);
 }
 
 /** The page's resource subdictionary under `key`, made when it has none. */

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import {
 	chmod,
 	lstat,
+	mkdir,
 	mkdtemp,
 	readFile,
 	readlink,
@@ -215,6 +216,40 @@ describe("exportWorkspace with fileOutput", () => {
 			REPORT_FILE_NAME,
 		);
 		expect(existsSync(output.temporary)).toBe(false);
+	});
+
+	it("writes the target of a dangling symlink and keeps the link", async () => {
+		const link = join(dir, "dangling.zip");
+		await symlink("dangling-target.zip", link);
+		const real = join(dir, "dangling-target.zip");
+		const output = fileOutput(link);
+		expect(output.temporary.startsWith(`${real}.`)).toBe(true);
+		await exportWorkspace(workspace, small, { renderer, fonts, output });
+		expect((await lstat(link)).isSymbolicLink()).toBe(true);
+		expect(await readlink(link)).toBe("dangling-target.zip");
+		expect(unzipSync(new Uint8Array(await readFile(real)))).toHaveProperty(
+			REPORT_FILE_NAME,
+		);
+	});
+
+	it("follows a chain of links to a missing target", async () => {
+		await mkdir(join(dir, "sub"), { recursive: true });
+		const first = join(dir, "chain.zip");
+		await symlink(join("sub", "middle.zip"), first);
+		await symlink("end.zip", join(dir, "sub", "middle.zip"));
+		const output = fileOutput(first);
+		expect(output.temporary.startsWith(`${join(dir, "sub", "end.zip")}.`)).toBe(
+			true,
+		);
+	});
+
+	it("refuses a symlink loop", async () => {
+		const a = join(dir, "loop-a.zip");
+		const b = join(dir, "loop-b.zip");
+		await symlink(b, a);
+		await symlink(a, b);
+		expect(() => fileOutput(a)).toThrow(`${a} is a symlink loop`);
+		expect((await lstat(a)).isSymbolicLink()).toBe(true);
 	});
 
 	it("keeps the mode of the file it replaces", async () => {
