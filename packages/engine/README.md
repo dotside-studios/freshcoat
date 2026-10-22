@@ -122,7 +122,9 @@ Images and local font files are read through the renderer's byte loader.
 an error that names it, because a template chooses these URLs. A relative URL
 resolves against `location` in a browser and is refused where there is none.
 Pass your own `load` to allow more. Font URLs follow the same policy unless you
-pass your own `fetch` to `fontBytes`.
+pass your own `fetch` to `fontBytes`. Redirects are followed up to 5 hops and
+each target must pass the policy; in a browser the browser follows them under
+its mixed-content rules.
 
 `createFetchLoader({ unsafeAllowHttp: true })` also allows `http:`. It is
 unsafe: http is plaintext, and a template can aim it at internal services such
