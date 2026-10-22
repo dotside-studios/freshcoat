@@ -1,4 +1,5 @@
-import { type CoatErrorCode, decodeTemplate, type UnpackOptions } from "./coat";
+import { decodeTemplate, type UnpackOptions } from "./coat";
+import type { CoatErrorCode } from "./errors";
 import { healElementIds } from "./normalize";
 import type { Template, ValidationError } from "./types";
 import { validate } from "./validate";

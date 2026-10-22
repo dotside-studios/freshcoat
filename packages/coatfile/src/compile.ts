@@ -42,6 +42,7 @@ import {
 	templateBleed,
 } from "./bleed";
 import { applyBooleans } from "./boolean";
+import { CoatError } from "./errors";
 import { leadColor, linearPoints } from "./fills";
 import { barcodeFontFamily, defaultFontFamily } from "./font-usage";
 import { parseImageFocus } from "./image-focus";
@@ -144,7 +145,8 @@ export function compile(
 		!opts.resize &&
 		Math.abs(aspectTarget - aspectTemplate) >= ASPECT_TOLERANCE
 	) {
-		throw new Error(
+		throw new CoatError(
+			"aspect_mismatch",
 			`aspect ratio mismatch: template ${aspectTemplate.toFixed(3)}, target ${aspectTarget.toFixed(3)}`,
 		);
 	}
@@ -474,7 +476,8 @@ function compileElement(
 // Every element type has a case above; one added to the schema without one is
 // a type error here rather than a frame that silently draws nothing.
 function unknownElement(el: never): never {
-	throw new Error(
+	throw new CoatError(
+		"unknown_element_type",
 		`compile: no case for element type ${(el as { type?: unknown }).type}`,
 	);
 }

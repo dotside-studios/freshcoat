@@ -1,5 +1,6 @@
 import { inlineAssetUrls, resolveAssetSrcs } from "./assets";
 import { resizeTemplate } from "./constraints";
+import { CoatError } from "./errors";
 import type { Size, Template } from "./types";
 import { validate } from "./validate";
 import { applyVariant } from "./variants";
@@ -22,8 +23,10 @@ export function prepareTemplate(
 	if (!validated.has(template)) {
 		const v = validate(template);
 		if (!v.ok) {
-			throw new Error(
+			throw new CoatError(
+				"invalid_template",
 				`invalid template: ${v.errors.map((e) => e.code).join(", ")}`,
+				{ path: v.errors[0]?.path },
 			);
 		}
 		validated.add(template);

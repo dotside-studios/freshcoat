@@ -320,13 +320,13 @@ describe("compile (CompiledTemplate)", () => {
 	test("rejects unknown variantId", () => {
 		expect(() =>
 			compile(baseTemplate, {}, { width: 100, height: 60, variantId: "ghost" }),
-		).toThrow(/unknown_variant/);
+		).toThrow(expect.objectContaining({ code: "unknown_variant" }));
 	});
 
 	test("rejects aspect-ratio mismatch", () => {
 		expect(() =>
 			compile(baseTemplate, {}, { width: 100, height: 100 }),
-		).toThrow(/aspect/);
+		).toThrow(expect.objectContaining({ code: "aspect_mismatch" }));
 	});
 
 	test("background pos/size omitted in author input is normalized to frame-fill", () => {

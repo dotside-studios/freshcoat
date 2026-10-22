@@ -20,6 +20,17 @@ untrusted templates? See [safer defaults](security-defaults.md).
 
 These land in the next release's notes.
 
+- **One typed error in coatfile (breaking).** Everything coatfile throws is
+  now a `CoatError`, exported from the package root with its `CoatErrorCode`
+  union, an optional `path` and a `cause`: an unknown variant, an aspect-ratio
+  mismatch, a missing side or slice, an unresolved asset, invalid SVG and the
+  rest no longer throw a plain `Error`. `saveTemplate` reports a pack failure
+  as `write_failed` at the template root instead of at `/format_version`, and
+  `decodeTemplate` reports a failed hash as `hash_failed` instead of
+  `invalid_json`. Migration: match on `err.code` (for example
+  `err instanceof CoatError && err.code === "unknown_variant"`) instead of the
+  message, which no longer starts with the code.
+
 - **Safer defaults for untrusted templates.** The engine's default loader
   accepts only `data:`, `blob:` and `https:`. See
   [safer defaults](security-defaults.md).

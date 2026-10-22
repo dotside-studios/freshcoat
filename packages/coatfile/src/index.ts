@@ -101,6 +101,8 @@ export {
 	type PathOp,
 } from "./boolean";
 export {
+	CoatError,
+	type CoatErrorCode,
 	pruneUnusedAssets,
 	type SaveResult,
 	saveTemplate,

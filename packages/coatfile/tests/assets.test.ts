@@ -250,7 +250,7 @@ describe("detachAssets", () => {
 
 	test("throws rather than persist a template that would lose an image", () => {
 		expect(() => detachAssets(template(), new Map())).toThrow(
-			"unresolved_asset: bg",
+			expect.objectContaining({ code: "unresolved_asset" }),
 		);
 	});
 

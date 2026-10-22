@@ -18,6 +18,12 @@ const svg = (body: string, attrs = 'width="100" height="100"') =>
 	`<svg xmlns="http://www.w3.org/2000/svg" ${attrs}>${body}</svg>`;
 
 describe("svgToElements", () => {
+	test("refuses markup that is not SVG with invalid_svg", () => {
+		expect(() => svgToElements("<html/>")).toThrow(
+			expect.objectContaining({ code: "invalid_svg", name: "CoatError" }),
+		);
+	});
+
 	test("the root is a frame at the drawing's size", () => {
 		const { element, warnings } = svgToElements(
 			svg('<rect x="10" y="20" width="30" height="40" fill="red"/>'),

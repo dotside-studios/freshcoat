@@ -155,8 +155,8 @@ frame names; `front` and `back` are card conventions.
 Two constraints do apply:
 
 - `compile()` scales freely but reshapes only when asked. It throws if the
-  target `width`/`height` ratio differs from the template's by ≥0.005, unless
-  `resize` is set (see [Constraints](#constraints)).
+  target `width`/`height` ratio differs from the template's by ≥0.005
+  (`aspect_mismatch`), unless `resize` is set (see [Constraints](#constraints)).
 - A frame's `background` must fill it — `pos` `{x:0, y:0}` (or absent) and
   `size` equal to the template dims (or absent).
 
@@ -331,7 +331,7 @@ const urlByHash = await upload(readAssets(template));   // [{ sha256, blob, cont
 const stored = detachAssets(template, urlByHash);       // srcs → URLs, `assets` gone
 ```
 
-`detachAssets` throws `unresolved_asset: <sha>` rather than emit a template that
+`detachAssets` throws an `unresolved_asset` error rather than emit a template that
 has silently lost an image. `collectAssetRefs` lists what still needs
 resolving; `resolveAssetSrcs` is the non-throwing variant for previews.
 
@@ -402,9 +402,15 @@ if (read.ok) validate(healElementIds(read.document));
 `saveTemplate(template, "coat" | "json")` is the rule for writing a template out:
 `writableTemplate` (unused assets pruned, `format_version` raised to cover the
 fields used), `validate`, then `packTemplate` or `serializeTemplate`. It returns
-`{ ok: true, data }` or `{ ok: false, errors }`, a refused write (a newer minor)
-reported as an error on `/format_version`. `loadTemplate` is its counterpart for
+`{ ok: true, data }` or `{ ok: false, errors }`. A refused
+write (a newer minor) is reported as an error on `/format_version`; any other
+pack failure is `write_failed` at the template root. `loadTemplate` is its counterpart for
 reading a file in.
+
+Everything coatfile throws is a `CoatError`, with a `code` from the exported
+`CoatErrorCode` union, an optional `path` (a JSON pointer into the template)
+and the underlying `cause` where there is one. Match on `code`; messages are
+for people and may change.
 
 `packTemplate` re-keys every asset by the real hash of its bytes first
 (`rehashAssets`), because that hash becomes its entry name and `unpackTemplate`
@@ -1371,7 +1377,7 @@ and everything inside it is removed by default (`hidden: "drop"`); `"keep"`
 leaves it in with `hidden: true`, and without `hidden` where the variant shows
 it, for an editor that still lists it. A mask's shape is never drawn
 itself, so hiding it has no effect. The input is not mutated, `variants` is
-kept, and an unknown id throws `unknown_variant: <id>`. `compile` applies the
+kept, and an unknown id throws a `CoatError` with code `unknown_variant`. `compile` applies the
 variant before `resize`, so its backgrounds and moved layers are laid out with
 everything else.
 

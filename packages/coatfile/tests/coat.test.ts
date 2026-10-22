@@ -345,9 +345,34 @@ describe("saveTemplate", () => {
 			expect(result.errors[0]?.code).toBe("newer_format_version");
 		}
 	});
+
+	test("reports a failed pack at the template root, not /format_version", async () => {
+		const template = await withAssets();
+		const broken = {
+			...template,
+			assets: template.assets?.map((a) => ({ ...a, base64: "@@@@" })),
+		};
+		const coat = await saveTemplate(broken, "coat");
+		expect(coat.ok).toBe(false);
+		if (coat.ok) return;
+		expect(coat.errors[0]).toMatchObject({ path: "", code: "write_failed" });
+	});
 });
 
 describe("decodeTemplate", () => {
+	test("reports a failed hash as hash_failed, not invalid_json", async () => {
+		const read = await decodeTemplate(await packTemplate(await withAssets()), {
+			sha256: () => Promise.reject(new Error("no digest")),
+		});
+		expect(read.ok).toBe(false);
+		expect(!read.ok && read.code).toBe("hash_failed");
+	});
+
+	test("reports unparsable JSON as invalid_json", async () => {
+		const read = await decodeTemplate("{not json");
+		expect(!read.ok && read.code).toBe("invalid_json");
+	});
+
 	test("reads JSON text, JSON bytes and packages alike", async () => {
 		const text = JSON.stringify(fixtures.minimalCard);
 		const fromText = await decodeTemplate(text);

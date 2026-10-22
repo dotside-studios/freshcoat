@@ -26,10 +26,13 @@ import {
 	type Sha256,
 	subtleSha256,
 } from "./assets";
+import { CoatError, type CoatErrorCode, errorMessage } from "./errors";
 import { formatVersionStatus, raiseFormatVersion } from "./format";
 import { unwrapLegacyBundle } from "./normalize";
 import type { InlineAsset, Template, ValidationError } from "./types";
 import { validate } from "./validate";
+
+export { CoatError, type CoatErrorCode } from "./errors";
 
 export const COAT_EXTENSION = ".coat";
 /** The name a tool writes template JSON under. Plain `.json` still reads; the
@@ -92,27 +95,6 @@ const STORED_TYPES = new Set([
 	"font/woff2",
 	"font/woff",
 ]);
-
-export type CoatErrorCode =
-	| "newer_format_version"
-	| "unsupported_format_version"
-	| "invalid_package"
-	| "wrong_media_type"
-	| "missing_template"
-	| "invalid_json"
-	| "missing_asset"
-	| "asset_hash_mismatch"
-	| "package_too_large";
-
-export class CoatError extends Error {
-	constructor(
-		readonly code: CoatErrorCode,
-		message: string,
-	) {
-		super(message);
-		this.name = "CoatError";
-	}
-}
 
 /** Whether these bytes are a zip, and so a `.coat` rather than template JSON. */
 export function isCoatPackage(bytes: Uint8Array): boolean {
@@ -197,12 +179,14 @@ function assertWritable(template: Template): void {
 		throw new CoatError(
 			"newer_format_version",
 			`format_version ${template.format_version} is newer than this kit writes`,
+			{ path: "/format_version" },
 		);
 	}
 	if (status === "unsupported") {
 		throw new CoatError(
 			"unsupported_format_version",
 			`format_version ${template.format_version} is not supported`,
+			{ path: "/format_version" },
 		);
 	}
 }
@@ -243,7 +227,8 @@ export async function unpackTemplate(
 	} catch (err) {
 		throw new CoatError(
 			"invalid_json",
-			`${TEMPLATE_ENTRY}: ${err instanceof Error ? err.message : String(err)}`,
+			`${TEMPLATE_ENTRY}: ${errorMessage(err)}`,
+			{ cause: err },
 		);
 	}
 	if (typeof document !== "object" || document === null) return document;
@@ -274,7 +259,16 @@ export async function unpackTemplate(
 				`asset ${declared} is listed but not in the package`,
 			);
 		}
-		const actual = await sha256(data);
+		let actual: string;
+		try {
+			actual = await sha256(data);
+		} catch (err) {
+			throw new CoatError(
+				"hash_failed",
+				`asset ${declared} could not be hashed: ${errorMessage(err)}`,
+				{ cause: err },
+			);
+		}
 		if (actual !== declared) {
 			throw new CoatError(
 				"asset_hash_mismatch",
@@ -323,20 +317,22 @@ export async function decodeTemplate(
 			typeof input === "string"
 				? input
 				: new TextDecoder("utf-8").decode(input);
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(text);
+		} catch (err) {
+			throw new CoatError("invalid_json", errorMessage(err), { cause: err });
+		}
 		return {
 			ok: true,
-			document: unwrapLegacyBundle(JSON.parse(text)),
+			document: unwrapLegacyBundle(parsed),
 			packaged: false,
 		};
 	} catch (err) {
 		if (err instanceof CoatError) {
 			return { ok: false, code: err.code, message: err.message };
 		}
-		return {
-			ok: false,
-			code: "invalid_json",
-			message: err instanceof Error ? err.message : String(err),
-		};
+		return { ok: false, code: "read_failed", message: errorMessage(err) };
 	}
 }
 
@@ -406,11 +402,10 @@ export function saveTemplate(
 }
 
 function writeError(err: unknown): ValidationError {
-	return {
-		path: "/format_version",
-		code: err instanceof CoatError ? err.code : "write_failed",
-		message: err instanceof Error ? err.message : String(err),
-	};
+	if (err instanceof CoatError) {
+		return { path: err.path ?? "", code: err.code, message: err.message };
+	}
+	return { path: "", code: "write_failed", message: errorMessage(err) };
 }
 
 function assetEntryName(asset: InlineAsset): string {
@@ -449,7 +444,8 @@ function unzip(bytes: Uint8Array): Unzipped {
 		if (err instanceof CoatError) throw err;
 		throw new CoatError(
 			"invalid_package",
-			`not a readable zip: ${err instanceof Error ? err.message : String(err)}`,
+			`not a readable zip: ${errorMessage(err)}`,
+			{ cause: err },
 		);
 	}
 }

@@ -4,6 +4,7 @@
 // re-places its children the same way. The result is an ordinary template at
 // the new size, so compile, the editor and anything else read it unchanged.
 
+import { CoatError } from "./errors";
 import { resizeBackground, resizeFrames, sameSize } from "./relayout";
 import { walkElements } from "./tree";
 import type { Element, Size, Template, Variant } from "./types";
@@ -133,7 +134,10 @@ export function fitDesignSize(
 	targetH: number,
 ): Size {
 	if (!(targetW > 0 && targetH > 0)) {
-		throw new Error(`fitDesignSize: invalid target ${targetW}x${targetH}`);
+		throw new CoatError(
+			"invalid_target",
+			`fitDesignSize: invalid target ${targetW}x${targetH}`,
+		);
 	}
 	const short = Math.min(template.width, template.height);
 	return targetW <= targetH
