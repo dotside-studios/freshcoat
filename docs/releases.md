@@ -25,6 +25,10 @@ pixels Freshcoat writes for the same input.
 [Migrating to 0.5](migrating-to-0.5.md) covers each one, and how to keep the
 old behaviour where that is possible.
 
+- **Supported runtimes.** The npm packages declare `"engines": { "node": ">=22" }`
+  and run on Node 22 or later and Bun 1.3.13 or later. On Node 22, npm warns
+  `EBADENGINE` for `hucre`, which declares Node 24; the warning is harmless.
+
 ### SDK users
 
 #### Errors and API

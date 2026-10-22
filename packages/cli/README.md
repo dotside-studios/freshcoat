@@ -6,12 +6,17 @@ to a zip or PDF, check a
 template or workspace and list what it holds, and package a template, without
 writing a script. It is built on
 [`@freshcoat-js/coatfile`](../coatfile), [`@freshcoat-js/engine`](../engine)
-and [`@freshcoat-js/workspace`](../workspace), and runs on Node.
+and [`@freshcoat-js/workspace`](../workspace), and runs on Node 22 or later
+and Bun 1.3.13 or later.
 
 ```sh
 npm install --global @freshcoat-js/cli
 freshcoat --help
 ```
+
+On Node 22, npm warns `EBADENGINE` for `hucre`, which declares Node 24. The
+warning is harmless: spreadsheet import and export work on Node 22. With
+`engine-strict` set, install with `--engine-strict=false`.
 
 Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
 `0` done, `1` the work failed (an invalid template, a failed export item) and

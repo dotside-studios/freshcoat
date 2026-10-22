@@ -138,6 +138,7 @@ const label = "./x";`;
 			new Map([["@freshcoat-js/engine", "0.1.0"]]),
 		);
 		expect(result.private).toBe(false);
+		expect(result.engines).toEqual({ node: ">=22" });
 		expect(result.peerDependencies).toEqual({ "canvaskit-wasm": "^0.41.1" });
 		expect(result.devDependencies).toBeUndefined();
 		expect(result.dependencies).toEqual({
