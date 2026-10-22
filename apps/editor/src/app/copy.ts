@@ -301,6 +301,8 @@ export const ISSUE_COPY = {
 export const AUTOSAVE_COPY = {
 	writeFailed: "Couldn't autosave",
 	retry: "Retry",
-	readFailed: "Couldn't read autosave",
+	readFailed: "Couldn't read autosave. New edits aren't autosaved.",
+	discard: "Discard old autosave",
+	discardFailed: "Couldn't discard autosave",
 	newer: "Autosave is from a newer version of Studio",
 } as const;

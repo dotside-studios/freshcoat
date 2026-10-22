@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { formatDate } from "~/app/format";
 import { PRESETS } from "~/doc/new-document";
 import { findSample } from "~/samples";
-import { loadAutosave, restoreNotices } from "./autosave";
+import { type Autosave, loadAutosave, restoreNotices } from "./autosave";
 import type { CommandContext } from "./commands";
-import type { EditorController } from "./controller";
+import { type EditorController, onAutosaveRecovered } from "./controller";
 import { OPEN_HINT } from "./copy";
 import { readHandoff } from "./handoff";
 import type { AppRouter } from "./router";
@@ -77,16 +77,14 @@ export function useUrlState(
 				return;
 			}
 			if (askOpen) toastOpenHint(ctx);
-			if (!saved) return;
-			toast(`Unsaved work from ${formatDate(new Date(saved.savedAt))}`, {
-				timeout: 0,
-				action: {
-					label: "Restore",
-					onAction: () => ctx.confirmDiscard(() => controller.restore(saved)),
-				},
-			});
+			if (saved) toastRestore(ctx, saved);
 		})();
 	}, [controller, ctx, router, enabled]);
+
+	useEffect(
+		() => onAutosaveRecovered((saved) => toastRestore(ctx, saved)),
+		[ctx],
+	);
 
 	useEffect(() => {
 		if (!enabled) return;
@@ -95,6 +93,16 @@ export function useUrlState(
 	}, [controller, router, enabled]);
 
 	return { openHint };
+}
+
+function toastRestore(ctx: CommandContext, saved: Autosave): void {
+	toast(`Unsaved work from ${formatDate(new Date(saved.savedAt))}`, {
+		timeout: 0,
+		action: {
+			label: "Restore",
+			onAction: () => ctx.confirmDiscard(() => ctx.controller.restore(saved)),
+		},
+	});
 }
 
 /** The welcome screen's "Open file…" hint, for when a workspace is showing

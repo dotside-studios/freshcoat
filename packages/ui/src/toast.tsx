@@ -19,7 +19,7 @@ interface ToastAction {
 interface ToastContent {
 	message: string;
 	tone: ToastTone;
-	action?: ToastAction;
+	actions: ToastAction[];
 }
 
 const TIMEOUT_MS = 4000;
@@ -32,6 +32,8 @@ export interface ToastOptions {
 	timeout?: number;
 	/** One button beside the message; pressing it also closes the toast. */
 	action?: ToastAction;
+	/** Buttons below the message, for a toast with more than one choice. */
+	actions?: ToastAction[];
 }
 
 /** Shows a toast in the `ToastRegion`. Returns a function that closes it. */
@@ -41,7 +43,7 @@ export function toast(message: string, options: ToastOptions = {}) {
 		{
 			message,
 			tone: options.tone ?? "info",
-			...(options.action ? { action: options.action } : {}),
+			actions: options.actions ?? (options.action ? [options.action] : []),
 		},
 		timeout > 0 ? { timeout } : undefined,
 	);
@@ -81,19 +83,27 @@ export function ToastRegion({ className }: ToastRegionProps) {
 						)}
 						aria-hidden="true"
 					/>
-					<RACToastContent className="min-w-0 flex-1 py-px leading-snug">
-						<Text slot="title">{item.content.message}</Text>
-					</RACToastContent>
-					{item.content.action ? (
-						<Button
-							onPress={() => {
-								item.content.action?.onAction();
-								queue.close(item.key);
-							}}
-							className="shrink-0 cursor-default rounded-[3px] px-1.5 py-px font-medium text-fc-accent outline-none data-hovered:bg-fc-hover data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent"
-						>
-							{item.content.action.label}
-						</Button>
+					<div className="flex min-w-0 flex-1 flex-col gap-1">
+						<RACToastContent className="py-px leading-snug">
+							<Text slot="title">{item.content.message}</Text>
+						</RACToastContent>
+						{item.content.actions.length > 1 ? (
+							<div className="-ml-1.5 flex flex-wrap gap-1">
+								{item.content.actions.map((action) => (
+									<ActionButton
+										key={action.label}
+										action={action}
+										close={() => queue.close(item.key)}
+									/>
+								))}
+							</div>
+						) : null}
+					</div>
+					{item.content.actions.length === 1 && item.content.actions[0] ? (
+						<ActionButton
+							action={item.content.actions[0]}
+							close={() => queue.close(item.key)}
+						/>
 					) : null}
 					<Button
 						slot="close"
@@ -105,5 +115,25 @@ export function ToastRegion({ className }: ToastRegionProps) {
 				</RACToast>
 			)}
 		</RACToastRegion>
+	);
+}
+
+function ActionButton({
+	action,
+	close,
+}: {
+	action: ToastAction;
+	close: () => void;
+}) {
+	return (
+		<Button
+			onPress={() => {
+				action.onAction();
+				close();
+			}}
+			className="shrink-0 cursor-default rounded-[3px] px-1.5 py-px font-medium text-fc-accent outline-none data-hovered:bg-fc-hover data-focus-visible:outline-solid data-focus-visible:outline-1 data-focus-visible:outline-fc-accent"
+		>
+			{action.label}
+		</Button>
 	);
 }

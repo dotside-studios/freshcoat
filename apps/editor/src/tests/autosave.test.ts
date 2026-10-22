@@ -66,6 +66,16 @@ async function rawGet(name: string, store: string, key?: string) {
 	}
 }
 
+/** Makes every IndexedDB get throw until the returned function runs. */
+function breakGets(): () => void {
+	const get = vi
+		.spyOn(IDBObjectStore.prototype, "get")
+		.mockImplementation(() => {
+			throw new DOMException("broken", "UnknownError");
+		});
+	return () => get.mockRestore();
+}
+
 async function bytes(blob: Blob): Promise<number[]> {
 	return [...new Uint8Array(await blob.arrayBuffer())];
 }
@@ -597,6 +607,101 @@ describe("autosave", () => {
 		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("other");
 	});
 
+	it("keeps an autosave it couldn't read when cleared", async () => {
+		const db = freshDb();
+		await createAutosaveStore(db).write({
+			workspace: workspace([asset(1)]),
+			fileName: "kept",
+		});
+
+		const store = createAutosaveStore(db);
+		const fix = breakGets();
+		expect((await store.read()).status).toBe("failed");
+		fix();
+
+		await store.clear();
+		const read = await readSaved(createAutosaveStore(db));
+		expect(read?.fileName).toBe("kept");
+		expect(read?.workspace.datasets[0]?.assets).toHaveLength(1);
+		expect(await rawGet(db, "assets")).toEqual(["sha1"]);
+	});
+
+	it("reports writes held back by a failed read once", async () => {
+		const db = freshDb();
+		await createAutosaveStore(db).write({
+			workspace: workspace([asset(1)]),
+			fileName: "kept",
+		});
+		const onWriteBlocked = vi.fn();
+		const onWriteFailed = vi.fn();
+		const store = createAutosaveStore(db, { onWriteBlocked, onWriteFailed });
+		const fix = breakGets();
+		expect((await store.read()).status).toBe("failed");
+		fix();
+		expect(onWriteBlocked).not.toHaveBeenCalled();
+
+		await store.write({ workspace: workspace([asset(2)]), fileName: "a" });
+		await store.write({ workspace: workspace([asset(3)]), fileName: "b" });
+		store.flush({ workspace: workspace([asset(4)]), fileName: "c" });
+		expect(onWriteBlocked).toHaveBeenCalledTimes(1);
+		expect(onWriteFailed).not.toHaveBeenCalled();
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("kept");
+	});
+
+	it("reads again on retry and writes once the read succeeds", async () => {
+		const db = freshDb();
+		await createAutosaveStore(db).write({
+			workspace: workspace([asset(1)]),
+			fileName: "kept",
+		});
+		const onWriteBlocked = vi.fn();
+		const store = createAutosaveStore(db, { onWriteBlocked });
+		let fix = breakGets();
+		expect((await store.read()).status).toBe("failed");
+		await store.write({ workspace: workspace([asset(2)]), fileName: "mine" });
+		expect((await store.reread()).status).toBe("failed");
+		fix();
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("kept");
+
+		const read = await store.reread();
+		expect(read.status === "found" && read.autosave.fileName).toBe("kept");
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("kept");
+		await store.write({ workspace: workspace([asset(2)]), fileName: "next" });
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("next");
+
+		const empty = createAutosaveStore(freshDb());
+		fix = breakGets();
+		expect((await empty.read()).status).toBe("failed");
+		await empty.write({ workspace: workspace([asset(3)]), fileName: "held" });
+		fix();
+		expect((await empty.reread()).status).toBe("empty");
+		expect((await readSaved(empty))?.fileName).toBe("held");
+		expect(onWriteBlocked).toHaveBeenCalledTimes(1);
+	});
+
+	it("discards an autosave it couldn't read only when asked, then writes", async () => {
+		const db = freshDb();
+		await createAutosaveStore(db).write({
+			workspace: workspace([asset(1)]),
+			fileName: "old",
+		});
+		const store = createAutosaveStore(db);
+		await store.discard();
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("old");
+
+		const fix = breakGets();
+		expect((await store.read()).status).toBe("failed");
+		fix();
+		await store.write({ workspace: workspace([asset(2)]), fileName: "mine" });
+		await store.discard();
+
+		const read = await readSaved(createAutosaveStore(db));
+		expect(read?.fileName).toBe("mine");
+		expect(await rawGet(db, "assets")).toEqual(["sha2"]);
+		await store.write({ workspace: workspace([asset(3)]), fileName: "next" });
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("next");
+	});
+
 	it("refuses an autosave from a newer version and leaves it alone", async () => {
 		const db = freshDb();
 		const seed = createAutosaveStore(db);
@@ -615,6 +720,7 @@ describe("autosave", () => {
 		expect((await store.read()).status).toBe("newer");
 		await store.write({ workspace: workspace([asset(2)]), fileName: "mine" });
 		await store.clear();
+		await store.discard();
 		expect(await rawGet(db, "autosave", "current")).toEqual(newer);
 	});
 
