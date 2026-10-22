@@ -207,7 +207,7 @@ export const LAYERED: Style = {
 	groups: [0.5, 0.4],
 	masks: 0.2,
 };
-const FLAT: Style = {
+export const FLAT: Style = {
 	name: "flat",
 	effects: 0.02,
 	layers: 0.05,
