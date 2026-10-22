@@ -1,11 +1,11 @@
 // Invariants that hold across combinations of features, rather than per feature.
 // Each table below takes a new case in one line.
 
-import { afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import type { CanvasKit } from "canvaskit-wasm";
 import { identityColorMatrix, identityLut3d } from "../src/adjust";
-import { paintScene, setLayerBounds } from "../src/canvaskit";
+import { paintScene } from "../src/canvaskit";
 import { compileScene, prepareScene } from "../src/compile-scene";
 import { deriveFontMetrics } from "../src/font-metrics";
 import {
@@ -43,13 +43,17 @@ beforeAll(async () => {
 	textEngine = createParagraphEngine(ck, FONTS);
 	images = await fuzzImages();
 });
-afterEach(() => setLayerBounds(true));
 
 type Paint = { pixels: Uint8Array; warnings: PaintWarning[] };
 
-async function paintCommands(commands: Command[]): Promise<Paint> {
+async function paintCommands(
+	commands: Command[],
+	layerBounds = true,
+): Promise<Paint> {
 	const rt = createHeadlessEnv({ fonts: FONTS, images });
-	const out = await paintScene(ck, commands, rt);
+	const out = await paintScene(ck, commands, rt, {
+		switches: { layerBounds },
+	});
 	try {
 		const px = out.readPixels?.();
 		if (!px) throw new Error("no pixels");
@@ -340,9 +344,7 @@ describe("bounded and unbounded layers paint the same", () => {
 			scale: cfg.scale,
 			supersample: cfg.supersample,
 		});
-		setLayerBounds(false);
-		const unbounded = await paintCommands(commands);
-		setLayerBounds(true);
+		const unbounded = await paintCommands(commands, false);
 		const bounded = await paintCommands(commands);
 		expect(bounded.warnings).toEqual(unbounded.warnings);
 		for (const w of bounded.warnings)

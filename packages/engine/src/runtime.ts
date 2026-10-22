@@ -1,4 +1,4 @@
-import { paintScene } from "./canvaskit";
+import { type PaintSwitches, paintScene } from "./canvaskit";
 import type { EncodeOptions } from "./png";
 import type {
 	Painter,
@@ -43,9 +43,9 @@ export async function applyDisposePolicy(
 // The in-tree Painter: CanvasKit-WASM with its instance bound. A second backend
 // supplies its own and is otherwise indistinguishable to the runtime.
 export const paintCanvasKit =
-	(ck: unknown): Painter =>
+	(ck: unknown, switches?: PaintSwitches): Painter =>
 	(commands: Command[], rt: PaintRuntime) =>
-		paintScene(ck, commands, rt);
+		paintScene(ck, commands, rt, switches ? { switches } : undefined);
 
 // Assemble a runtime from its I/O + canvas parts, a disposal policy and a
 // backend. paint() runs the Painter for one scene and applies the policy;
@@ -56,6 +56,7 @@ export function makeRuntime(
 	policy: DisposePolicy,
 	encode?: EncodeOptions,
 	painter?: Painter,
+	switches?: PaintSwitches,
 ): PaintRuntime {
 	const rt: PaintRuntime = {
 		...base,
@@ -63,7 +64,7 @@ export function makeRuntime(
 			// Without a painter the backend is CanvasKit and `ck` is its instance,
 			// which is every caller in the tree. With one, the backend was chosen at
 			// construction and `ck` is not consulted.
-			const paint = painter ?? paintCanvasKit(ck);
+			const paint = painter ?? paintCanvasKit(ck, switches);
 			const target = opts?.cache ? { ...rt, cache: opts.cache } : rt;
 			return applyDisposePolicy(await paint(commands, target), policy, encode);
 		},

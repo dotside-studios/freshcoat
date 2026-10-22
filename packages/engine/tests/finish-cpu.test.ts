@@ -1,18 +1,16 @@
 // The finishing pass on the CPU against the shader it stands in for, byte for
 // byte, on frames that cover every 8-bit value.
 
-import { afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { setCpuFinish } from "../src/canvaskit";
 import { deriveFontMetrics } from "../src/font-metrics";
 import {
 	compileScene,
 	createFrame,
 	createImage,
-	createPaintCache,
 	encodePng,
-	type PaintCache,
 } from "../src/index";
+import { createPaintCache, type PaintCache } from "../src/paint-cache";
 import { paintCacheState } from "../src/paint-cache-state";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { FrameFinish } from "../src/types";
@@ -24,7 +22,6 @@ let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
 });
-afterEach(() => setCpuFinish(true));
 
 // Pseudo-random pixels, opaque unless `translucent`.
 function noisePng(size: Size, translucent = false): Promise<Uint8Array> {
@@ -62,11 +59,11 @@ async function paint(
 		{ ...size, textEngine, fontMetrics: deriveFontMetrics(fonts), finish },
 	);
 	textEngine.dispose();
-	setCpuFinish(cpu);
 	const env = createHeadlessEnv({
 		fonts,
 		images: new Map([["img://noise", png]]),
 		cache,
+		switches: { cpuFinish: cpu },
 	});
 	const out = (await env.paint(commands, ck)) as { bytes: Uint8Array };
 	return out.bytes;
