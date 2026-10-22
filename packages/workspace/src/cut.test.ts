@@ -1,6 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
 import { describe, expect, it } from "vitest";
-import { itemCuts } from "./cut";
+import { cutSpotNames, itemCuts } from "./cut";
 
 const rect = (
 	id: string,
@@ -247,5 +247,18 @@ describe("itemCuts with open vector lines", () => {
 			(l) => l.name === "fold",
 		);
 		expect(line?.path).toBe("M14 25L54 25");
+	});
+});
+
+describe("cutSpotNames", () => {
+	it("takes the default for a name PDF reserves", () => {
+		expect(
+			cutSpotNames({ through: "All", kiss: "NONE", score: "Fold" }),
+		).toEqual({
+			through: "CutContour",
+			kiss: "KissCut",
+			score: "Fold",
+			perforate: "Perfcut",
+		});
 	});
 });

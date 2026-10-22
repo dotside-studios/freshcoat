@@ -76,6 +76,14 @@ describe("argument parsers", () => {
 				() => parseMaxEdge("1.5"),
 				"Expected a whole number of pixels, 1 or more.",
 			],
+			[
+				() => collectCutSpot("through=All"),
+				'"All" is reserved by PDF for every or no plate; name the cut spot something else.',
+			],
+			[
+				() => collectCutSpot("none"),
+				'"none" is reserved by PDF for every or no plate; name the cut spot something else.',
+			],
 			[() => parseQuality("101"), "Expected a whole number from 0 to 100."],
 			[() => parseJobs("1.5"), "Expected a whole number, 1 or more."],
 			[() => parseLength("-1"), "Expected millimetres, 0 or more."],
