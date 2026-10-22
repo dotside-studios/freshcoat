@@ -4,6 +4,7 @@
 // so the CLI of the release it announces renders it.
 
 import { readFileSync } from "node:fs";
+import { FORMAT_VERSION } from "../../packages/coatfile/src/format";
 import type { Element, Fill, Template } from "../../packages/coatfile/src/types";
 import { scalePathData } from "../../packages/engine/src/path-data";
 
@@ -210,7 +211,7 @@ export type BannerOptions = {
  *  the logo and version, one frame named after the release. */
 export function banner(o: BannerOptions): Template {
 	return {
-		format_version: "1.6",
+		format_version: FORMAT_VERSION,
 		version: "1.0.0",
 		id: `freshcoat-release-v${o.version}`,
 		name: `Freshcoat v${o.version} release banner`,
