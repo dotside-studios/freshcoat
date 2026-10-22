@@ -138,6 +138,7 @@ import {
 } from "~/state/workspace";
 import {
 	type Autosave,
+	type AutosaveRead,
 	clearAutosave,
 	configureAutosave,
 	discardAutosave,
@@ -195,18 +196,21 @@ function toastReadFailed(): void {
 	});
 }
 
+function reportRead(read: AutosaveRead | null): void {
+	if (read?.status === "failed") toastReadFailed();
+	else if (read?.status === "newer") toastNewerAutosave();
+	else if (read?.status === "found") offerRecovered?.(read.autosave);
+}
+
 /** Reads the stored autosave again after a failed read. */
 export async function retryAutosaveRead(): Promise<void> {
-	const read = await rereadAutosave();
-	if (read.status === "failed") toastReadFailed();
-	else if (read.status === "newer") toastNewerAutosave();
-	else if (read.status === "found") offerRecovered?.(read.autosave);
+	reportRead(await rereadAutosave());
 }
 
 /** Deletes the stored autosave that couldn't be read, so autosave resumes. */
 export async function discardUnreadableAutosave(): Promise<void> {
 	try {
-		await discardAutosave();
+		reportRead(await discardAutosave());
 	} catch {
 		toast(AUTOSAVE_COPY.discardFailed, { tone: "danger" });
 		toastReadFailed();
@@ -231,9 +235,10 @@ configureAutosave({
 	},
 	onReadProblem: (problem) =>
 		problem === "newer" ? toastNewerAutosave() : toastReadFailed(),
-	onWriteBlocked: toastReadFailed,
+	onWriteBlocked: (reason) =>
+		reason === "newer" ? toastNewerAutosave() : toastReadFailed(),
 	onPausedChange: (paused) => {
-		if (paused) return;
+		if (paused === "failed") return;
 		closeReadFailed?.();
 		closeReadFailed = undefined;
 	},

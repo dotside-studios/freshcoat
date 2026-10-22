@@ -30,6 +30,10 @@ export type AutosaveRead =
 	| { status: "failed" }
 	| { status: "newer" };
 
+/** Why writes are held back: the stored autosave couldn't be read, or a
+ *  newer version of Studio wrote it. */
+export type AutosavePause = "failed" | "newer";
+
 /** What restoring `saved` has to tell the user. */
 export function restoreNotices(saved: Autosave): string[] {
 	const notices: string[] = [];
@@ -130,13 +134,12 @@ export type AutosaveOptions = {
 	onWriteFailed?: (err: unknown) => void;
 	/** Called when a write succeeds after `onWriteFailed`. */
 	onWriteRecovered?: () => void;
-	/** Called once when a write is held back because the stored autosave
-	 *  couldn't be read, and not again until a read succeeds or `discard`
-	 *  runs. */
-	onWriteBlocked?: () => void;
-	/** Called when writes start or stop being held back because the stored
-	 *  autosave couldn't be read. */
-	onPausedChange?: (paused: boolean) => void;
+	/** Called once when a write is held back, and not again until a read
+	 *  succeeds, `discard` runs or the reason changes. */
+	onWriteBlocked?: (reason: AutosavePause) => void;
+	/** Called when writes start or stop being held back, or the reason
+	 *  changes. */
+	onPausedChange?: (paused: AutosavePause | null) => void;
 };
 
 export type AutosaveStore = {
@@ -152,8 +155,10 @@ export type AutosaveStore = {
 	 *  entry that was held back. */
 	reread(): Promise<AutosaveRead>;
 	/** Deletes a stored autosave that couldn't be read and writes the entry
-	 *  that was held back. Does nothing unless a read failed. */
-	discard(): Promise<void>;
+	 *  that was held back. Does nothing and returns null unless a read
+	 *  failed. When what is stored now can be read, as after another tab
+	 *  wrote, deletes nothing and reads it again as `reread` does. */
+	discard(): Promise<AutosaveRead | null>;
 	/** The stored copy of one photo, or null. */
 	asset(sha256: string): Promise<Blob | null>;
 	/** Stores `asset` unless storage holds it already and hands back the
@@ -281,6 +286,79 @@ function fromInline(v: InlineAutosave): Autosave {
 	};
 }
 
+/** What the stored shell `v` holds, read with its datasets and photos
+ *  through `tx`. Throws when it can't be read. */
+async function parse(tx: IDBTransaction, raw: unknown): Promise<AutosaveRead> {
+	const v = raw as
+		| StoredAutosave
+		| SingleRecordAutosave
+		| InlineAutosave
+		| LegacyTemplateAutosave
+		| undefined;
+	if (!v) return { status: "empty" };
+	if ("version" in v) {
+		const version: unknown = v.version;
+		if (version !== 2 && version !== 3)
+			return {
+				status: typeof version === "number" && version > 3 ? "newer" : "failed",
+			};
+	}
+	const docs = tx.objectStore(DOC_STORE);
+	if (!("workspace" in v)) {
+		return {
+			status: "found",
+			autosave: {
+				workspace: singleTemplateWorkspace(v.template, v.fileName),
+				fileName: "Untitled.coatworkspace",
+				savedAt: v.savedAt,
+			},
+		};
+	}
+	if (!("version" in v)) {
+		const autosave = fromInline(v);
+		return { status: "found", autosave };
+	}
+	let saved: StoredDataset[];
+	let missingDatasets = 0;
+	if (v.version === 2) {
+		saved = v.workspace.datasets;
+	} else {
+		saved = [];
+		for (const id of v.workspace.datasets) {
+			const d = (await request(docs.get(datasetKey(id)))) as
+				| StoredDataset
+				| undefined;
+			if (d) saved.push(d);
+			else missingDatasets += 1;
+		}
+	}
+	const blobs = tx.objectStore(ASSET_STORE);
+	let missing = 0;
+	const datasets: Dataset[] = [];
+	for (const d of saved) {
+		const assets: DatasetAsset[] = [];
+		for (const meta of d.assets) {
+			const blob = (await request(blobs.get(meta.sha256))) as Blob | undefined;
+			if (blob) assets.push({ ...meta, blob });
+			else missing += 1;
+		}
+		datasets.push({ ...d, assets });
+	}
+	const out: Autosave = {
+		workspace: { ...v.workspace, datasets },
+		fileName: v.fileName,
+		savedAt: v.savedAt,
+	};
+	if (missing) out.missingAssets = missing;
+	if (missingDatasets) out.missingDatasets = missingDatasets;
+	if (v.version === 3 && v.recentId) out.recentId = v.recentId;
+	return { status: "found", autosave: out };
+}
+
+function isSingleRecord(v: unknown): v is SingleRecordAutosave {
+	return (v as { version?: unknown } | undefined)?.version === 2;
+}
+
 /**
  * Autosave in two object stores: the workspace document, split into a shell
  * and one record per dataset with its photos reduced to metadata, and the
@@ -311,7 +389,7 @@ export function createAutosaveStore(
 	let generation = 0;
 	let conn: Promise<IDBDatabase> | null = null;
 	let open: IDBDatabase | null = null;
-	let blocked: "failed" | "newer" | null = null;
+	let blocked: AutosavePause | null = null;
 	let failedEntry: Omit<Autosave, "savedAt"> | null = null;
 	let heldEntry: Omit<Autosave, "savedAt"> | null = null;
 	let heldReported = false;
@@ -482,17 +560,18 @@ export function createAutosaveStore(
 	let retrying = false;
 
 	function hold(entry: Omit<Autosave, "savedAt">): void {
-		if (blocked !== "failed") return;
+		if (!blocked) return;
 		heldEntry = entry;
 		if (heldReported) return;
 		heldReported = true;
-		opts.onWriteBlocked?.();
+		opts.onWriteBlocked?.(blocked);
 	}
 
-	function block(next: "failed" | "newer" | null): void {
-		const was = blocked === "failed";
+	function block(next: AutosavePause | null): void {
+		if (blocked === next) return;
 		blocked = next;
-		if (was !== (next === "failed")) opts.onPausedChange?.(!was);
+		heldReported = false;
+		opts.onPausedChange?.(next);
 	}
 
 	function unblock(): void {
@@ -733,87 +812,23 @@ export function createAutosaveStore(
 		},
 
 		async read(): Promise<AutosaveRead> {
+			let read: AutosaveRead;
 			try {
 				const db = await connect();
 				const tx = db.transaction([DOC_STORE, ASSET_STORE]);
-				const docs = tx.objectStore(DOC_STORE);
-				const v = (await request(docs.get(KEY))) as
-					| StoredAutosave
-					| SingleRecordAutosave
-					| InlineAutosave
-					| LegacyTemplateAutosave
-					| undefined;
-				if (!v) {
-					unblock();
-					return { status: "empty" };
-				}
-				if (!("workspace" in v)) {
-					unblock();
-					return {
-						status: "found",
-						autosave: {
-							workspace: singleTemplateWorkspace(v.template, v.fileName),
-							fileName: "Untitled.coatworkspace",
-							savedAt: v.savedAt,
-						},
-					};
-				}
-				if (!("version" in v)) {
-					const autosave = fromInline(v);
-					unblock();
-					return { status: "found", autosave };
-				}
-				const version: unknown = v.version;
-				if (version !== 2 && version !== 3) {
-					const status =
-						typeof version === "number" && version > 3 ? "newer" : "failed";
-					block(status);
-					return { status };
-				}
-				let saved: StoredDataset[];
-				let missingDatasets = 0;
-				if (v.version === 2) {
-					saved = v.workspace.datasets;
-				} else {
-					saved = [];
-					for (const id of v.workspace.datasets) {
-						const d = (await request(docs.get(datasetKey(id)))) as
-							| StoredDataset
-							| undefined;
-						if (d) saved.push(d);
-						else missingDatasets += 1;
-					}
-				}
-				const blobs = tx.objectStore(ASSET_STORE);
-				let missing = 0;
-				const datasets: Dataset[] = [];
-				for (const d of saved) {
-					const assets: DatasetAsset[] = [];
-					for (const meta of d.assets) {
-						const blob = (await request(blobs.get(meta.sha256))) as
-							| Blob
-							| undefined;
-						if (blob) assets.push({ ...meta, blob });
-						else missing += 1;
-					}
-					datasets.push({ ...d, assets });
-				}
-				if (v.version === 2) await migrate(db, v).catch(() => {});
-				const out: Autosave = {
-					workspace: { ...v.workspace, datasets },
-					fileName: v.fileName,
-					savedAt: v.savedAt,
-				};
-				if (missing) out.missingAssets = missing;
-				if (missingDatasets) out.missingDatasets = missingDatasets;
-				if (v.version === 3 && v.recentId) out.recentId = v.recentId;
-				unblock();
-				return { status: "found", autosave: out };
+				const v: unknown = await request(tx.objectStore(DOC_STORE).get(KEY));
+				read = await parse(tx, v);
+				if (read.status === "found" && isSingleRecord(v))
+					await migrate(db, v).catch(() => {});
 			} catch {
 				block("failed");
 				await disconnect();
 				return { status: "failed" };
 			}
+			if (read.status === "failed" || read.status === "newer")
+				block(read.status);
+			else unblock();
+			return read;
 		},
 
 		async reread() {
@@ -824,25 +839,37 @@ export function createAutosaveStore(
 		},
 
 		async discard() {
-			if (blocked !== "failed") return;
+			if (blocked !== "failed") return null;
 			const held = heldEntry;
 			last = null;
 			savedAssets = null;
 			written = null;
+			let cleared = false;
 			try {
 				const db = await connect();
 				const tx = db.transaction([DOC_STORE, ASSET_STORE], "readwrite");
-				tx.objectStore(DOC_STORE).clear();
-				tx.objectStore(ASSET_STORE).clear();
+				const docs = tx.objectStore(DOC_STORE);
+				const now = await parse(tx, await request(docs.get(KEY))).catch(
+					(): AutosaveRead => ({ status: "failed" }),
+				);
+				if (now.status === "failed") {
+					docs.clear();
+					tx.objectStore(ASSET_STORE).clear();
+					cleared = true;
+				}
 				await done(tx);
-				stored = new Set();
-				written = new Map();
+				if (cleared) {
+					stored = new Set();
+					written = new Map();
+				}
 			} catch (err) {
 				await disconnect();
 				throw err;
 			}
+			if (!cleared) return api.reread();
 			unblock();
 			if (held) await api.write(held);
+			return { status: "empty" };
 		},
 
 		async asset(sha256) {
@@ -904,7 +931,7 @@ function store(): AutosaveStore {
 		onUnreadable: (asset) => sharedOptions.onUnreadable?.(asset),
 		onWriteFailed: (err) => sharedOptions.onWriteFailed?.(err),
 		onWriteRecovered: () => sharedOptions.onWriteRecovered?.(),
-		onWriteBlocked: () => sharedOptions.onWriteBlocked?.(),
+		onWriteBlocked: (reason) => sharedOptions.onWriteBlocked?.(reason),
 		onPausedChange: (next) => {
 			paused = next;
 			for (const fn of pausedListeners) fn();
@@ -914,12 +941,11 @@ function store(): AutosaveStore {
 	return shared;
 }
 
-let paused = false;
+let paused: AutosavePause | null = null;
 const pausedListeners = new Set<() => void>();
 
-/** Whether the editor's autosave holds back writes because the stored one
- *  couldn't be read. */
-export function autosavePaused(): boolean {
+/** Why the editor's autosave holds back writes, or null when it doesn't. */
+export function autosavePaused(): AutosavePause | null {
 	return paused;
 }
 
@@ -950,7 +976,7 @@ export function rereadAutosave(): Promise<AutosaveRead> {
 	return store().reread();
 }
 
-export function discardAutosave(): Promise<void> {
+export function discardAutosave(): Promise<AutosaveRead | null> {
 	return store().discard();
 }
 

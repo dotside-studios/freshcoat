@@ -307,4 +307,6 @@ export const AUTOSAVE_COPY = {
 	newer: "Autosave is from a newer version of Studio",
 	paused: "Autosave paused",
 	pausedDetail: "Couldn't read the old autosave. New edits aren't autosaved.",
+	pausedNewerDetail:
+		"Autosave was saved by a newer version of Studio. New edits aren't autosaved.",
 } as const;

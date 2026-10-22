@@ -281,13 +281,40 @@ function storedSavedAt(page: Page): Promise<number | null> {
 	});
 }
 
-async function seedThenFailRead(page: Page): Promise<number> {
+function corruptAutosave(page: Page): Promise<void> {
+	return page.evaluate(async () => {
+		const db = await new Promise<IDBDatabase>((resolve, reject) => {
+			const req = indexedDB.open("freshcoat");
+			req.onsuccess = () => resolve(req.result);
+			req.onerror = () => reject(req.error);
+		});
+		try {
+			await new Promise<void>((resolve, reject) => {
+				const tx = db.transaction("autosave", "readwrite");
+				const docs = tx.objectStore("autosave");
+				docs.get("current").onsuccess = (e) => {
+					const doc = (e.target as IDBRequest<{ savedAt: number }>).result;
+					docs.put({ ...doc, version: "bad" }, "current");
+				};
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+			});
+		} finally {
+			db.close();
+		}
+	});
+}
+
+/** Leaves autosave paused over the stored one: unreadable for now, or
+ *  corrupt, which Discard deletes. */
+async function seedThenFailRead(page: Page, corrupt = false): Promise<number> {
 	await openSample(page, "minimal");
 	await run(page, `c.select(["0/0"]); c.deleteSelection();`);
 	await expect.poll(() => storedSavedAt(page)).not.toBeNull();
 	const savedAt = (await storedSavedAt(page)) as number;
 
-	await breakAutosaveReads(page);
+	if (corrupt) await corruptAutosave(page);
+	else await breakAutosaveReads(page);
 	await openSample(page, "certificate");
 	const blocked = page
 		.getByRole("alertdialog")
@@ -297,7 +324,7 @@ async function seedThenFailRead(page: Page): Promise<number> {
 	await expect(blocked).toBeHidden();
 	await run(page, `c.select(["0/0"]); c.deleteSelection();`);
 	await expect(blocked).toBeVisible();
-	await fixAutosaveReads(page);
+	if (!corrupt) await fixAutosaveReads(page);
 	expect(await storedSavedAt(page)).toBe(savedAt);
 	return savedAt;
 }
@@ -317,7 +344,7 @@ test("a failed autosave read keeps the old autosave and Retry offers it back", a
 test("discarding an autosave that failed to read starts autosaving again", async ({
 	page,
 }) => {
-	const savedAt = await seedThenFailRead(page);
+	const savedAt = await seedThenFailRead(page, true);
 	await page.getByRole("button", { name: "Discard old autosave" }).click();
 	await expect(
 		page.getByText("Couldn't read autosave. New edits aren't autosaved."),
@@ -325,8 +352,8 @@ test("discarding an autosave that failed to read starts autosaving again", async
 	await expect.poll(() => storedSavedAt(page)).toBeGreaterThan(savedAt);
 });
 
-async function dismissToastsThenOpenPaused(page: Page) {
-	const savedAt = await seedThenFailRead(page);
+async function dismissToastsThenOpenPaused(page: Page, corrupt = false) {
+	const savedAt = await seedThenFailRead(page, corrupt);
 	const blocked = page
 		.getByRole("alertdialog")
 		.filter({ hasText: "Couldn't read autosave. New edits aren't autosaved." });
@@ -356,7 +383,7 @@ test("the paused indicator offers Retry after the toasts are dismissed", async (
 test("the paused indicator offers Discard after the toasts are dismissed", async ({
 	page,
 }) => {
-	const { savedAt, popover } = await dismissToastsThenOpenPaused(page);
+	const { savedAt, popover } = await dismissToastsThenOpenPaused(page, true);
 	await popover.getByRole("button", { name: "Discard old autosave" }).click();
 	await expect(
 		page.getByRole("button", { name: "Autosave paused" }),
