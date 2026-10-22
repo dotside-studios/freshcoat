@@ -267,23 +267,19 @@ The engine and workspace also add:
   and slug) on imposed sheets, and A5 and A6 sheet paper.
 - for-print: print target presets fitted from printed charts, a warning when
   a profile was measured on another target, and short target names.
+- `exportWorkspace` takes `confirmLargePdf`, as `runExportJob` does, and both
+  take `largePdfBytes`, the estimate past which it is asked, default
+  `PDF_CONFIRM_BYTES` (1 GiB). `PDF_SAMPLE_PAGES` is exported.
 
 ### CLI users
 
-- **PDF card cap (breaking).** `render` and workspace exports refuse a PDF
-  that renders more than 2000 cards before rendering or writing anything,
-  exiting 1 with no output file, since every rendered card is held in memory
-  until the PDF is built. **A job that rendered more than 2000 cards into a
-  PDF in 0.4 now fails**, even on sheets where they fill far fewer pages.
-  Each card side counts once, before sheets are laid out; the message gives
-  the card count and, on sheets, the sheet count. `--max-pdf-cards <n>`
-  raises the cap and `--max-pdf-cards 0` removes it. The flag is a usage
-  error for image presets.
-- **Import limits (breaking).** `render --data` applies `readTable`'s limits:
-  500,000 records, 500 columns, 10,000,000 cells and 128 MiB per file.
-  `--max-rows <n>` raises the record limit and, above the default, the file
-  size, uncompressed size and cell limits in proportion; `--max-rows 0` lifts
-  all four. The error ends with how to raise it.
+- **Large file warnings.** A PDF export estimates its size from the first
+  3 items it renders and, past 1 GiB, where Studio asks first, warns that the
+  PDF is held in memory until it is built and goes on. `render --data` warns for
+  a data file over 128 MiB and goes on. `--dry-run` gives both warnings, and
+  renders the first 3 items of a PDF to do so. `render --data` reads a file
+  of any size; only `readTable`'s limits of 500 columns and 10,000 zip
+  entries apply.
 - **Cancellation.** Ctrl-C (SIGINT) exits 130 and SIGTERM exits 143, after
   removing the partial `.zip` or `.pdf` an export was writing and printing
   `freshcoat: cancelled`. A second signal exits at once. Workspace saves
@@ -302,8 +298,8 @@ The engine and workspace also add:
 - **New flags.** `--pdf-text <embed|outline>`, `--copies <n|fill>`,
   `--marks <list>`, `--min-dpi <n>`, `--back-offset <x,y>`, `--blank-backs`,
   `--print-target <target>`, `--output-intent <file>`,
-  `--output-intent-id <name>`, `--no-output-intent`, `--cut-spot`,
-  `--max-rows <n>` and `--max-pdf-cards <n>`. See the [CLI
+  `--output-intent-id <name>`, `--no-output-intent` and `--cut-spot`. See the
+  [CLI
   README](../packages/cli/README.md).
 
 ### Studio

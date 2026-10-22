@@ -29,8 +29,6 @@ every change.
 | a field `pattern` with nested repetition or a backreference | a pattern without them, or a check in your own code |
 | images of any size | up to `maxImageDecodePixels` (200,000,000) on `createRenderer` |
 | spreadsheets of any size | up to the `readTable` limits, raised with `limits` |
-| `freshcoat render --data` with any number of rows | up to 500,000 records; `--max-rows <n>` or `--max-rows 0` |
-| a CLI PDF of any number of cards | up to 2000 rendered cards, sheets or not; `--max-pdf-cards <n>` or `--max-pdf-cards 0` |
 | CSV and TSV export writing `=SUM(A1)` as is | `'=SUM(A1)`; `writeTable(dataset, format, { escapeFormulas: false })` for the old output |
 
 Symbols that are no longer exported anywhere are listed in the
@@ -179,27 +177,9 @@ string can hold, about 512 MB, is refused whatever the limits.
 
 ### CLI
 
-```sh
-freshcoat render card.coat --data people.csv --max-rows 2000000 --out cards.zip
-freshcoat render card.coat --data people.csv --max-rows 0 --out cards.zip
-freshcoat render club.coatworkspace --preset Print --max-pdf-cards 5000 --out cards.pdf
-freshcoat render club.coatworkspace --preset Print --max-pdf-cards 0 --out cards.pdf
-```
-
-`--max-rows <n>` raises the record limit. Above the default it also raises the
-file size, uncompressed size and cell limits in proportion. `--max-rows 0`
-lifts all four. Columns and zip entries keep their limits.
-
-`--max-pdf-cards` defaults to 2000. It counts rendered cards, one per card
-side, before sheets are laid out, so a 10-up job of 3,000 cards is refused
-although its PDF has only 300 pages. **A job that rendered more cards into a
-PDF in 0.4 now exits 1 with no output.** Pass a higher limit or
-`--max-pdf-cards 0` to restore the old behaviour. The CLI holds every card in
-memory until it builds the PDF, so a very large one can still run out of
-memory; to avoid that, split the export with `--where`.
-
-For scripts that check exit codes: Ctrl-C now exits 130 and SIGTERM 143, and
-a cancelled export removes its partial file.
+`freshcoat render --data` reads a file of any size, warning past 128 MiB; of
+the limits above, only the 500 columns and 10,000 zip entries apply. A PDF
+export warns when it is estimated past 1 GiB. Neither warning stops the job.
 
 ## Templates
 
