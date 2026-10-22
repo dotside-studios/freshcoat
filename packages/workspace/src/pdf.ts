@@ -17,6 +17,7 @@ import {
 	jpegIccProfile,
 	rgbIdat,
 } from "@freshcoat-js/engine/image";
+import { md5 } from "@freshcoat-js/engine/internal";
 import { mergeFontSubsets, subsetTag } from "@freshcoat-js/engine/pdf";
 import { normalizePath } from "@freshcoat-js/engine/svg";
 import { crc32 } from "./crc";
@@ -339,7 +340,7 @@ export async function assemblePdf(
 			);
 		}
 		await finishDocument(lib, doc, intent, profiles);
-		return doc.save();
+		return saveWithId(lib, doc, date);
 	}
 	for (const page of pages) {
 		const image = await embed(page);
@@ -362,7 +363,7 @@ export async function assemblePdf(
 		}
 	}
 	await finishDocument(lib, doc, intent, profiles);
-	return doc.save();
+	return saveWithId(lib, doc, date);
 }
 
 /** The page's resource subdictionary under `key`, made when it has none. */
@@ -515,6 +516,20 @@ async function finishDocument(
 	if (intent) declareOutputIntent(lib, doc, intent, profiles);
 	await doc.flush();
 	shareIccProfiles(lib, doc, profiles);
+}
+
+/** Saves `doc` with a trailer /ID, which PDF/X requires, taken from its
+ *  content and `date` so the same input and date give the same bytes. */
+async function saveWithId(lib: PdfLib, doc: PDFDocument, date: Date) {
+	const body = await doc.save();
+	const stamp = new TextEncoder().encode(date.toISOString());
+	const seed = new Uint8Array(body.length + stamp.length);
+	seed.set(body);
+	seed.set(stamp, body.length);
+	const hex = Array.from(md5(seed), (b) => b.toString(16).padStart(2, "0"));
+	const id = lib.PDFHexString.of(hex.join(""));
+	doc.context.trailerInfo.ID = doc.context.obj([id, id]);
+	return doc.save();
 }
 
 /** Adds the intent to the catalog, and tags every page's RGB as sRGB. */

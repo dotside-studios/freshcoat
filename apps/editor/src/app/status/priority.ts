@@ -12,6 +12,7 @@ export const STATUS_PRIORITY = {
 	photos: 340,
 	cellIssue: 330,
 	// end
+	autosave: 400,
 	zoom: 300,
 	renderError: 250,
 	render: 200,

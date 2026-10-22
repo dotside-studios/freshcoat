@@ -25,6 +25,12 @@ import { parsePrintProfile } from "@freshcoat-js/for-print";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { assetExtension } from "./assets";
+import {
+	CUT_KINDS,
+	type CutSpots,
+	DEFAULT_CUT_SPOTS,
+	isReservedSpotName,
+} from "./cut";
 import { portraitPaper } from "./impose";
 import { columnsToJsonSchema, jsonSchemaToColumns } from "./json-schema";
 import { readOutputProfile, usedProfiles } from "./output-intent";
@@ -541,6 +547,27 @@ function parseJsonEntry(read: ReadEntries, path: string): unknown {
 	}
 }
 
+/** `preset` with each cut spot PDF reserves dropped, so that kind takes its
+ *  default name, and a warning for each. */
+function withoutReservedCutSpots<
+	P extends { name: string; cutSpots?: CutSpots },
+>(preset: P, warnings: string[]): P {
+	const spots = preset.cutSpots;
+	if (!spots || !Object.values(spots).some((n) => n && isReservedSpotName(n)))
+		return preset;
+	const kept: CutSpots = {};
+	for (const kind of CUT_KINDS) {
+		const name = spots[kind];
+		if (name === undefined) continue;
+		if (isReservedSpotName(name))
+			warnings.push(
+				`${preset.name}: the ${kind} cut spot "${name}" is reserved by PDF; it uses ${DEFAULT_CUT_SPOTS[kind]}`,
+			);
+		else kept[kind] = name;
+	}
+	return { ...preset, cutSpots: kept };
+}
+
 function readManifest(read: ReadEntries): {
 	manifest: WorkspaceManifest;
 	warnings: string[];
@@ -752,7 +779,10 @@ export async function unpackWorkspace(
 		for (const item of manifest.profiles ?? []) {
 			profiles.push(await readProfile(read, item));
 		}
-		for (const preset of manifest.presets) {
+		const presets = manifest.presets.map((preset) =>
+			withoutReservedCutSpots(preset, warnings),
+		);
+		for (const preset of presets) {
 			const intent = preset.outputIntent;
 			if (
 				intent?.kind === "profile" &&
@@ -769,7 +799,7 @@ export async function unpackWorkspace(
 				name: manifest.name,
 				templates,
 				datasets,
-				presets: manifest.presets,
+				presets,
 				...(profiles.length > 0 ? { profiles } : {}),
 			},
 			warnings,

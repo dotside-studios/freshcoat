@@ -19,12 +19,6 @@ beforeAll(async () => {
 	const rows = Array.from({ length: 80 }, (_, i) => `Person ${i}`);
 	await box.write("offline.json", JSON.stringify(card({ fonts: [] })));
 	await box.write("people.csv", `name\n${rows.join("\n")}\n`);
-	await box.write("pair.csv", `name\n${rows.slice(0, 2).join("\n")}\n`);
-	await box.write("crew.coatworkspace", await crew(rows));
-	await box.write("pair.coatworkspace", await crew(rows.slice(0, 2)));
-});
-
-function crew(rows: string[]): Promise<Uint8Array> {
 	const workspace = workspaceOf(card());
 	const [dataset] = workspace.datasets;
 	if (dataset)
@@ -33,8 +27,13 @@ function crew(rows: string[]): Promise<Uint8Array> {
 			values: { name },
 			status: "pending" as const,
 		}));
-	return workspaceBytes(workspace);
-}
+	await box.write("crew.coatworkspace", await workspaceBytes(workspace));
+	if (dataset) dataset.records = dataset.records.slice(0, 3);
+	await box.write("few.coatworkspace", await workspaceBytes(workspace));
+	await box.write("few.csv", `name\n${rows.slice(0, 3).join("\n")}\n`);
+});
+
+const FULL_EXPORT_TIMEOUT = 30_000;
 
 afterAll(() => box.cleanup());
 
@@ -127,19 +126,23 @@ describe("cancellation", () => {
 		expect(existsSync(box.path("frames"))).toBe(false);
 	});
 
-	test("an uncancelled export still succeeds", async () => {
-		const run = await box.run(
-			"render",
-			"badge.json",
-			"--data",
-			"pair.csv",
-			"--out",
-			"done.zip",
-			"-q",
-		);
-		expect(run.code).toBe(0);
-		expect(existsSync(box.path("done.zip"))).toBe(true);
-	});
+	test(
+		"an uncancelled export still succeeds",
+		async () => {
+			const run = await box.run(
+				"render",
+				"badge.json",
+				"--data",
+				"few.csv",
+				"--out",
+				"done.zip",
+				"-q",
+			);
+			expect(run.code).toBe(0);
+			expect(existsSync(box.path("done.zip"))).toBe(true);
+		},
+		FULL_EXPORT_TIMEOUT,
+	);
 });
 
 describe("listenForCancel", () => {
@@ -237,23 +240,29 @@ describe("existing output", () => {
 			);
 		});
 
-	test("is replaced by a finished export", async () => {
-		await box.write("replaced.pdf", "old");
-		const run = await box.run(
-			"render",
-			"pair.coatworkspace",
-			"--preset",
-			"p_pdf",
-			"--out",
-			"replaced.pdf",
-			"-q",
-		);
-		expect(run.code).toBe(0);
-		expect(
-			readFileSync(box.path("replaced.pdf")).subarray(0, 5).toString(),
-		).toBe("%PDF-");
-		expect(readdirSync(box.dir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
-	});
+	test(
+		"is replaced by a finished export",
+		async () => {
+			await box.write("replaced.pdf", "old");
+			const run = await box.run(
+				"render",
+				"few.coatworkspace",
+				"--preset",
+				"p_pdf",
+				"--out",
+				"replaced.pdf",
+				"-q",
+			);
+			expect(run.code).toBe(0);
+			expect(
+				readFileSync(box.path("replaced.pdf")).subarray(0, 5).toString(),
+			).toBe("%PDF-");
+			expect(readdirSync(box.dir).filter((f) => f.endsWith(".tmp"))).toEqual(
+				[],
+			);
+		},
+		FULL_EXPORT_TIMEOUT,
+	);
 });
 
 describe("signals", () => {

@@ -45,6 +45,7 @@ import {
 	exportSplit,
 	imageFields,
 	imageFormat,
+	isReservedSpotName,
 	MAX_BACK_OFFSET_MM,
 	PRESET_SCALE,
 	paperSize,
@@ -204,7 +205,8 @@ const CUT_SPOT_LABEL: Record<CutKind, string> = {
 };
 
 /** The spot colour each edge kind the template cuts is drawn in. A field
- *  left empty keeps the default name. */
+ *  left empty keeps the default name, and one naming a colorant PDF reserves
+ *  is refused, keeping the last name it took. */
 function CutSpotFields({
 	edges,
 	spots,
@@ -217,12 +219,10 @@ function CutSpotFields({
 	return (
 		<>
 			{edges.map((kind) => (
-				<TextField
+				<CutSpotField
 					key={kind}
-					label={CUT_SPOT_LABEL[kind]}
-					labelPosition="side"
+					kind={kind}
 					value={spots?.[kind] ?? ""}
-					placeholder={DEFAULT_CUT_SPOTS[kind]}
 					onChange={(name) => {
 						const { [kind]: _, ...rest } = spots ?? {};
 						onChange(name.trim() ? { ...rest, [kind]: name } : rest);
@@ -231,6 +231,40 @@ function CutSpotFields({
 			))}
 			<Hint>Separation names your cutter's RIP looks for</Hint>
 		</>
+	);
+}
+
+function CutSpotField({
+	kind,
+	value,
+	onChange,
+}: {
+	kind: CutKind;
+	value: string;
+	onChange: (name: string) => void;
+}) {
+	const [reserved, setReserved] = useState<string | null>(null);
+	return (
+		<TextField
+			label={CUT_SPOT_LABEL[kind]}
+			labelPosition="side"
+			value={reserved ?? value}
+			placeholder={DEFAULT_CUT_SPOTS[kind]}
+			isInvalid={reserved !== null}
+			errorMessage={
+				reserved === null
+					? undefined
+					: `${reserved.trim()} is reserved by PDF; name the spot something else`
+			}
+			onChange={(name) => {
+				if (isReservedSpotName(name)) {
+					setReserved(name);
+					return;
+				}
+				setReserved(null);
+				onChange(name);
+			}}
+		/>
 	);
 }
 

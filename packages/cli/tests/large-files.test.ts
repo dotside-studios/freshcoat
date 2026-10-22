@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { cornerCells, workbookBomb } from "@freshcoat-js/test-utils";
 import {
 	card,
 	type Sandbox,
@@ -218,5 +219,34 @@ describe("large data file warning", () => {
 		);
 		expect(run.code).toBe(0);
 		expect(run.stdout).toContain("500001 items would be exported");
+	});
+
+	test.each([
+		[
+			"bomb.xlsx",
+			workbookBomb,
+			/bomb\.xlsx is too large to import: 700\.0 MB is over the limit of 512\.0 MB/,
+		],
+		[
+			"corner.xlsx",
+			cornerCells,
+			/corner\.xlsx is too large to import: .+ cells is over the limit of 10,000,000 cells/,
+		],
+	])("refuses %s before inflating it", async (name, build, message) => {
+		await box.write(name, build());
+		const run = await box.run(
+			"render",
+			"badge.json",
+			"--data",
+			name,
+			"--out",
+			"refused.zip",
+			"--dry-run",
+		);
+		expect(run.code).not.toBe(0);
+		expect(run.stderr).toMatch(message);
+		expect(run.stderr).toContain(
+			"; split it into files of fewer rows and render each",
+		);
 	});
 });

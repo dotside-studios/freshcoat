@@ -23,6 +23,15 @@ import { useUrlState } from "./use-url-state";
 import { Welcome } from "./Welcome";
 import { Workspace } from "./Workspace";
 
+/** Whether leaving the page asks first: unsaved edits, autosaved or not,
+ *  or a running export. */
+export function unloadWarns(controller: EditorController): boolean {
+	return (
+		controller.dirty ||
+		exportJobsFor(controller).getSnapshot().runner.state === "running"
+	);
+}
+
 /** The editor. `urlSync` off leaves the URL alone, for the benchmark, which
  *  opens its own sample and is not addressed by what it shows. */
 export function Editor({
@@ -137,11 +146,7 @@ function EditorRoot({
 
 	useEffect(() => {
 		const onBeforeUnload = (e: BeforeUnloadEvent) => {
-			if (
-				controller.dirty ||
-				exportJobsFor(controller).getSnapshot().runner.state === "running"
-			)
-				e.preventDefault();
+			if (unloadWarns(controller)) e.preventDefault();
 		};
 		window.addEventListener("beforeunload", onBeforeUnload);
 		return () => window.removeEventListener("beforeunload", onBeforeUnload);

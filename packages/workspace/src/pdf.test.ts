@@ -62,6 +62,27 @@ describe("assemblePdf", () => {
 		expect(doc.getProducer()).toBe("Freshcoat CLI 0.5.0 (pdf-lib)");
 	});
 
+	it("writes a trailer /ID that is stable for a fixed date", async () => {
+		const pages = [
+			{ bytes: makePng(2, 2), format: png, widthPx: 96, heightPx: 96 },
+		];
+		const id = async (date: Date) => {
+			const bytes = await assemblePdf(pages, { dpi: 96, date });
+			const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+			const ids = doc.context.trailerInfo.ID;
+			expect(ids).toBeInstanceOf(PDFArray);
+			const [a, b] = (ids as PDFArray)
+				.asArray()
+				.map((v) => (v as PDFHexString).asString());
+			expect(a).toMatch(/^[0-9a-f]{32}$/);
+			expect(b).toBe(a);
+			return a;
+		};
+		const date = new Date("2026-01-01T00:00:00Z");
+		expect(await id(date)).toBe(await id(date));
+		expect(await id(new Date("2026-01-02T00:00:00Z"))).not.toBe(await id(date));
+	});
+
 	it("is repeatable with a fixed date", async () => {
 		const pages = [
 			{ bytes: makePng(2, 2), format: png, widthPx: 96, heightPx: 96 },

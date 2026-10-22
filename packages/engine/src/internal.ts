@@ -55,6 +55,7 @@ export {
 	sideStrokeGeometry,
 } from "./outline";
 export { fitRect, strokeInset } from "./paint-helpers";
+export { md5 } from "./pdf/md5";
 export { resolveLayout, rotatedFootprint } from "./resolve-layout";
 export { roundCorners } from "./round-corners";
 export {

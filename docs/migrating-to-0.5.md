@@ -173,13 +173,17 @@ try {
 | `maxColumns` | 500 | `columns` |
 | `maxCells` | 10,000,000 | `cells` |
 
-`DEFAULT_TABLE_LIMITS` holds these values. Text longer than a JavaScript
+`DEFAULT_TABLE_LIMITS` holds these values. `maxUncompressedBytes`,
+`maxColumns` and `maxCells` can be raised to any finite number, but
+`Number.POSITIVE_INFINITY` for one of them takes its default, as they bound
+the memory a workbook inflates to. Text longer than a JavaScript
 string can hold, about 512 MB, is refused whatever the limits.
 
 ### CLI
 
-`freshcoat render --data` reads a file of any size, warning past 128 MiB; of
-the limits above, only the 500 columns and 10,000 zip entries apply. A PDF
+`freshcoat render --data` reads a file of any size or number of records,
+warning past 128 MiB; the other limits above apply, and a file past the cell
+or uncompressed limit is refused with a message to split it. A PDF
 export warns when it is estimated past 1 GiB. Neither warning stops the job.
 
 ## Templates
@@ -238,9 +242,9 @@ differ:
 - Cut lines stroke in overprinting `/Separation` spots (`CutContour`,
   `KissCut`, `Crease`, `Perfcut`) instead of DeviceRGB. They look the
   same; `cutSpots` or `--cut-spot` renames the spots.
-- CSV and TSV text cells starting with `=`, `+`, `-`, `@`, a tab or a
-  carriage return get a leading `'`, and so do cells starting with `'` and
-  then one of those. Image cells are left alone. Phone numbers and signed
+- CSV and TSV text and image cells starting with `=`, `+`, `-`, `@`, a tab
+  or a carriage return get a leading `'`, and so do cells starting with `'`
+  and then one of those. Phone numbers and signed
   amounts stored as text, such as `+63 912 345 6789` or `-1,200.00`, show the
   `'` in a spreadsheet. Machine consumers can pass `escapeFormulas: false` to
   `writeTable`; Studio always escapes. `readTable` drops the first `'` from a
