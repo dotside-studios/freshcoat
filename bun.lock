@@ -148,6 +148,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@freshcoat-js/engine": "workspace:*",
+        "fflate": "^0.8.3",
       },
       "devDependencies": {
         "@types/bun": "^1.3.12",

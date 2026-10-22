@@ -116,6 +116,14 @@ export class TableLimitError extends TabularError {
 
 type Sheets = { sheets: TableSheet[] };
 
+/** The limits that bound how much a workbook inflates in memory. A
+ *  non-finite value takes the default, so they cannot be lifted. */
+const INFLATION_LIMITS = [
+	"maxUncompressedBytes",
+	"maxColumns",
+	"maxCells",
+] as const satisfies readonly (keyof TableLimits)[];
+
 const TEXT_FORMATS = new Set(["csv", "tsv", "txt"]);
 const ZIP_FORMATS = new Set(["xlsx", "xlsm", "ods"]);
 
@@ -387,7 +395,9 @@ function readNdjson(
  * cells, `unsupported_format` for an extension it does not read,
  * `invalid_file` when the contents do not parse, and a `TableLimitError`
  * (`limit_exceeded`) when the file is past `DEFAULT_TABLE_LIMITS` or the
- * `options.limits` that override them. Size limits are checked before any
+ * `options.limits` that override them. `maxUncompressedBytes`, `maxColumns`
+ * and `maxCells` can be raised but not lifted: a non-finite value for one of
+ * them takes its default. Size limits are checked before any
  * untrusted bytes are decoded or inflated. A CSV or TSV cell that starts with
  * `'` and then `=`, `+`, `-`, `@`, tab or CR loses that `'`, undoing
  * `writeTable`'s formula escaping, unless `options.unescapeFormulas` is false.
@@ -398,6 +408,9 @@ export async function readTable(
 	options: ReadTableOptions = {},
 ): Promise<Sheets> {
 	const limits: TableLimits = { ...DEFAULT_TABLE_LIMITS, ...options.limits };
+	for (const key of INFLATION_LIMITS) {
+		if (!Number.isFinite(limits[key])) limits[key] = DEFAULT_TABLE_LIMITS[key];
+	}
 	const fail = (
 		limit: TableLimitKind,
 		actual: number | undefined,

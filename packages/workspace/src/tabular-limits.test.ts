@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { cornerCells, workbookBomb } from "@freshcoat-js/test-utils";
 import { zipSync } from "fflate";
 import { writeXlsx } from "hucre/xlsx";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -472,6 +473,55 @@ describe("readTable: workbook limits", () => {
 			limits: { maxCells: 50 },
 		});
 		expect(sheets[0]?.rows).toHaveLength(26);
+	});
+
+	const LIFTED = {
+		maxBytes: Number.POSITIVE_INFINITY,
+		maxUncompressedBytes: Number.POSITIVE_INFINITY,
+		maxRows: Number.POSITIVE_INFINITY,
+		maxColumns: Number.POSITIVE_INFINITY,
+		maxCells: Number.POSITIVE_INFINITY,
+	};
+
+	it.each([
+		["the default limits", undefined],
+		["lifted limits", LIFTED],
+	])("refuses a workbook.xml that inflates to 700 MB under %s", async (_, limits) => {
+		const err = await limitOf(
+			readTable(workbookBomb(), "bomb.xlsx", { limits }),
+		);
+		expect(err).toMatchObject({
+			limit: "uncompressed_bytes",
+			max: DEFAULT_TABLE_LIMITS.maxUncompressedBytes,
+		});
+		expect(err.actual).toBeGreaterThan(700 * 1024 * 1024);
+	});
+
+	it.each([
+		["the default limits", undefined],
+		["lifted limits", LIFTED],
+	])("refuses cells at A1 and ALL1048576 under %s", async (_, limits) => {
+		const err = await limitOf(
+			readTable(cornerCells(), "corner.xlsx", { limits }),
+		);
+		expect(err).toMatchObject({
+			limit: "cells",
+			max: DEFAULT_TABLE_LIMITS.maxCells,
+		});
+	});
+
+	it("passes no unbounded limit to the workbook reader", async () => {
+		const { hucreCodec } = await import("./workbook/hucre");
+		const read = vi.spyOn(hucreCodec, "read");
+		await readTable(await workbook([["a"], ["b"]]), "ok.xlsx", {
+			limits: LIFTED,
+		});
+		expect(read).toHaveBeenCalledWith(expect.anything(), "xlsx", {
+			maxDecompressedBytes: DEFAULT_TABLE_LIMITS.maxUncompressedBytes,
+			maxTotalCells:
+				DEFAULT_TABLE_LIMITS.maxCells + DEFAULT_TABLE_LIMITS.maxColumns,
+		});
+		read.mockRestore();
 	});
 
 	it("reads an xlsx inside the limits", async () => {
