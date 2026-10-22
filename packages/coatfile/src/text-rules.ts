@@ -1,5 +1,5 @@
 import {
-	PATTERN_INPUT_MAX_LENGTH,
+	patternInputMaxLength,
 	UNSAFE_PATTERN_MESSAGES,
 	unsafePatternReason,
 } from "./safe-regex";
@@ -69,7 +69,10 @@ export function textRuleBreaks(
 	if (rules.pattern !== undefined) {
 		const re = compiledPattern(rules.pattern);
 		if (re !== null) {
-			if (value.length > PATTERN_INPUT_MAX_LENGTH || !re.test(value))
+			if (
+				value.length > patternInputMaxLength(rules.pattern) ||
+				!re.test(value)
+			)
 				breaks.push("pattern_mismatch");
 		}
 	}
