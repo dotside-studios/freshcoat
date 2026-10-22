@@ -47,11 +47,13 @@ export type TableLimits = {
 	maxUncompressedBytes: number;
 	/** Entries in a workbook zip. */
 	maxZipEntries: number;
-	/** Rows of one sheet, before empty trailing rows are trimmed. */
+	/** Data records of one sheet: rows after the first, which is the header,
+	 *  counted before empty trailing rows are trimmed. A JSON list of objects
+	 *  counts its objects. */
 	maxRows: number;
 	/** Columns of one sheet, before empty trailing columns are trimmed. */
 	maxColumns: number;
-	/** Cells of one sheet, rows times columns. */
+	/** Cells of one sheet, records times columns. */
 	maxCells: number;
 };
 
@@ -70,7 +72,7 @@ const LIMIT_LABELS: Record<TableLimitKind, { label: string; size: boolean }> = {
 	bytes: { label: "bytes", size: true },
 	uncompressed_bytes: { label: "uncompressed bytes", size: true },
 	zip_entries: { label: "zip entries", size: false },
-	rows: { label: "rows", size: false },
+	rows: { label: "records", size: false },
 	columns: { label: "columns", size: false },
 	cells: { label: "cells", size: false },
 };
@@ -244,7 +246,7 @@ function splitDelimited(
 		startCode = text.charCodeAt(start);
 		if (code !== sepCode) {
 			rows.push(row);
-			if (rows.length > limits.maxRows) fail("rows", rows.length);
+			if (rows.length - 1 > limits.maxRows) fail("rows", rows.length - 1);
 			row = [];
 		}
 	};
@@ -319,7 +321,8 @@ function readJson(
 			"Expected an array, or an object with records, rows or data",
 		);
 	}
-	if (items.length > limits.maxRows) fail("rows", items.length);
+	const records = items.every(Array.isArray) ? items.length - 1 : items.length;
+	if (records > limits.maxRows) fail("rows", records);
 	return objectsToRows(items);
 }
 
@@ -329,7 +332,7 @@ function readNdjson(
 	fail: (limit: "rows", actual: number) => never,
 ): string[][] {
 	const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
-	if (lines.length > limits.maxRows) fail("rows", lines.length);
+	if (lines.length - 1 > limits.maxRows) fail("rows", lines.length);
 	const items = lines.map(parseJson);
 	return items.length === 0 ? [] : objectsToRows(items);
 }
@@ -415,7 +418,7 @@ export async function readTable(
 		try {
 			sheets = await codec.read(input, ext, {
 				maxDecompressedBytes: limits.maxUncompressedBytes,
-				maxTotalCells: limits.maxCells,
+				maxTotalCells: limits.maxCells + limits.maxColumns,
 			});
 		} catch (err) {
 			const name = (err as { name?: string }).name;
@@ -423,11 +426,10 @@ export async function readTable(
 			if (name === "ZipError" && /zip bomb/.test(message)) {
 				fail("uncompressed_bytes", undefined, limits.maxUncompressedBytes);
 			}
-			const spans = /^Sheet .* spans \d+ rows x \d+ columns \((\d+) cells/.exec(
-				message,
-			);
+			const spans = /^Sheet .* spans (\d+) rows x (\d+) columns/.exec(message);
 			if (name === "ParseError" && spans) {
-				fail("cells", Number(spans[1]), limits.maxCells);
+				const [height, width] = [Number(spans[1]), Number(spans[2])];
+				fail("cells", Math.max(height - 1, 0) * width, limits.maxCells);
 			}
 			throw new TabularError("invalid_file", message);
 		}
@@ -438,13 +440,13 @@ export async function readTable(
 		);
 	}
 	for (const sheet of sheets) {
-		const height = sheet.rows.length;
-		if (height > limits.maxRows) failShape("rows", height);
+		const records = Math.max(sheet.rows.length - 1, 0);
+		if (records > limits.maxRows) failShape("rows", records);
 		let width = 0;
 		for (const row of sheet.rows) width = Math.max(width, row.length);
 		if (width > limits.maxColumns) failShape("columns", width);
-		if (height * width > limits.maxCells) {
-			fail("cells", height * width, limits.maxCells);
+		if (records * width > limits.maxCells) {
+			fail("cells", records * width, limits.maxCells);
 		}
 	}
 	const nonEmpty = sheets

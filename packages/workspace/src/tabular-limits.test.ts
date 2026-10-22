@@ -60,14 +60,32 @@ describe("readTable: limits", () => {
 			readTable(csv, "rows.csv", { limits: { maxRows: 10 } }),
 		);
 		expect(err).toMatchObject({ limit: "rows", actual: 11, max: 10 });
-		expect(err.message).toContain("11 rows is over the limit of 10 rows");
+		expect(err.message).toContain("11 records is over the limit of 10 records");
 	});
 
-	it("allows a csv exactly at the row cap", async () => {
-		const { sheets } = await readTable("a\n1\n2\n", "x.csv", {
+	it("does not count the header against the row cap", async () => {
+		const { sheets } = await readTable("a\n1\n2\n3\n", "x.csv", {
 			limits: { maxRows: 3 },
 		});
-		expect(sheets[0]?.rows).toHaveLength(3);
+		expect(sheets[0]?.rows).toHaveLength(4);
+		const err = await limitOf(
+			readTable("a\n1\n2\n3\n4\n", "x.csv", { limits: { maxRows: 3 } }),
+		);
+		expect(err).toMatchObject({ limit: "rows", actual: 4, max: 3 });
+	});
+
+	it("does not count the header against the row cap of a tsv", async () => {
+		const tsv = `a\tb\n${"1\t2\n".repeat(5)}`;
+		const { sheets } = await readTable(tsv, "x.tsv", {
+			limits: { maxRows: 5 },
+		});
+		expect(sheets[0]?.rows).toHaveLength(6);
+	});
+
+	it("reads an even 100,000 records under the default caps", async () => {
+		const csv = `id,name\n${"7,Ana\n".repeat(100_000)}`;
+		const { sheets } = await readTable(csv, "even.csv");
+		expect(sheets[0]?.rows).toHaveLength(100_001);
 	});
 
 	it("rejects a csv with too many columns", async () => {
@@ -90,7 +108,15 @@ describe("readTable: limits", () => {
 		const err = await limitOf(
 			readTable(csv, "cells.csv", { limits: { maxCells: 20 } }),
 		);
-		expect(err).toMatchObject({ limit: "cells", actual: 30, max: 20 });
+		expect(err).toMatchObject({ limit: "cells", actual: 27, max: 20 });
+	});
+
+	it("does not count the header's cells", async () => {
+		const csv = `a,b,c\n${"1,2,3\n".repeat(9)}`;
+		const { sheets } = await readTable(csv, "cells.csv", {
+			limits: { maxCells: 27 },
+		});
+		expect(sheets[0]?.rows).toHaveLength(10);
 	});
 
 	it("rejects json with too many rows", async () => {
@@ -99,6 +125,27 @@ describe("readTable: limits", () => {
 			readTable(JSON.stringify(items), "rows.json", { limits: { maxRows: 5 } }),
 		);
 		expect(err).toMatchObject({ limit: "rows", actual: 20, max: 5 });
+	});
+
+	it("counts json objects as records, with no header to exclude", async () => {
+		const items = (n: number) =>
+			JSON.stringify(Array.from({ length: n }, (_, i) => ({ id: i })));
+		const { sheets } = await readTable(items(5), "x.json", {
+			limits: { maxRows: 5 },
+		});
+		expect(sheets[0]?.rows).toHaveLength(6);
+		const err = await limitOf(
+			readTable(items(6), "x.json", { limits: { maxRows: 5 } }),
+		);
+		expect(err).toMatchObject({ limit: "rows", actual: 6, max: 5 });
+	});
+
+	it("excludes the header row of a json list of arrays", async () => {
+		const rows = [["id"], ...Array.from({ length: 5 }, (_, i) => [i])];
+		const { sheets } = await readTable(JSON.stringify(rows), "x.json", {
+			limits: { maxRows: 5 },
+		});
+		expect(sheets[0]?.rows).toHaveLength(6);
 	});
 
 	it("rejects a wrapped json list with too many rows", async () => {
@@ -129,6 +176,18 @@ describe("readTable: limits", () => {
 			readTable(lines, "rows.ndjson", { limits: { maxRows: 5 } }),
 		);
 		expect(err.limit).toBe("rows");
+	});
+
+	it("counts ndjson objects as records", async () => {
+		const lines = (n: number) => '{"id":1}\n'.repeat(n);
+		const { sheets } = await readTable(lines(5), "x.ndjson", {
+			limits: { maxRows: 5 },
+		});
+		expect(sheets[0]?.rows).toHaveLength(6);
+		const err = await limitOf(
+			readTable(lines(6), "x.ndjson", { limits: { maxRows: 5 } }),
+		);
+		expect(err).toMatchObject({ limit: "rows", actual: 6, max: 5 });
 	});
 
 	it("counts rows before trailing empty rows are trimmed", async () => {
@@ -210,7 +269,15 @@ describe("readTable: workbook limits", () => {
 		const err = await limitOf(
 			readTable(await workbook(rows), "rows.xlsx", { limits: { maxRows: 10 } }),
 		);
-		expect(err).toMatchObject({ limit: "rows", actual: 40, max: 10 });
+		expect(err).toMatchObject({ limit: "rows", actual: 39, max: 10 });
+	});
+
+	it("does not count an xlsx header against the row cap", async () => {
+		const rows = [["name"], ...Array.from({ length: 10 }, (_, i) => [`r${i}`])];
+		const { sheets } = await readTable(await workbook(rows), "x.xlsx", {
+			limits: { maxRows: 10 },
+		});
+		expect(sheets[0]?.rows).toHaveLength(11);
 	});
 
 	it("rejects an xlsx with too many columns", async () => {
@@ -230,7 +297,16 @@ describe("readTable: workbook limits", () => {
 				limits: { maxCells: 50 },
 			}),
 		);
-		expect(err.limit).toBe("cells");
+		expect(err).toMatchObject({ limit: "cells", max: 50 });
+		expect(err.actual).toBeGreaterThan(50);
+	});
+
+	it("does not count an xlsx header's cells", async () => {
+		const rows = [["a", "b"], ...Array.from({ length: 25 }, (_, i) => [i, i])];
+		const { sheets } = await readTable(await workbook(rows), "x.xlsx", {
+			limits: { maxCells: 50 },
+		});
+		expect(sheets[0]?.rows).toHaveLength(26);
 	});
 
 	it("reads an xlsx inside the limits", async () => {
