@@ -67,6 +67,10 @@ export function resolveAsset(dist: string, pathname: string): string | null {
 	} catch {
 		return null; // malformed percent-encoding
 	}
+	for (const ch of decoded) {
+		const code = ch.charCodeAt(0);
+		if (code < 0x20 || code === 0x7f) return null;
+	}
 	const full = normalize(join(dist, decoded));
 	// normalize() collapses `..`; anything that escaped dist/ is not ours to serve.
 	return (full + sep).startsWith(dist + sep) ? full : null;
@@ -108,6 +112,13 @@ async function serveFile(
 function notFound(): Response {
 	return new Response("not found", {
 		status: 404,
+		headers: { "content-type": "text/plain; charset=utf-8" },
+	});
+}
+
+function internalError(): Response {
+	return new Response("internal server error", {
+		status: 500,
 		headers: { "content-type": "text/plain; charset=utf-8" },
 	});
 }
@@ -157,8 +168,7 @@ export function createHandler(distDir: string) {
 		});
 	}
 
-	return async (req: Request): Promise<Response> => {
-		const res = await route(req);
+	async function secure(res: Response): Promise<Response> {
 		const type = res.headers.get("content-type") ?? "";
 		scripts ??= inlineScriptHashes(dist);
 		const csp = contentSecurityPolicy(
@@ -169,6 +179,16 @@ export function createHandler(distDir: string) {
 			res.headers.set(name, value);
 		res.headers.set("content-security-policy", csp);
 		return res;
+	}
+
+	return async (req: Request): Promise<Response> => {
+		try {
+			return await secure(await route(req));
+		} catch (e) {
+			const reason = e instanceof Error ? e.message : String(e);
+			console.error(`${req.method} ${req.url} failed: ${reason}`);
+			return secure(internalError());
+		}
 	};
 }
 

@@ -371,6 +371,7 @@ function walkNode(
 				inheritedOpacity,
 			);
 			if (el) {
+				blurWarning(n, fx, containerEntry, w.sink.warnings);
 				containerEntry.el = el;
 				target.push(el);
 				return;
