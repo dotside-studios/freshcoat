@@ -86,6 +86,8 @@ describe("decodeHandoff", () => {
 		expect(decodeHandoff("AAAAAAAAAAAAAAAA")).toMatchObject({ ok: false });
 	});
 
+	// Deflates and inflates 64 MB: well under a second alone, several times
+	// that under a parallel `bun run test`.
 	test("refuses a link that inflates past the limit", () => {
 		const bomb = encodeBytes(new Uint8Array(HANDOFF_MAX_JSON_BYTES + 1));
 		expect(bomb.length).toBeLessThan(200_000);
@@ -93,7 +95,7 @@ describe("decodeHandoff", () => {
 			ok: false,
 			reason: "it is too large to open from a link",
 		});
-	});
+	}, 30_000);
 });
 
 describe("isHandoffOrigin", () => {

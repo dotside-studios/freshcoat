@@ -129,6 +129,8 @@ describe("generateMatrix symbol version", () => {
 describe("QR memo", () => {
 	const v40 = (i: number) => `${i}:${"x".repeat(2900)}`;
 
+	// 80 symbols overflow both budgets: about 1 s alone, several times that
+	// under a parallel `bun run test`.
 	test("stays within its byte budgets across many version-40 symbols", () => {
 		for (let i = 0; i < 80; i++) {
 			const { size } = qrSymbol(v40(i), "L");
@@ -138,7 +140,7 @@ describe("QR memo", () => {
 			expect(paths).toBeLessThanOrEqual(PATH_CACHE_BYTES);
 		}
 		expect(qrCacheBytes().paths).toBeGreaterThan(PATH_CACHE_BYTES / 2);
-	});
+	}, 30_000);
 
 	test("keys paths by value, level and style", () => {
 		const a = qrSymbol("https://example.com/memo", "Q");
