@@ -66,6 +66,21 @@ async function rawGet(name: string, store: string, key?: string) {
 	}
 }
 
+async function putCurrent(name: string, value: unknown): Promise<void> {
+	await createAutosaveStore(name).clear();
+	const db = await openRaw(name);
+	try {
+		await new Promise<void>((resolve, reject) => {
+			const tx = db.transaction("autosave", "readwrite");
+			tx.objectStore("autosave").put(value, "current");
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+		});
+	} finally {
+		db.close();
+	}
+}
+
 /** Makes every IndexedDB get throw until the returned function runs. */
 function breakGets(): () => void {
 	const get = vi
@@ -686,14 +701,13 @@ describe("autosave", () => {
 			fileName: "old",
 		});
 		const store = createAutosaveStore(db);
-		await store.discard();
+		expect(await store.discard()).toBeNull();
 		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("old");
 
-		const fix = breakGets();
+		await putCurrent(db, { version: "bad", fileName: "bad", savedAt: 1 });
 		expect((await store.read()).status).toBe("failed");
-		fix();
 		await store.write({ workspace: workspace([asset(2)]), fileName: "mine" });
-		await store.discard();
+		expect(await store.discard()).toEqual({ status: "empty" });
 
 		const read = await readSaved(createAutosaveStore(db));
 		expect(read?.fileName).toBe("mine");
@@ -713,20 +727,20 @@ describe("autosave", () => {
 		let fix = breakGets();
 		expect((await store.read()).status).toBe("failed");
 		expect((await store.reread()).status).toBe("failed");
-		expect(onPausedChange.mock.calls).toEqual([[true]]);
+		expect(onPausedChange.mock.calls).toEqual([["failed"]]);
 		fix();
 		expect((await store.reread()).status).toBe("found");
-		expect(onPausedChange.mock.calls).toEqual([[true], [false]]);
+		expect(onPausedChange.mock.calls).toEqual([["failed"], [null]]);
 
 		fix = breakGets();
 		expect((await store.read()).status).toBe("failed");
 		fix();
 		await store.discard();
 		expect(onPausedChange.mock.calls).toEqual([
-			[true],
-			[false],
-			[true],
-			[false],
+			["failed"],
+			[null],
+			["failed"],
+			[null],
 		]);
 	});
 
@@ -734,24 +748,87 @@ describe("autosave", () => {
 		const db = freshDb();
 		const seed = createAutosaveStore(db);
 		await seed.write({ workspace: workspace([asset(1)]), fileName: "old" });
-		const handle = await openRaw(db);
 		const newer = { version: 4, workspace: {}, fileName: "future", savedAt: 1 };
-		await new Promise<void>((resolve, reject) => {
-			const tx = handle.transaction("autosave", "readwrite");
-			tx.objectStore("autosave").put(newer, "current");
-			tx.oncomplete = () => resolve();
-			tx.onerror = () => reject(tx.error);
-		});
-		handle.close();
+		await putCurrent(db, newer);
 
 		const onPausedChange = vi.fn();
-		const store = createAutosaveStore(db, { onPausedChange });
+		const onWriteBlocked = vi.fn();
+		const store = createAutosaveStore(db, { onPausedChange, onWriteBlocked });
 		expect((await store.read()).status).toBe("newer");
-		expect(onPausedChange).not.toHaveBeenCalled();
+		expect(onPausedChange.mock.calls).toEqual([["newer"]]);
 		await store.write({ workspace: workspace([asset(2)]), fileName: "mine" });
+		expect(onWriteBlocked.mock.calls).toEqual([["newer"]]);
 		await store.clear();
-		await store.discard();
+		expect(await store.discard()).toBeNull();
 		expect(await rawGet(db, "autosave", "current")).toEqual(newer);
+	});
+
+	it("keeps another tab's readable autosave when discarding", async () => {
+		const db = freshDb();
+		await putCurrent(db, { version: "bad", fileName: "bad", savedAt: 1 });
+		const a = createAutosaveStore(db, { tabId: "a" });
+		expect((await a.read()).status).toBe("failed");
+
+		const b = createAutosaveStore(db, { tabId: "b" });
+		await b.write({ workspace: workspace([asset(1)]), fileName: "b" });
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("b");
+
+		const read = await a.discard();
+		expect(read?.status === "found" && read.autosave.fileName).toBe("b");
+		const saved = await readSaved(createAutosaveStore(db));
+		expect(saved?.fileName).toBe("b");
+		expect(saved?.workspace.datasets[0]?.assets).toHaveLength(1);
+		expect(await rawGet(db, "assets")).toEqual(["sha1"]);
+
+		await a.write({ workspace: workspace([asset(2)]), fileName: "a" });
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("a");
+	});
+
+	it("keeps an autosave a newer version wrote since the read failed", async () => {
+		const db = freshDb();
+		await putCurrent(db, { version: "bad", fileName: "bad", savedAt: 1 });
+		const onPausedChange = vi.fn();
+		const store = createAutosaveStore(db, { onPausedChange });
+		expect((await store.read()).status).toBe("failed");
+		await store.write({ workspace: workspace([asset(1)]), fileName: "held" });
+
+		const newer = { version: 4, workspace: {}, fileName: "future", savedAt: 2 };
+		await putCurrent(db, newer);
+		expect(await store.discard()).toEqual({ status: "newer" });
+		expect(await rawGet(db, "autosave", "current")).toEqual(newer);
+		expect(onPausedChange.mock.calls).toEqual([["failed"], ["newer"]]);
+	});
+
+	it("stays paused and reports writes when Retry finds a newer autosave", async () => {
+		const db = freshDb();
+		await putCurrent(db, { version: "bad", fileName: "bad", savedAt: 1 });
+		const onPausedChange = vi.fn();
+		const onWriteBlocked = vi.fn();
+		const store = createAutosaveStore(db, { onPausedChange, onWriteBlocked });
+		expect((await store.read()).status).toBe("failed");
+		await store.write({ workspace: workspace([asset(1)]), fileName: "a" });
+		expect(onWriteBlocked.mock.calls).toEqual([["failed"]]);
+
+		const newer = { version: 4, workspace: {}, fileName: "future", savedAt: 2 };
+		await putCurrent(db, newer);
+		expect((await store.reread()).status).toBe("newer");
+		expect(onPausedChange.mock.calls).toEqual([["failed"], ["newer"]]);
+
+		await store.write({ workspace: workspace([asset(2)]), fileName: "b" });
+		store.flush({ workspace: workspace([asset(3)]), fileName: "c" });
+		expect(onWriteBlocked.mock.calls).toEqual([["failed"], ["newer"]]);
+		expect(await rawGet(db, "autosave", "current")).toEqual(newer);
+
+		const handle = await openRaw(db);
+		await new Promise<void>((resolve) => {
+			const tx = handle.transaction("autosave", "readwrite");
+			tx.objectStore("autosave").delete("current");
+			tx.oncomplete = () => resolve();
+		});
+		handle.close();
+		expect((await store.reread()).status).toBe("empty");
+		expect((await readSaved(store))?.fileName).toBe("c");
+		expect(onPausedChange.mock.calls).toEqual([["failed"], ["newer"], [null]]);
 	});
 
 	it("starts a flushed write before anything is awaited", async () => {
