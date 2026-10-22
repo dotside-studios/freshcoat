@@ -55,12 +55,20 @@ export const DEFAULT_CUT_SPOTS: Readonly<Record<CutKind, string>> = {
  *  only spaces, takes its `DEFAULT_CUT_SPOTS` name. */
 export type CutSpots = Partial<Record<CutKind, string>>;
 
-/** Every kind's spot colour name, `spots` over the defaults. */
+/** Whether PDF reserves `name` as a colorant: All images on every plate and
+ *  None on no plate. Matched in any case, so a near miss is refused too. */
+export function isReservedSpotName(name: string): boolean {
+	const lower = name.trim().toLowerCase();
+	return lower === "all" || lower === "none";
+}
+
+/** Every kind's spot colour name, `spots` over the defaults. A reserved
+ *  name takes the default too. */
 export function cutSpotNames(spots?: CutSpots): Record<CutKind, string> {
 	const out = { ...DEFAULT_CUT_SPOTS };
 	for (const kind of CUT_KINDS) {
 		const name = spots?.[kind]?.trim();
-		if (name) out[kind] = name;
+		if (name && !isReservedSpotName(name)) out[kind] = name;
 	}
 	return out;
 }

@@ -667,6 +667,28 @@ describe("export section", { timeout: 20_000 }, () => {
 			expect(stored(controller)?.cutSpots).toEqual({});
 		});
 
+		test("refuses a cut spot named for a colorant PDF reserves", async () => {
+			const { controller, user, templateId } = setup(withSlices());
+			act(() =>
+				controller.dispatch({
+					type: "setPreset",
+					preset: preset(templateId, { format: "pdf", cutLines: true }),
+				}),
+			);
+			const through = screen.getByLabelText("Through spot");
+			await user.type(through, "All");
+			expect(stored(controller)?.cutSpots).toEqual({ through: "Al" });
+			expect(through.getAttribute("aria-invalid")).toBe("true");
+			expect(
+				screen.getByText(
+					"All is reserved by PDF; name the spot something else",
+				),
+			).toBeTruthy();
+			await user.type(through, "oy");
+			expect(stored(controller)?.cutSpots).toEqual({ through: "Alloy" });
+			expect(through.getAttribute("aria-invalid")).toBeNull();
+		});
+
 		test("says why pieces of vector pages can't run", async () => {
 			const { controller, templateId } = setup(withSlices());
 			act(() =>
