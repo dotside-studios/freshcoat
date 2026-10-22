@@ -1,7 +1,7 @@
 import { openAsBlob } from "node:fs";
 import { readWorkspace } from "./archive";
 
-export { fileOutput } from "./export/file-output";
+export { type FileOutput, fileOutput } from "./export/file-output";
 export { folderOutput } from "./export/folder-output";
 
 /** Reads a `.coatworkspace` at `path` without loading it into memory first.

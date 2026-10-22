@@ -26,6 +26,8 @@ export type ExportOutput = {
 	sink?(): OutputSink;
 	/** takes the file the job hands back, such as a PDF */
 	save?(file: JobFile): Promise<void>;
+	/** makes what was written final once the job succeeds */
+	commit?(): Promise<void>;
 	/** removes what was written when the job is cancelled or fails */
 	discard?(): Promise<void>;
 };
@@ -148,9 +150,14 @@ export async function exportWorkspace(
 				options.renderer,
 				() => signal?.aborted ?? false,
 			);
-			if (glyphs) result.glyphs = glyphs;
+			if (glyphs && !signal?.aborted) result.glyphs = glyphs;
+		}
+		if (signal?.aborted) {
+			await output?.discard?.();
+			return { ...result, cancelled: true, workspace };
 		}
 		if (result.file) await output?.save?.(result.file);
+		await output?.commit?.();
 		return result;
 	} catch (e) {
 		await output?.discard?.();
