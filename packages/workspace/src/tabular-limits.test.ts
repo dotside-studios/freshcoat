@@ -7,6 +7,7 @@ import {
 	DEFAULT_TABLE_LIMITS,
 	MAX_TEXT_LENGTH,
 	readTable,
+	TABLE_LIMIT_CEILINGS,
 	TableLimitError,
 	TabularError,
 } from "./tabular";
@@ -28,6 +29,49 @@ const limitOf = async (p: Promise<unknown>) => {
 };
 
 const encode = (text: string) => new TextEncoder().encode(text);
+
+/** `zip` with its end record moved to a zip64 record declaring `entries`. */
+const asZip64 = (zip: Uint8Array, entries: number) => {
+	const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+	const eocd = zip.length - 22;
+	const start = view.getUint32(eocd + 16, true);
+	const size = view.getUint32(eocd + 12, true);
+	const out = new Uint8Array(zip.length + 56 + 20);
+	out.set(zip.subarray(0, eocd));
+	const record = eocd;
+	const o = new DataView(out.buffer);
+	o.setUint32(record, 0x06064b50, true);
+	o.setBigUint64(record + 4, 44n, true);
+	o.setBigUint64(record + 24, BigInt(entries), true);
+	o.setBigUint64(record + 32, BigInt(entries), true);
+	o.setBigUint64(record + 40, BigInt(size), true);
+	o.setBigUint64(record + 48, BigInt(start), true);
+	const locator = record + 56;
+	o.setUint32(locator, 0x07064b50, true);
+	o.setBigUint64(locator + 8, BigInt(record), true);
+	o.setUint32(locator + 16, 1, true);
+	const end = locator + 20;
+	o.setUint32(end, 0x06054b50, true);
+	o.setUint16(end + 8, 0xffff, true);
+	o.setUint16(end + 10, 0xffff, true);
+	o.setUint32(end + 12, 0xffffffff, true);
+	o.setUint32(end + 16, 0xffffffff, true);
+	return out;
+};
+
+/** A zip of only a central directory with `entries` empty entries, which
+ *  is all `readTable` reads before the entry limit refuses it. */
+const directoryOnly = (entries: number) => {
+	const size = 46 * entries;
+	const out = new Uint8Array(size + 22);
+	const view = new DataView(out.buffer);
+	for (let at = 0; at < size; at += 46) view.setUint32(at, 0x02014b50, true);
+	view.setUint32(size, 0x06054b50, true);
+	view.setUint16(size + 8, Math.min(entries, 0xffff), true);
+	view.setUint16(size + 10, Math.min(entries, 0xffff), true);
+	view.setUint32(size + 12, size, true);
+	return out;
+};
 
 describe("readTable: limits", () => {
 	it("rejects input over the byte cap before decoding it", async () => {
@@ -524,6 +568,97 @@ describe("readTable: workbook limits", () => {
 		read.mockRestore();
 	});
 
+	it.each([
+		Number.MAX_SAFE_INTEGER,
+		1e308,
+	])("caps cells and columns at their ceilings when given %d", async (huge) => {
+		const err = await limitOf(
+			readTable(cornerCells(), "corner.xlsx", {
+				limits: {
+					maxUncompressedBytes: huge,
+					maxZipEntries: huge,
+					maxColumns: huge,
+					maxCells: huge,
+				},
+			}),
+		);
+		expect(err).toMatchObject({
+			limit: "cells",
+			max: TABLE_LIMIT_CEILINGS.maxCells,
+		});
+		expect(err.message).toContain("20,000,000 cells");
+	});
+
+	it("passes the ceilings to the workbook reader for a huge finite limit", async () => {
+		const { hucreCodec } = await import("./workbook/hucre");
+		const read = vi.spyOn(hucreCodec, "read");
+		await readTable(await workbook([["a"], ["b"]]), "ok.xlsx", {
+			limits: {
+				maxUncompressedBytes: 1e308,
+				maxColumns: 1e308,
+				maxCells: 1e308,
+			},
+		});
+		expect(read).toHaveBeenCalledWith(expect.anything(), "xlsx", {
+			maxDecompressedBytes: 2 * 1024 * 1024 * 1024,
+			maxTotalCells: 20_000_000 + 16_384,
+		});
+		read.mockRestore();
+	});
+
+	it("reports the ceiling as the limit of a capped zip entry count", async () => {
+		const count = TABLE_LIMIT_CEILINGS.maxZipEntries + 1;
+		const err = await limitOf(
+			readTable(asZip64(directoryOnly(count), count), "many.xlsx", {
+				limits: { maxZipEntries: Number.MAX_SAFE_INTEGER },
+			}),
+		);
+		expect(err).toMatchObject({
+			limit: "zip_entries",
+			actual: count,
+			max: TABLE_LIMIT_CEILINGS.maxZipEntries,
+		});
+	});
+
+	it.each([
+		["NaN", Number.NaN],
+		["undefined", undefined],
+		["negative", -1],
+		["a string", "5" as unknown as number],
+	])("takes the default for a limit given as %s", async (_, value) => {
+		const zip = directoryOnly(DEFAULT_TABLE_LIMITS.maxZipEntries + 1);
+		const entries = await limitOf(
+			readTable(zip, "many.xlsx", { limits: { maxZipEntries: value } }),
+		);
+		expect(entries.max).toBe(DEFAULT_TABLE_LIMITS.maxZipEntries);
+		const oversized = {
+			length: DEFAULT_TABLE_LIMITS.maxBytes + 1,
+		} as unknown as Uint8Array;
+		const bytes = await limitOf(
+			readTable(oversized, "big.csv", { limits: { maxBytes: value } }),
+		);
+		const rows = await limitOf(
+			readTable(
+				`a\n${"1\n".repeat(DEFAULT_TABLE_LIMITS.maxRows + 1)}`,
+				"rows.csv",
+				{ limits: { maxRows: value } },
+			),
+		);
+		expect(rows.max).toBe(DEFAULT_TABLE_LIMITS.maxRows);
+		expect(bytes.max).toBe(DEFAULT_TABLE_LIMITS.maxBytes);
+	});
+
+	it("lifts maxBytes and maxRows with Infinity", async () => {
+		const rows = DEFAULT_TABLE_LIMITS.maxRows + 1;
+		const { sheets } = await readTable(`a\n${"1\n".repeat(rows)}`, "x.csv", {
+			limits: {
+				maxBytes: Number.POSITIVE_INFINITY,
+				maxRows: Number.POSITIVE_INFINITY,
+			},
+		});
+		expect(sheets[0]?.rows).toHaveLength(rows + 1);
+	});
+
 	it("reads an xlsx inside the limits", async () => {
 		const { sheets } = await readTable(
 			await workbook([["a"], ["b"]]),
@@ -541,30 +676,7 @@ describe("readZipDirectory", () => {
 
 	it("reads the entry count and offset from a zip64 record", () => {
 		const zip = zipSync({ "a.txt": encode("hello"), "b.txt": encode("hi") });
-		const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
-		const eocd = zip.length - 22;
-		const start = view.getUint32(eocd + 16, true);
-		const size = view.getUint32(eocd + 12, true);
-		const out = new Uint8Array(zip.length + 56 + 20);
-		out.set(zip.subarray(0, eocd));
-		const record = eocd;
-		const o = new DataView(out.buffer);
-		o.setUint32(record, 0x06064b50, true);
-		o.setBigUint64(record + 4, 44n, true);
-		o.setBigUint64(record + 24, 2n, true);
-		o.setBigUint64(record + 32, 2n, true);
-		o.setBigUint64(record + 40, BigInt(size), true);
-		o.setBigUint64(record + 48, BigInt(start), true);
-		const locator = record + 56;
-		o.setUint32(locator, 0x07064b50, true);
-		o.setBigUint64(locator + 8, BigInt(record), true);
-		o.setUint32(locator + 16, 1, true);
-		const end = locator + 20;
-		o.setUint32(end, 0x06054b50, true);
-		o.setUint16(end + 8, 0xffff, true);
-		o.setUint16(end + 10, 0xffff, true);
-		o.setUint32(end + 12, 0xffffffff, true);
-		o.setUint32(end + 16, 0xffffffff, true);
+		const out = asZip64(zip, 2);
 		expect(readZipDirectory(out)).toEqual({ entries: 2, uncompressedBytes: 7 });
 	});
 
