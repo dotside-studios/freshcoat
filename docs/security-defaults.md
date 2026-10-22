@@ -4,7 +4,7 @@ A `.coat` file and its field values choose URLs: an image `src`, a font file,
 a font stylesheet, a font family name. A host that renders templates it did not
 write would otherwise let them make its server fetch internal addresses
 (`http://169.254.169.254/`, `http://localhost:6379/`) or read local files. The
-defaults now refuse that. This lands in the release after 0.4.
+defaults now refuse that, from 0.5.
 
 ## What changed
 
