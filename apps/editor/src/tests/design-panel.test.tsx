@@ -23,8 +23,18 @@ import { button, chooseOption, fastUser, spinbutton } from "./aria";
 import { booleanDoc, doc, geometryOf } from "./doc-fixture";
 
 function addEffect(name: string) {
-	fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
-	fireEvent.click(screen.getByRole("menuitem", { name }));
+	fireEvent.click(button("Add effect"));
+	fireEvent.click(
+		within(screen.getByRole("menu")).getByRole("menuitem", { name }),
+	);
+}
+
+function sectionToggle(title: string) {
+	return (
+		screen
+			.queryByText(title, { selector: "h3 button span" })
+			?.closest("button") ?? null
+	);
 }
 
 function setup(selection: string[], t: Template = doc()) {
@@ -202,18 +212,14 @@ describe("DesignPanel", () => {
 	it("remembers a collapsed section across selections", async () => {
 		const c = setup(["0/0"]);
 		const user = fastUser();
-		const stroke = () => screen.getByRole("button", { name: "Stroke" });
+		const stroke = () => sectionToggle("Stroke") as HTMLElement;
 		await user.click(stroke());
 		expect(stroke().getAttribute("aria-expanded")).toBe("false");
 		act(() => c.select(["0/2"]));
-		expect(screen.queryByRole("button", { name: "Stroke" })).toBeNull();
+		expect(sectionToggle("Stroke")).toBeNull();
 		act(() => c.select(["0/1"]));
 		expect(stroke().getAttribute("aria-expanded")).toBe("false");
-		expect(
-			screen
-				.getByRole("button", { name: "Fill" })
-				.getAttribute("aria-expanded"),
-		).toBe("true");
+		expect(sectionToggle("Fill")?.getAttribute("aria-expanded")).toBe("true");
 		await user.click(stroke());
 		expect(stroke().getAttribute("aria-expanded")).toBe("true");
 	});
@@ -278,9 +284,7 @@ describe("DesignPanel", () => {
 	it("adds a background blur as one shared effect", () => {
 		const c = setup(["0/0", "0/1"]);
 		addEffect("Background blur");
-		fireEvent.click(
-			screen.getByRole("button", { name: "Background blur settings" }),
-		);
+		fireEvent.click(button("Background blur settings"));
 		typeInto(spinbutton("Background blur"), "16");
 		expect(el(c, "0/0").effects).toEqual([
 			{ type: "backdropBlur", radius: 16 },
@@ -289,17 +293,17 @@ describe("DesignPanel", () => {
 			{ type: "backdropBlur", radius: 16 },
 		]);
 		expect(validate(c.template).ok).toBe(true);
-		fireEvent.click(screen.getByRole("button", { name: "Close" }));
-		fireEvent.click(screen.getByRole("button", { name: "Add effect" }));
+		fireEvent.click(button("Close"));
+		fireEvent.click(button("Add effect"));
 		expect(
-			screen
+			within(screen.getByRole("menu"))
 				.getByRole("menuitem", { name: "Background blur" })
 				.getAttribute("aria-disabled"),
 		).toBe("true");
-		fireEvent.click(screen.getAllByRole("button", { name: "Dismiss" })[0]);
 		fireEvent.click(
-			screen.getByRole("button", { name: "Remove background blur" }),
+			screen.getAllByLabelText("Dismiss", { selector: "button" })[0],
 		);
+		fireEvent.click(button("Remove background blur"));
 		expect("effects" in el(c, "0/0")).toBe(false);
 	});
 
