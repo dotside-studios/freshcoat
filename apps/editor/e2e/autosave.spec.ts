@@ -1,7 +1,7 @@
 import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chromium, expect, test } from "@playwright/test";
+import { chromium, expect, type Page, test } from "@playwright/test";
 import { openSample, probePath, run, state } from "./helpers";
 
 const PROBE = probePath("autosave-probe");
@@ -230,3 +230,97 @@ for (const hide of ["visibilitychange", "pagehide"] as const) {
 		expect(elapsed).toBeLessThan(900);
 	});
 }
+
+/** Makes the autosave store's reads throw until the page sets
+ *  `__autosaveFixed`. */
+async function breakAutosaveReads(page: Page) {
+	await page.addInitScript(() => {
+		const get = IDBObjectStore.prototype.get;
+		IDBObjectStore.prototype.get = function (
+			this: IDBObjectStore,
+			key: IDBValidKey | IDBKeyRange,
+		) {
+			if (
+				this.name === "autosave" &&
+				!(window as unknown as { __autosaveFixed?: boolean }).__autosaveFixed
+			)
+				throw new DOMException("broken", "UnknownError");
+			return get.call(this, key);
+		};
+	});
+}
+
+function fixAutosaveReads(page: Page) {
+	return page.evaluate(() => {
+		(window as unknown as { __autosaveFixed: boolean }).__autosaveFixed = true;
+	});
+}
+
+function storedSavedAt(page: Page): Promise<number | null> {
+	return page.evaluate(async () => {
+		const db = await new Promise<IDBDatabase>((resolve, reject) => {
+			const req = indexedDB.open("freshcoat");
+			req.onsuccess = () => resolve(req.result);
+			req.onerror = () => reject(req.error);
+		});
+		try {
+			const doc = await new Promise<{ savedAt: number } | undefined>(
+				(resolve, reject) => {
+					const req = db
+						.transaction("autosave")
+						.objectStore("autosave")
+						.get("current");
+					req.onsuccess = () => resolve(req.result);
+					req.onerror = () => reject(req.error);
+				},
+			);
+			return doc?.savedAt ?? null;
+		} finally {
+			db.close();
+		}
+	});
+}
+
+async function seedThenFailRead(page: Page): Promise<number> {
+	await openSample(page, "minimal");
+	await run(page, `c.select(["0/0"]); c.deleteSelection();`);
+	await expect.poll(() => storedSavedAt(page)).not.toBeNull();
+	const savedAt = (await storedSavedAt(page)) as number;
+
+	await breakAutosaveReads(page);
+	await openSample(page, "certificate");
+	const blocked = page
+		.getByRole("alertdialog")
+		.filter({ hasText: "Couldn't read autosave. New edits aren't autosaved." });
+	await expect(blocked).toBeVisible();
+	await blocked.getByRole("button", { name: "Dismiss" }).click();
+	await expect(blocked).toBeHidden();
+	await run(page, `c.select(["0/0"]); c.deleteSelection();`);
+	await expect(blocked).toBeVisible();
+	await fixAutosaveReads(page);
+	expect(await storedSavedAt(page)).toBe(savedAt);
+	return savedAt;
+}
+
+test("a failed autosave read keeps the old autosave and Retry offers it back", async ({
+	page,
+}) => {
+	const savedAt = await seedThenFailRead(page);
+	await page.getByRole("button", { name: "Retry" }).click();
+	await expect(
+		page.getByText("Couldn't read autosave. New edits aren't autosaved."),
+	).toBeHidden();
+	await expect(page.getByText(/^Unsaved work from /)).toBeVisible();
+	expect(await storedSavedAt(page)).toBe(savedAt);
+});
+
+test("discarding an autosave that failed to read starts autosaving again", async ({
+	page,
+}) => {
+	const savedAt = await seedThenFailRead(page);
+	await page.getByRole("button", { name: "Discard old autosave" }).click();
+	await expect(
+		page.getByText("Couldn't read autosave. New edits aren't autosaved."),
+	).toBeHidden();
+	await expect.poll(() => storedSavedAt(page)).toBeGreaterThan(savedAt);
+});

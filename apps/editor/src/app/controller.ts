@@ -140,8 +140,10 @@ import {
 	type Autosave,
 	clearAutosave,
 	configureAutosave,
+	discardAutosave,
 	flushAutosave,
 	keepAutosaveAsset,
+	rereadAutosave,
 	retryAutosave,
 	writeAutosave,
 } from "./autosave";
@@ -161,6 +163,50 @@ import { loadSvgImport } from "./svg";
 import type { SvgElements, svgToElements } from "./svg-import";
 
 let closeWriteFailed: (() => void) | undefined;
+let closeReadFailed: (() => void) | undefined;
+let offerRecovered: ((saved: Autosave) => void) | undefined;
+
+/** Sets how an autosave that Retry could read is offered back. */
+export function onAutosaveRecovered(
+	offer: (saved: Autosave) => void,
+): () => void {
+	offerRecovered = offer;
+	return () => {
+		if (offerRecovered === offer) offerRecovered = undefined;
+	};
+}
+
+function toastNewerAutosave(): void {
+	toast(AUTOSAVE_COPY.newer, { tone: "warning", timeout: 10000 });
+}
+
+function toastReadFailed(): void {
+	closeReadFailed?.();
+	closeReadFailed = toast(AUTOSAVE_COPY.readFailed, {
+		tone: "danger",
+		timeout: 0,
+		actions: [
+			{ label: AUTOSAVE_COPY.retry, onAction: () => void rereadFailed() },
+			{ label: AUTOSAVE_COPY.discard, onAction: () => void discardFailed() },
+		],
+	});
+}
+
+async function rereadFailed(): Promise<void> {
+	const read = await rereadAutosave();
+	if (read.status === "failed") toastReadFailed();
+	else if (read.status === "newer") toastNewerAutosave();
+	else if (read.status === "found") offerRecovered?.(read.autosave);
+}
+
+async function discardFailed(): Promise<void> {
+	try {
+		await discardAutosave();
+	} catch {
+		toast(AUTOSAVE_COPY.discardFailed, { tone: "danger" });
+		toastReadFailed();
+	}
+}
 
 configureAutosave({
 	onWriteFailed: () => {
@@ -179,10 +225,8 @@ configureAutosave({
 		closeWriteFailed = undefined;
 	},
 	onReadProblem: (problem) =>
-		toast(
-			problem === "newer" ? AUTOSAVE_COPY.newer : AUTOSAVE_COPY.readFailed,
-			{ tone: problem === "newer" ? "warning" : "danger", timeout: 10000 },
-		),
+		problem === "newer" ? toastNewerAutosave() : toastReadFailed(),
+	onWriteBlocked: toastReadFailed,
 	onStorageFull: () =>
 		toast("Storage full. Photos aren't autosaved.", {
 			tone: "warning",
