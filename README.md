@@ -46,10 +46,14 @@ and print workflows. If that sounds like your kind of work, see the
 
 ## Quick start
 
-From a terminal, install the command line and render a template:
+From a terminal, install the command line and render a template. To try it
+without a template of your own, download
+[`minimal-card.json`](packages/coatfile/fixtures/minimal-card.json) and pack
+it first:
 
 ```sh
 npm install --global @freshcoat-js/cli
+freshcoat pack minimal-card.json --out card.coat
 freshcoat render card.coat --set displayName="Alex" --out out
 freshcoat render card.coat --data people.csv --out cards.zip
 ```
@@ -157,6 +161,7 @@ Figma plugin bundles.
 
 - [Architecture](ARCHITECTURE.md): package responsibilities and host boundaries.
 - [Contributing](CONTRIBUTING.md): repository setup, checks and review conventions.
+- [Upgrading from 0.4](docs/migrating-to-0.5.md): what changed in 0.5 and how to move over.
 - [Upgrading from 0.3](docs/migrating-to-0.4.md): what changed in 0.4 and how to move over.
 - [Releases](docs/releases.md): npm publication and Figma release bundles.
 - [CLI](packages/cli/README.md), [Studio](apps/editor/README.md) and
