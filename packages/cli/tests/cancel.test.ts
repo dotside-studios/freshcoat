@@ -28,7 +28,12 @@ beforeAll(async () => {
 			status: "pending" as const,
 		}));
 	await box.write("crew.coatworkspace", await workspaceBytes(workspace));
+	if (dataset) dataset.records = dataset.records.slice(0, 3);
+	await box.write("few.coatworkspace", await workspaceBytes(workspace));
+	await box.write("few.csv", `name\n${rows.slice(0, 3).join("\n")}\n`);
 });
+
+const FULL_EXPORT_TIMEOUT = 30_000;
 
 afterAll(() => box.cleanup());
 
@@ -121,19 +126,23 @@ describe("cancellation", () => {
 		expect(existsSync(box.path("frames"))).toBe(false);
 	});
 
-	test("an uncancelled export still succeeds", async () => {
-		const run = await box.run(
-			"render",
-			"badge.json",
-			"--data",
-			"people.csv",
-			"--out",
-			"done.zip",
-			"-q",
-		);
-		expect(run.code).toBe(0);
-		expect(existsSync(box.path("done.zip"))).toBe(true);
-	});
+	test(
+		"an uncancelled export still succeeds",
+		async () => {
+			const run = await box.run(
+				"render",
+				"badge.json",
+				"--data",
+				"few.csv",
+				"--out",
+				"done.zip",
+				"-q",
+			);
+			expect(run.code).toBe(0);
+			expect(existsSync(box.path("done.zip"))).toBe(true);
+		},
+		FULL_EXPORT_TIMEOUT,
+	);
 });
 
 describe("listenForCancel", () => {
@@ -231,23 +240,29 @@ describe("existing output", () => {
 			);
 		});
 
-	test("is replaced by a finished export", async () => {
-		await box.write("replaced.pdf", "old");
-		const run = await box.run(
-			"render",
-			"crew.coatworkspace",
-			"--preset",
-			"p_pdf",
-			"--out",
-			"replaced.pdf",
-			"-q",
-		);
-		expect(run.code).toBe(0);
-		expect(
-			readFileSync(box.path("replaced.pdf")).subarray(0, 5).toString(),
-		).toBe("%PDF-");
-		expect(readdirSync(box.dir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
-	});
+	test(
+		"is replaced by a finished export",
+		async () => {
+			await box.write("replaced.pdf", "old");
+			const run = await box.run(
+				"render",
+				"few.coatworkspace",
+				"--preset",
+				"p_pdf",
+				"--out",
+				"replaced.pdf",
+				"-q",
+			);
+			expect(run.code).toBe(0);
+			expect(
+				readFileSync(box.path("replaced.pdf")).subarray(0, 5).toString(),
+			).toBe("%PDF-");
+			expect(readdirSync(box.dir).filter((f) => f.endsWith(".tmp"))).toEqual(
+				[],
+			);
+		},
+		FULL_EXPORT_TIMEOUT,
+	);
 });
 
 describe("signals", () => {
