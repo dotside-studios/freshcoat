@@ -54,7 +54,7 @@
     },
     "apps/figma-plugin": {
       "name": "@freshcoat-js/figma-plugin",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@create-figma-plugin/ui": "^4.0.3",
         "@create-figma-plugin/utilities": "^4.0.3",
@@ -75,7 +75,7 @@
     },
     "packages/cli": {
       "name": "@freshcoat-js/cli",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "bin": {
         "freshcoat": "./src/bin.ts",
       },
@@ -98,7 +98,7 @@
     },
     "packages/coatfile": {
       "name": "@freshcoat-js/coatfile",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@freshcoat-js/engine": "workspace:*",
         "@freshcoat-js/for-print": "workspace:*",
@@ -117,7 +117,7 @@
     },
     "packages/engine": {
       "name": "@freshcoat-js/engine",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "brotli": "^2.1.0",
         "canvaskit-wasm": "0.41.1",
@@ -132,7 +132,7 @@
     },
     "packages/for-print": {
       "name": "@freshcoat-js/for-print",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@freshcoat-js/engine": "workspace:*",
         "zod": "^4.1.13",
@@ -187,7 +187,7 @@
     },
     "packages/workspace": {
       "name": "@freshcoat-js/workspace",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@freshcoat-js/coatfile": "workspace:*",
         "@freshcoat-js/engine": "workspace:*",
