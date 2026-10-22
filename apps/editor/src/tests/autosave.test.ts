@@ -702,6 +702,34 @@ describe("autosave", () => {
 		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("next");
 	});
 
+	it("reports when writes start and stop being held back", async () => {
+		const db = freshDb();
+		await createAutosaveStore(db).write({
+			workspace: workspace([asset(1)]),
+			fileName: "old",
+		});
+		const onPausedChange = vi.fn();
+		const store = createAutosaveStore(db, { onPausedChange });
+		let fix = breakGets();
+		expect((await store.read()).status).toBe("failed");
+		expect((await store.reread()).status).toBe("failed");
+		expect(onPausedChange.mock.calls).toEqual([[true]]);
+		fix();
+		expect((await store.reread()).status).toBe("found");
+		expect(onPausedChange.mock.calls).toEqual([[true], [false]]);
+
+		fix = breakGets();
+		expect((await store.read()).status).toBe("failed");
+		fix();
+		await store.discard();
+		expect(onPausedChange.mock.calls).toEqual([
+			[true],
+			[false],
+			[true],
+			[false],
+		]);
+	});
+
 	it("refuses an autosave from a newer version and leaves it alone", async () => {
 		const db = freshDb();
 		const seed = createAutosaveStore(db);
@@ -716,8 +744,10 @@ describe("autosave", () => {
 		});
 		handle.close();
 
-		const store = createAutosaveStore(db);
+		const onPausedChange = vi.fn();
+		const store = createAutosaveStore(db, { onPausedChange });
 		expect((await store.read()).status).toBe("newer");
+		expect(onPausedChange).not.toHaveBeenCalled();
 		await store.write({ workspace: workspace([asset(2)]), fileName: "mine" });
 		await store.clear();
 		await store.discard();

@@ -134,6 +134,9 @@ export type AutosaveOptions = {
 	 *  couldn't be read, and not again until a read succeeds or `discard`
 	 *  runs. */
 	onWriteBlocked?: () => void;
+	/** Called when writes start or stop being held back because the stored
+	 *  autosave couldn't be read. */
+	onPausedChange?: (paused: boolean) => void;
 };
 
 export type AutosaveStore = {
@@ -486,8 +489,14 @@ export function createAutosaveStore(
 		opts.onWriteBlocked?.();
 	}
 
+	function block(next: "failed" | "newer" | null): void {
+		const was = blocked === "failed";
+		blocked = next;
+		if (was !== (next === "failed")) opts.onPausedChange?.(!was);
+	}
+
 	function unblock(): void {
-		blocked = null;
+		block(null);
 		heldEntry = null;
 		heldReported = false;
 	}
@@ -756,9 +765,10 @@ export function createAutosaveStore(
 				}
 				const version: unknown = v.version;
 				if (version !== 2 && version !== 3) {
-					blocked =
+					const status =
 						typeof version === "number" && version > 3 ? "newer" : "failed";
-					return { status: blocked };
+					block(status);
+					return { status };
 				}
 				let saved: StoredDataset[];
 				let missingDatasets = 0;
@@ -800,7 +810,7 @@ export function createAutosaveStore(
 				unblock();
 				return { status: "found", autosave: out };
 			} catch {
-				blocked = "failed";
+				block("failed");
 				await disconnect();
 				return { status: "failed" };
 			}
@@ -895,8 +905,29 @@ function store(): AutosaveStore {
 		onWriteFailed: (err) => sharedOptions.onWriteFailed?.(err),
 		onWriteRecovered: () => sharedOptions.onWriteRecovered?.(),
 		onWriteBlocked: () => sharedOptions.onWriteBlocked?.(),
+		onPausedChange: (next) => {
+			paused = next;
+			for (const fn of pausedListeners) fn();
+			sharedOptions.onPausedChange?.(next);
+		},
 	});
 	return shared;
+}
+
+let paused = false;
+const pausedListeners = new Set<() => void>();
+
+/** Whether the editor's autosave holds back writes because the stored one
+ *  couldn't be read. */
+export function autosavePaused(): boolean {
+	return paused;
+}
+
+export function subscribeAutosavePaused(fn: () => void): () => void {
+	pausedListeners.add(fn);
+	return () => {
+		pausedListeners.delete(fn);
+	};
 }
 
 export function writeAutosave(entry: Omit<Autosave, "savedAt">): Promise<void> {

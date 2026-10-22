@@ -324,3 +324,57 @@ test("discarding an autosave that failed to read starts autosaving again", async
 	).toBeHidden();
 	await expect.poll(() => storedSavedAt(page)).toBeGreaterThan(savedAt);
 });
+
+async function dismissToastsThenOpenPaused(page: Page) {
+	const savedAt = await seedThenFailRead(page);
+	const blocked = page
+		.getByRole("alertdialog")
+		.filter({ hasText: "Couldn't read autosave. New edits aren't autosaved." });
+	await blocked.getByRole("button", { name: "Dismiss" }).click();
+	await expect(blocked).toBeHidden();
+	await run(page, `c.select(["0/0"]); c.deleteSelection();`);
+	await page.waitForTimeout(1500);
+	await expect(blocked).toBeHidden();
+	await page.getByRole("button", { name: "Autosave paused" }).click();
+	const popover = page.getByRole("dialog", { name: "Autosave paused" });
+	await expect(popover).toBeVisible();
+	return { savedAt, popover };
+}
+
+test("the paused indicator offers Retry after the toasts are dismissed", async ({
+	page,
+}) => {
+	const { savedAt, popover } = await dismissToastsThenOpenPaused(page);
+	await popover.getByRole("button", { name: "Retry" }).click();
+	await expect(page.getByText(/^Unsaved work from /)).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "Autosave paused" }),
+	).toBeHidden();
+	expect(await storedSavedAt(page)).toBe(savedAt);
+});
+
+test("the paused indicator offers Discard after the toasts are dismissed", async ({
+	page,
+}) => {
+	const { savedAt, popover } = await dismissToastsThenOpenPaused(page);
+	await popover.getByRole("button", { name: "Discard old autosave" }).click();
+	await expect(
+		page.getByRole("button", { name: "Autosave paused" }),
+	).toBeHidden();
+	await expect.poll(() => storedSavedAt(page)).toBeGreaterThan(savedAt);
+});
+
+test("leaving warns while autosave is paused and edits are unsaved", async ({
+	page,
+}) => {
+	await seedThenFailRead(page);
+	await expect(
+		page.getByRole("button", { name: "Autosave paused" }),
+	).toBeVisible();
+	const warns = await page.evaluate(() => {
+		const event = new Event("beforeunload", { cancelable: true });
+		window.dispatchEvent(event);
+		return event.defaultPrevented;
+	});
+	expect(warns).toBe(true);
+});

@@ -305,4 +305,6 @@ export const AUTOSAVE_COPY = {
 	discard: "Discard old autosave",
 	discardFailed: "Couldn't discard autosave",
 	newer: "Autosave is from a newer version of Studio",
+	paused: "Autosave paused",
+	pausedDetail: "Couldn't read the old autosave. New edits aren't autosaved.",
 } as const;
