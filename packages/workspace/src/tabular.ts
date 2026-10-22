@@ -569,11 +569,10 @@ function delimited(
 		text.includes(separator) || /["\r\n]/.test(text)
 			? `"${text.replace(/"/g, '""')}"`
 			: text;
-	const guard = (text: string, column: Column, value: CellValue | undefined) =>
+	const guard = (text: string, value: CellValue | undefined) =>
 		escapeFormulas &&
 		typeof value !== "number" &&
-		(ESCAPED_FORMULA.test(text) ||
-			(column.type !== "image" && FORMULA_TRIGGER.test(text)))
+		(ESCAPED_FORMULA.test(text) || FORMULA_TRIGGER.test(text))
 			? `'${text}`
 			: text;
 	const lines = [
@@ -582,7 +581,7 @@ function delimited(
 			dataset.columns
 				.map((c) => {
 					const value = record.values[c.key];
-					return quote(guard(exportText(dataset, c, value), c, value));
+					return quote(guard(exportText(dataset, c, value), value));
 				})
 				.join(separator),
 		),
@@ -642,12 +641,12 @@ async function workbookBytes(
 /**
  * The dataset as a file. The header row is the column keys.
  *
- * In CSV and TSV, text cells starting with `=`, `+`, `-`, `@`, tab or CR get a
- * leading `'` so spreadsheets do not run them as formulas, and so do text
+ * In CSV and TSV, text and image cells starting with `=`, `+`, `-`, `@`, tab or
+ * CR get a leading `'` so spreadsheets do not run them as formulas, and so do
  * cells starting with `'` and then one of those, so the escape can be undone.
- * Numbers and image cells, which hold file names, are left alone, apart from
- * that second rule. `readTable` drops one leading `'` from a cell that starts
- * with `'` and a trigger, so the file reads back as written. Set
+ * Numbers are left alone. `readTable` drops one leading `'` from a cell that
+ * starts with `'` and a trigger, so the file reads back as written, an image
+ * named `-front.png` included. Set
  * `escapeFormulas: false` for machine consumers.
  */
 export async function writeTable(

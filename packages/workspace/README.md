@@ -66,10 +66,11 @@ and numbers alike.
 
 ### Formula escaping
 
-`writeTable()` puts a `'` before a CSV or TSV text cell that starts with `=`,
-`+`, `-`, `@`, a tab or a carriage return, so a spreadsheet does not run it as
-a formula. A cell that starts with `'` and then one of those gets one more
-`'`. Numbers are left alone, and so are image cells, which hold file names.
+`writeTable()` puts a `'` before a CSV or TSV text or image cell that starts
+with `=`, `+`, `-`, `@`, a tab or a carriage return, so a spreadsheet does not
+run it as a formula. A cell that starts with `'` and then one of those gets one
+more `'`. Numbers are left alone. An image named `-front.png` is written as
+`'-front.png` and reads back as `-front.png`.
 Text that looks like a number gets the prefix: a phone number such as
 `+63 912 345 6789` or a signed amount such as `-1,200.00` stored as text shows
 as `'+63 912 345 6789` in a spreadsheet. Pass `escapeFormulas: false` to

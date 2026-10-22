@@ -221,9 +221,9 @@ differ:
 - Cut lines stroke in overprinting `/Separation` spots (`CutContour`,
   `KissCut`, `Crease`, `Perfcut`) instead of DeviceRGB. They look the
   same; `cutSpots` or `--cut-spot` renames the spots.
-- CSV and TSV text cells starting with `=`, `+`, `-`, `@`, a tab or a
-  carriage return get a leading `'`, and so do cells starting with `'` and
-  then one of those. Image cells are left alone. Phone numbers and signed
+- CSV and TSV text and image cells starting with `=`, `+`, `-`, `@`, a tab
+  or a carriage return get a leading `'`, and so do cells starting with `'`
+  and then one of those. Phone numbers and signed
   amounts stored as text, such as `+63 912 345 6789` or `-1,200.00`, show the
   `'` in a spreadsheet. Machine consumers can pass `escapeFormulas: false` to
   `writeTable`; Studio always escapes. `readTable` drops the first `'` from a

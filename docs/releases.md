@@ -192,10 +192,10 @@ in the renderer or the importer.
 #### Output
 
 - **CSV and TSV export escape formula triggers (output change).** `writeTable`
-  prefixes `'` to a text cell that starts with `=`, `+`, `-`, `@`, a tab or a
-  carriage return, so a spreadsheet does not run it as a formula, and to one
-  that starts with `'` and then a trigger. Number values and image cells are
-  left alone. Phone numbers and signed amounts stored as text, such as
+  prefixes `'` to a text or image cell that starts with `=`, `+`, `-`, `@`, a
+  tab or a carriage return, so a spreadsheet does not run it as a formula, and
+  to one that starts with `'` and then a trigger. Number values are left
+  alone. Phone numbers and signed amounts stored as text, such as
   `+63 912 345 6789` or `-1,200.00`, show the `'` in a spreadsheet.
   `writeTable(dataset, format, { escapeFormulas: false })` writes them as
   before. `readTable` drops the first `'` from a CSV or TSV cell that starts
