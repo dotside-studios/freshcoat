@@ -96,8 +96,10 @@ export class TableLimitError extends TabularError {
 		fileName: string,
 	) {
 		const { label, size } = LIMIT_LABELS[limit];
+		const exact =
+			size && actual !== undefined && sizeText(actual) === sizeText(max);
 		const show = (n: number) =>
-			size ? sizeText(n) : `${n.toLocaleString("en-US")} ${label}`;
+			size && !exact ? sizeText(n) : `${n.toLocaleString("en-US")} ${label}`;
 		super(
 			"limit_exceeded",
 			`${fileName} is too large to import: ${actual === undefined ? "it" : show(actual)} is over the limit of ${show(max)}`,
@@ -134,17 +136,39 @@ function extensionOf(fileName: string): string {
 	return dot === -1 ? "" : fileName.slice(dot + 1).toLowerCase();
 }
 
+/** The longest string V8 makes, the limit on text in Node and Chromium. */
+export const MAX_TEXT_LENGTH = 0x1fffffe8;
+
+function isTooLong(err: unknown): boolean {
+	return (
+		err instanceof RangeError ||
+		(err as { code?: string } | null)?.code === "ERR_STRING_TOO_LONG"
+	);
+}
+
 // A file saved by Excel on Windows is often not UTF-8; reading it as UTF-8
-// would turn every accented letter into a replacement character.
-function decodeText(input: Uint8Array | string): string {
+// would turn every accented letter into a replacement character. Text longer
+// than a string can be makes Node throw and Chromium return "", so both call
+// `tooLong`; only a lone byte order mark decodes to "" otherwise.
+function decodeText(input: Uint8Array | string, tooLong: () => never): string {
 	let text: string;
 	if (typeof input === "string") text = input;
 	else {
+		const decode = (label: string, fatal: boolean) => {
+			try {
+				return new TextDecoder(label, { fatal }).decode(input);
+			} catch (err) {
+				if (isTooLong(err)) tooLong();
+				throw err;
+			}
+		};
 		try {
-			text = new TextDecoder("utf-8", { fatal: true }).decode(input);
-		} catch {
-			text = new TextDecoder("windows-1252").decode(input);
+			text = decode("utf-8", true);
+		} catch (err) {
+			if (err instanceof TableLimitError) throw err;
+			text = decode("windows-1252", false);
 		}
+		if (text === "" && input.length > 3) tooLong();
 	}
 	return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
@@ -366,17 +390,24 @@ export async function readTable(
 	}
 	const ext = extensionOf(fileName);
 	const base = fileName.replace(/\.[^.]*$/, "") || "Sheet1";
+	const tooLong = () => fail("bytes", input.length, MAX_TEXT_LENGTH);
 	let sheets: TableSheet[];
 	if (ext === "json") {
 		sheets = [
-			{ name: base, rows: readJson(decodeText(input), limits, failShape) },
+			{
+				name: base,
+				rows: readJson(decodeText(input, tooLong), limits, failShape),
+			},
 		];
 	} else if (ext === "ndjson" || ext === "jsonl") {
 		sheets = [
-			{ name: base, rows: readNdjson(decodeText(input), limits, failShape) },
+			{
+				name: base,
+				rows: readNdjson(decodeText(input, tooLong), limits, failShape),
+			},
 		];
 	} else if (TEXT_FORMATS.has(ext)) {
-		const text = decodeText(input);
+		const text = decodeText(input, tooLong);
 		sheets =
 			text.trim() === ""
 				? []

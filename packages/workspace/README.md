@@ -96,9 +96,12 @@ reach it.
 Memory follows cells more than records. A CSV runs about 11 bytes a cell, its
 parsed rows about 60 and a dataset held in Studio about 30, so the defaults
 keep a 10,000,000-cell import near 2 GB in a browser tab, with room for an
-export. A workbook takes two to three times a CSV's memory to read. Text over
-about 512 MB cannot be read at all in a browser or Node, whatever the limits,
-as it is longer than a JavaScript string can be.
+export. A workbook takes two to three times a CSV's memory to read.
+
+Text longer than a JavaScript string can be, about 512 MB in Node and
+Chromium, cannot be read whatever the limits. `readTable()` refuses it with a
+`bytes` limit error whose `max` is `MAX_TEXT_LENGTH`, where Node would throw
+`ERR_STRING_TOO_LONG` and Chromium would decode it to nothing. Bun reads it.
 
 ## The shape of a workspace
 

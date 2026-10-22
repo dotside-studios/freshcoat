@@ -177,7 +177,8 @@ size and cell limits in proportion, so `--max-rows 1000000` takes a file of
 twice the default size and cells; `0` lifts all three. The column limit stays.
 Memory grows with cells: a 500,000 by 20 file peaks near 2 GB while it is read,
 and a workbook takes two to three times a CSV's memory. Under Node a text file
-over about 512 MB cannot be read, whatever the limits.
+over about 512 MB is refused with a size limit message whatever the limits, as
+it is longer than a JavaScript string can be.
 
 `--where` keeps the rows that match, by field key, as for a workspace below.
 

@@ -1,8 +1,9 @@
 import { zipSync } from "fflate";
 import { writeXlsx } from "hucre/xlsx";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	DEFAULT_TABLE_LIMITS,
+	MAX_TEXT_LENGTH,
 	readTable,
 	TableLimitError,
 	TabularError,
@@ -38,6 +39,17 @@ describe("readTable: limits", () => {
 		expect(err).toMatchObject({ limit: "bytes", actual: 1001, max: 1000 });
 		expect(err.message).toBe(
 			"big.csv is too large to import: 1,001 bytes is over the limit of 1,000 bytes",
+		);
+	});
+
+	it("shows exact sizes when they round to the same megabytes", async () => {
+		const err = await limitOf(
+			readTable(new Uint8Array(2_000_001), "big.csv", {
+				limits: { maxBytes: 2_000_000 },
+			}),
+		);
+		expect(err.message).toBe(
+			"big.csv is too large to import: 2,000,001 bytes is over the limit of 2,000,000 bytes",
 		);
 	});
 
@@ -204,6 +216,57 @@ describe("readTable: limits", () => {
 			}),
 		);
 		expect(err.limit).toBe("rows");
+	});
+});
+
+describe("readTable: text longer than a string can be", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	const decoder = (decode: () => string) =>
+		vi.stubGlobal(
+			"TextDecoder",
+			class {
+				decode = decode;
+			},
+		);
+
+	it("reports Node's string length error as a limit", async () => {
+		decoder(() => {
+			throw Object.assign(new Error("Cannot create a string longer"), {
+				code: "ERR_STRING_TOO_LONG",
+			});
+		});
+		const err = await limitOf(readTable(new Uint8Array(100), "huge.csv"));
+		expect(err).toMatchObject({
+			limit: "bytes",
+			actual: 100,
+			max: MAX_TEXT_LENGTH,
+		});
+		expect(err.message).toBe(
+			"huge.csv is too large to import: 100 bytes is over the limit of 512.0 MB",
+		);
+	});
+
+	it("reports Chromium's empty decode as a limit, not an empty file", async () => {
+		decoder(() => "");
+		for (const name of ["huge.csv", "huge.json", "huge.ndjson"]) {
+			const err = await limitOf(readTable(new Uint8Array(100), name));
+			expect(err.limit).toBe("bytes");
+		}
+	});
+
+	it("still calls a file with only a byte order mark empty", async () => {
+		const err = await caught(
+			readTable(new Uint8Array([0xef, 0xbb, 0xbf]), "bom.csv"),
+		);
+		expect(err).toMatchObject({ code: "empty_file" });
+	});
+
+	it("still falls back to windows-1252 for text that is not UTF-8", async () => {
+		const { sheets } = await readTable(new Uint8Array([0x61, 0xe9]), "x.csv");
+		expect(sheets[0]?.rows).toEqual([["aé"]]);
 	});
 });
 

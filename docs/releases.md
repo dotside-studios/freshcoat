@@ -63,7 +63,9 @@ These land in the next release's notes.
   per file, sized from measured peak memory (about 2 GB in a browser tab at
   the cell limit). Limit messages say records. Studio's import wizard states
   the limits, and `render --data` takes `--max-rows <n>`, which raises the
-  file size and cell limits in proportion, or lifts them with `0`.
+  file size and cell limits in proportion, or lifts them with `0`. Text too
+  long for a JavaScript string, about 512 MB in Node and Chromium, is refused
+  with a size limit error rather than a raw Node error or Studio's "is empty".
 - **CLI parity with Studio.** `render` takes `--orientation`, `--size-from`
   and `--max-edge` (Studio's Match image) and `--no-analyze`, writing the
   preset fields Studio writes; `--print-target` takes for-print's target ids,
