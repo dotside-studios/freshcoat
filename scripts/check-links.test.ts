@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { checkLinks, slugOf } from "./check-links.ts";
+import { checkLinks, checkSubpaths, slugOf } from "./check-links.ts";
 
 let root: string;
 
@@ -83,5 +83,38 @@ describe("check-links", () => {
 
 	test("every relative link in Freshcoat's own docs resolves", () => {
 		expect(checkLinks(join(import.meta.dir, ".."))).toEqual([]);
+	});
+
+	test("reports a package subpath missing from exports, except in history docs", () => {
+		write(
+			"packages/kit/package.json",
+			JSON.stringify({
+				name: "@freshcoat-js/kit",
+				exports: { ".": "./a.ts", "./render": "./r.ts", "./schema/*": "./s/*" },
+			}),
+		);
+		write(
+			"docs/usage.md",
+			'`@freshcoat-js/kit/render`, `@freshcoat-js/kit/schema/v1.json`.\n\n```ts\nimport { x } from "@freshcoat-js/kit/normalize";\n```\n',
+		);
+		write("docs/releases.md", "Removed `@freshcoat-js/kit/normalize`.\n");
+		try {
+			expect(checkSubpaths(root)).toEqual([
+				{
+					file: join("docs", "usage.md"),
+					line: 4,
+					target: "@freshcoat-js/kit/normalize",
+					reason: "not in @freshcoat-js/kit exports",
+				},
+			]);
+		} finally {
+			rmSync(join(root, "packages"), { recursive: true });
+			rmSync(join(root, "docs/usage.md"));
+			rmSync(join(root, "docs/releases.md"));
+		}
+	});
+
+	test("every package subpath in Freshcoat's own docs is exported", () => {
+		expect(checkSubpaths(join(import.meta.dir, ".."))).toEqual([]);
 	});
 });
