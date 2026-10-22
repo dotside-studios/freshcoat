@@ -1,10 +1,10 @@
 # Migrating to 0.5
 
-0.5 hardens Freshcoat for templates, fonts, images and spreadsheets it did not
-write. Loaders refuse unsafe URL schemes, and decoders and importers refuse
-input over new size limits. Coatfile throws one typed error, and the engine
-and coatfile package roots export only their documented API. Every change
-is listed in the [release notes](releases.md#unreleased-changes).
+In 0.5, loaders refuse unsafe URL schemes, and the image, font and
+spreadsheet readers refuse input over new size limits. Coatfile throws one
+typed error, and the engine and coatfile package roots export only their
+documented API. The [release notes](releases.md#unreleased-changes) list
+every change.
 
 ## Replacements
 
@@ -127,8 +127,8 @@ gives the full list for your code.
 
 ## Limits
 
-Each limit refuses input that would otherwise exhaust memory. Raise a limit
-for input you trust. A value of `Number.POSITIVE_INFINITY` lifts it.
+Each limit stops input that would exhaust memory. Raise one only for input
+you trust; `Number.POSITIVE_INFINITY` lifts it.
 
 ### Images
 
@@ -139,15 +139,15 @@ const renderer = await createRenderer({ ck, maxImageDecodePixels: 400_000_000 })
 An image over the limit, or one whose header size cannot be read, paints a
 placeholder and reports `image_load_failed`. The header reader handles PNG,
 JPEG, GIF, WebP, BMP, ICO and CUR, WBMP and AVIF; HEIF is refused. Studio, the
-CLI and `exportWorkspace`'s worker pools use the default. Each image needs
-about 4 bytes per pixel of CanvasKit's 2 GiB heap, so raise the limit with
-care.
+CLI and `exportWorkspace`'s worker pools use the default. A decoded image
+takes 4 bytes per pixel of CanvasKit's 2 GiB heap, so one image at 400,000,000
+pixels needs about 1.6 GB.
 
 ### Fonts
 
 WOFF and WOFF2 fonts that would unpack to more than 128 MiB, or whose table
 lengths do not match, are refused with `font_load_failed`. This limit is
-fixed. Convert such a font to TTF or OTF to load it.
+fixed; convert such a font to TTF or OTF to load it.
 
 ### Spreadsheets
 
@@ -191,47 +191,49 @@ lifts all four. Columns and zip entries keep their limits.
 
 `--max-pdf-pages` defaults to 2000. **A job that wrote a larger PDF in 0.4 now
 exits 1 with no output.** Pass a higher limit or `--max-pdf-pages 0` to restore
-the old behaviour. Every page is held in memory until the PDF is built, so a
-very large PDF can still run out of memory. Splitting it with `--where` avoids
-that.
+the old behaviour. The CLI holds every page in memory until it builds the
+PDF, so a very large one can still run out of memory; split it with `--where`
+instead.
 
-Scripts that check exit codes should know that Ctrl-C now exits 130, SIGTERM
-exits 143, and a cancelled export removes its partial file.
+For scripts that check exit codes: Ctrl-C now exits 130 and SIGTERM 143, and
+a cancelled export removes its partial file.
 
 ## Templates
 
-- **Format version.** `format_version` is `MAJOR` or `MAJOR.MINOR`. Rewrite
-  `"1.7.0"` or `"1.7-beta"` as `"1.7"`; otherwise the file is
-  `unsupported_format_version`.
-- **Field patterns.** A `pattern` over 512 characters, with nested repetition
-  such as `(a+)+` or `^(\d+,)*\d+$`, or with a backreference fails `validate`
-  with `unsafe_field_pattern`. Rewrite it without a repeated group that
-  itself repeats, or check the value in your own code. At render time such a
-  pattern imposes no constraint.
-- **Prototype names.** `{{constructor}}`, `{{toString}}` and `{{__proto__}}`
-  render empty unless the values hold them as their own keys, and
-  `required: ["constructor"]` is no longer met by an empty record.
-- **Schema `$id`.** Generated schemas use the unversioned URL
-  `https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile/schema/coatfile.v1.schema.json`.
-  A `$schema` pinned to `@0.4.0` keeps working.
+`format_version` must be `MAJOR` or `MAJOR.MINOR`. A file with `"1.7.0"` or
+`"1.7-beta"` is `unsupported_format_version`; write `"1.7"`.
+
+A field `pattern` fails `validate` with `unsafe_field_pattern` when it is over
+512 characters, repeats a group that already repeats (`(a+)+`,
+`^(\d+,)*\d+$`) or uses a backreference. Rewrite it without the nested
+repetition, or check the value in your own code. At render time such a pattern
+imposes no constraint.
+
+`{{constructor}}`, `{{toString}}` and `{{__proto__}}` render empty unless the
+values have them as their own keys, and an empty record no longer meets
+`required: ["constructor"]`.
+
+Generated schemas have the unversioned `$id`
+`https://cdn.jsdelivr.net/npm/@freshcoat-js/coatfile/schema/coatfile.v1.schema.json`.
+A `$schema` pinned to `@0.4.0` keeps working.
 
 ## Output that changes
 
-There is nothing to migrate in code, but goldens and byte comparisons change:
+These need no code changes. Goldens and byte comparisons will differ.
 
-- **PDF.** Non-ASCII text strings are UTF-16BE, where they used to be `?`. The
+- PDF text strings that are not ASCII are UTF-16BE; they used to be `?`. The
   trailer has an `/ID`, and every PDF declares an sRGB output intent unless
-  `outputIntent: false` is passed (`--no-output-intent` in the CLI). Fix
+  you pass `outputIntent: false` (`--no-output-intent` in the CLI). Fix
   `date` to keep the bytes repeatable.
-- **Restricted fonts.** A font whose OS/2 `fsType` forbids embedding or
-  subsetting is drawn as outlines in vector PDFs, with
-  `font_embedding_restricted`. Its text cannot be selected or searched. No
-  option embeds it anyway, because the font's licence forbids it.
-- **Cut lines.** Cut lines stroke in overprinting `/Separation` spots
-  (`CutContour`, `KissCut`, `Crease`, `Perfcut`) instead of DeviceRGB. They
-  look the same. Rename the spots with `cutSpots` or `--cut-spot`.
-- **CSV and TSV.** Cells starting with `=`, `+`, `-`, `@`, a tab or a carriage
-  return get a leading `'`. Pass `escapeFormulas: false` to `writeTable` for
-  machine consumers. Studio always escapes.
-- **Figma.** A layer with several blurs of one kind keeps the first visible
+- A font whose OS/2 `fsType` forbids embedding or subsetting is drawn as
+  outlines in vector PDFs, with `font_embedding_restricted`, and its text
+  cannot be selected or searched. There is no option to embed it, since its
+  licence forbids that.
+- Cut lines stroke in overprinting `/Separation` spots (`CutContour`,
+  `KissCut`, `Crease`, `Perfcut`) where they used DeviceRGB. They look the
+  same; `cutSpots` or `--cut-spot` renames the spots.
+- CSV and TSV cells starting with `=`, `+`, `-`, `@`, a tab or a carriage
+  return get a leading `'`. Machine consumers can pass `escapeFormulas: false`
+  to `writeTable`; Studio always escapes.
+- In Figma, a layer with several blurs of one kind keeps the first visible
   one and warns with `duplicate_blur_dropped`.

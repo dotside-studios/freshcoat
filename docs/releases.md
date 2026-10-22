@@ -21,9 +21,9 @@ untrusted templates? See [safer defaults](security-defaults.md).
 
 These land in the next release's notes. Entries marked **(breaking)** need a
 code or command change; entries marked **(output change)** change the bytes or
-pixels Freshcoat writes for the same input. See
-[migrating to 0.5](migrating-to-0.5.md) for each one and how to keep the old
-behaviour where that is possible.
+pixels Freshcoat writes for the same input.
+[Migrating to 0.5](migrating-to-0.5.md) covers each one, and how to keep the
+old behaviour where that is possible.
 
 ### SDK users
 
@@ -150,8 +150,8 @@ behaviour where that is possible.
 
 #### New limits
 
-These are new in 0.5. Each one refuses the input instead of exhausting memory
-in the renderer or the importer.
+All of these are new in 0.5. Each refuses input that would exhaust memory in
+the renderer or the importer.
 
 - **Image decode cap (breaking).** An image whose width times height is over
   `RendererOptions.maxImageDecodePixels`, default 200,000,000
@@ -314,13 +314,13 @@ The engine and workspace also add:
   proxy that adds its own CSP must allow at least what
   [`apps/editor/server.ts`](../apps/editor/server.ts) sends, including
   `'wasm-unsafe-eval'` and, on scripts, `'unsafe-eval'`.
-- **Autosave never loses or hides a failure.** A failed write shows a
+- **Autosave failures are shown.** A failed write shows a
   persistent "Couldn't autosave" toast with Retry. An autosave that cannot be
   read, or that a newer Studio wrote, is never overwritten. Pending changes are
   saved when the tab is hidden or closed.
 - **Faster large exports.** The Export tab no longer re-renders settings,
-  checks and records on each finished item, and a 200,000-record dataset
-  lists in about a third of the time.
+  checks and records each time an item finishes, and the records list of a
+  200,000-record dataset renders in about 330 ms.
 - **Import limits** are stated in the import wizard, and an oversized file is
   refused before it is read.
 - **New:** a Print tab, settings popovers and reworked Data and Export panels;
@@ -334,8 +334,8 @@ The engine and workspace also add:
 - **Visible blur preferred (output change).** When a layer has more than one
   layer blur or background blur, the plugin keeps the first visible one of
   each kind (the first hidden one only when none is visible) and warns with
-  `duplicate_blur_dropped` for the rest. It used to keep the first, hidden or
-  not, without a word.
+  `duplicate_blur_dropped` for the rest. It used to keep the first one, hidden
+  or not, and say nothing.
 - **New mappings:** text strokes (`text_stroke_flattened` when rasterized),
   `hidden` layers a variant shows, per-side strokes, `effects`, monotone noise
   as grain (`noise_approximated`) and styled QR codes.
