@@ -31,4 +31,14 @@ describe("parseSymbology", () => {
 		expect(parseSymbology("")).toBeUndefined();
 		expect(parseSymbology("code 93")).toBeUndefined();
 	});
+
+	test("ignores Object.prototype keys", () => {
+		for (const name of [
+			"constructor",
+			"toString",
+			"__proto__",
+			"hasOwnProperty",
+		])
+			expect(parseSymbology(name)).toBeUndefined();
+	});
 });
