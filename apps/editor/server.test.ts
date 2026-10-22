@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, spyOn } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -136,6 +136,23 @@ describe("path handling", () => {
 		expect((await get("/")).status).toBe(200);
 	});
 
+	it("returns 404 with security headers for a NUL or control character", async () => {
+		for (const path of [
+			"/foo%00bar",
+			"/assets/a%00.js",
+			"/foo%0abar",
+			"/x%7f",
+		]) {
+			const res = await get(path);
+			expect(res.status).toBe(404);
+			expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+			expect(res.headers.get("content-security-policy")).toContain(
+				"frame-ancestors 'none'",
+			);
+		}
+		expect(resolveAsset(dist, "/foo%00bar")).toBeNull();
+	});
+
 	it("does not serve dotfiles", async () => {
 		for (const path of ["/.env", "/.git/config", "/%2eenv", "/assets/.hidden"])
 			expect((await get(path)).status).toBe(404);
@@ -188,6 +205,24 @@ describe("security headers", () => {
 			expect(res.headers.get("content-security-policy")).toContain(
 				"frame-ancestors 'none'",
 			);
+		}
+	});
+
+	it("are set on a 500 when the handler throws", async () => {
+		const log = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const res = await handle({ method: "GET", url: "not a url" } as Request);
+			expect(res.status).toBe(500);
+			expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+			expect(res.headers.get("x-frame-options")).toBe("DENY");
+			expect(res.headers.get("content-security-policy")).toContain(
+				"frame-ancestors 'none'",
+			);
+			expect(log).toHaveBeenCalledTimes(1);
+			expect(log.mock.calls[0]).toHaveLength(1);
+			expect(log.mock.calls[0]?.[0]).not.toContain("\n");
+		} finally {
+			log.mockRestore();
 		}
 	});
 

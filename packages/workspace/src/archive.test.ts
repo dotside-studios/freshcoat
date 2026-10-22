@@ -680,6 +680,24 @@ describe("packWorkspace", () => {
 		expect(kept).toEqual(cut);
 	});
 
+	it("reads a cut spot PDF reserves as the default name, with a warning", async () => {
+		const cut: ExportPreset = {
+			...(ws.presets[0] as ExportPreset),
+			id: "p_cut",
+			name: "Die",
+			cutSpots: { through: "All", kiss: "none", score: "Crease" },
+		};
+		const result = await unpackWorkspace(
+			await packWorkspace({ ...ws, presets: [...ws.presets, cut] }),
+		);
+		if (!result.ok) throw new Error("did not open");
+		expect(result.workspace.presets[1]?.cutSpots).toEqual({ score: "Crease" });
+		expect(result.warnings).toEqual([
+			'Die: the through cut spot "All" is reserved by PDF; it uses CutContour',
+			'Die: the kiss cut spot "none" is reserved by PDF; it uses KissCut',
+		]);
+	});
+
 	it("keeps how a preset draws PDF text and reads an older preset as embedding it", async () => {
 		const outlined: ExportPreset = {
 			...(ws.presets[0] as ExportPreset),

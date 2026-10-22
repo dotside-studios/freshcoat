@@ -93,6 +93,7 @@ export {
 	DEFAULT_CUT_SPOTS,
 	type ItemCuts,
 	type ItemCutsOptions,
+	isReservedSpotName,
 	itemCuts,
 } from "./cut";
 export { cutDxf, DXF_CHORD_TOLERANCE_MM } from "./cut-dxf";

@@ -323,14 +323,33 @@ describe("writeTable", () => {
 			expect(csv[1]).toBe("'-5,,,,,,'+3");
 		});
 
-		it("leaves image cells alone", async () => {
+		it("escapes an image cell's file name", async () => {
 			const data = {
 				...withValues({ photo: `ws:${dataset.assets[0]?.sha256}` }),
 				assets: [
 					{ ...(dataset.assets[0] as DatasetAsset), name: "-front.png" },
 				],
 			};
-			expect((await body(data, "csv"))[1]).toBe(",,,-front.png,,,");
+			expect((await body(data, "csv"))[1]).toBe(",,,'-front.png,,,");
+		});
+
+		it("escapes a formula in an image cell with no asset", async () => {
+			const hyperlink = '=HYPERLINK("http://evil.example","x")';
+			const csv = await body(withValues({ photo: hyperlink }), "csv");
+			expect(csv[1]).toBe(`,,,"'=HYPERLINK(""http://evil.example"",""x"")",,,`);
+			const tsv = await body(withValues({ photo: "@SUM(1+1)" }), "tsv");
+			expect(tsv[1]).toBe("\t\t\t'@SUM(1+1)\t\t\t");
+		});
+
+		it("reads image cells back as written", async () => {
+			const values = ['=HYPERLINK("http://evil.example","x")', "@SUM(1+1)"];
+			for (const format of ["csv", "tsv"] as const) {
+				for (const photo of values) {
+					const out = await writeTable(withValues({ photo }), format);
+					const { sheets } = await readTable(out.bytes, `x.${format}`);
+					expect(sheets[0]?.rows[1]?.[3], `${format}: ${photo}`).toBe(photo);
+				}
+			}
 		});
 
 		it("doubles a quote before a trigger, in image cells too", async () => {

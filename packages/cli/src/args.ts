@@ -2,6 +2,7 @@ import {
 	CUT_KINDS,
 	type CutKind,
 	type CutSpots,
+	isReservedSpotName,
 	MAX_BACK_OFFSET_MM,
 	PAPER_SIZES_MM,
 	type PaperName,
@@ -43,6 +44,10 @@ export function collectCutSpot(
 			`Expected through, kiss, score or perforate before =, got "${kind}".`,
 		);
 	if (!name) throw new ArgumentError("Expected a spot colour name.");
+	if (isReservedSpotName(name))
+		throw new ArgumentError(
+			`"${name}" is reserved by PDF for every or no plate; name the cut spot something else.`,
+		);
 	return { ...previous, [kind]: name };
 }
 

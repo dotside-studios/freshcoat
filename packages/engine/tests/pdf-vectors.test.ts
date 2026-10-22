@@ -11,6 +11,7 @@ import {
 	createFrame,
 	createGroup,
 	createImage,
+	createMask,
 	createPath,
 	createRect,
 	createText,
@@ -491,6 +492,49 @@ describe("spot colours", () => {
 				paint: "stroke",
 			},
 			{ kind: "vector_rasterized", feature: "shadow", layer: "plain" },
+		]);
+		expect(latin1(pdf.bytes)).not.toContain("/Separation");
+	});
+
+	test("a spot inside a mask warns that its spot is lost", async () => {
+		const gold = { name: "Gold Foil", tint: 1, overprint: false };
+		const pdf = await renderer.renderPdf(
+			frame([
+				createMask(
+					createRect({
+						id: "matte",
+						pos: { x: 10, y: 10 },
+						size: { width: 40, height: 40 },
+						fills: [{ kind: "solid", color: "#fff", spot: gold }],
+					}),
+					[
+						createRect({
+							id: "foil",
+							pos: { x: 10, y: 10 },
+							size: { width: 40, height: 40 },
+							fills: [{ kind: "solid", color: "#d4af37", spot: gold }],
+						}),
+					],
+					{ id: "masked", channel: "luminance" },
+				),
+			]),
+			{ width: W, height: H },
+		);
+		expect(pdf.warnings).toEqual([
+			{
+				kind: "spot_rasterized",
+				feature: "mask",
+				layer: "foil",
+				spot: "Gold Foil",
+				paint: "fill",
+			},
+			{
+				kind: "spot_rasterized",
+				feature: "mask",
+				layer: "matte",
+				spot: "Gold Foil",
+				paint: "fill",
+			},
 		]);
 		expect(latin1(pdf.bytes)).not.toContain("/Separation");
 	});

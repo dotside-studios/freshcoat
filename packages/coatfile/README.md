@@ -1243,8 +1243,13 @@ Patterns are checked before they compile, so a pattern cannot stall validation:
 - A pattern that repeats a group whose alternatives may overlap, such as
   `(a|aa)+` or `(\w|\d)*`, is refused. Any alternative that is not plain text
   (a class, `.` or an escape) counts as overlapping.
+- A pattern that chains enough groups with overlapping alternatives to split
+  a value more than 1,024 ways, such as eleven `(?:.|a)` in a row, is refused,
+  even without an outer repeat.
 - A pattern that puts two variable quantifiers able to match the same
   character next to each other, such as `\d*\d*` or `.*a.*`, is refused.
+- A pattern with an inline modifier group (`(?i:...)`, `(?-i:...)`) is
+  refused. Node 22 cannot compile them.
 - A pattern with a backreference (`\1`, `\k<name>`) is refused.
 - A value over 10,000 characters (`PATTERN_INPUT_MAX_LENGTH`) never matches a
   pattern. A pattern accepted only because a bounded repeat keeps its

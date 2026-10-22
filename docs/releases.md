@@ -142,14 +142,35 @@ old behaviour where that is possible.
   `required: ["constructor"]` is no longer satisfied by an empty record.
   Substitution, visibility conditions and `validateValues` read own
   properties only.
-- **Unsafe field patterns are rejected (breaking).** A field `pattern` longer
-  than 512 characters, one that repeats a group that already repeats (such as
-  `(a+)+` or `^(\d+,)*\d+$`), or one with a backreference fails `validate`
-  with `unsafe_field_pattern` at `/fields/properties/<key>/pattern`. At render
-  time such a pattern imposes no constraint, and a value over 10,000
-  characters counts as `pattern_mismatch` without being tested. Dataset column
-  patterns follow the same rule, and Studio's pattern inputs say why a pattern
-  is refused.
+- **Unsafe field patterns are rejected (breaking).** These field patterns fail
+  `validate` with `unsafe_field_pattern` at
+  `/fields/properties/<key>/pattern`:
+  - longer than 512 characters;
+  - repeating a group that already repeats, such as `(a+)+` or
+    `^(\d+,)*\d+$`. `{n}`, `{n,}` and `{n,m}` count as repeats, so
+    `(.*a){20}` is refused too;
+  - repeating a group whose alternatives may overlap, such as `(a|aa)+` or
+    `(\w|\d)*`;
+  - chaining enough groups with overlapping alternatives to split a value more
+    than 1,024 ways, such as eleven `(?:.|a)` in a row;
+  - putting two variable quantifiers able to match the same character next to
+    each other, such as `\d*\d*` or `.*a.*` (`adjacent_quantifiers`);
+  - using an inline modifier group such as `(?i:...)`, which Node 22 cannot
+    compile;
+  - using a backreference.
+
+  Some patterns that look safe are refused by these rules, for example
+  `^\S+@\S+\.\S+$` and `^(\d+\.){3}\d+$`. Write
+  `^[^\s@]+@[^\s@]+\.[^\s@.]+$` and `^\d+\.\d+\.\d+\.\d+$` or
+  `^(\d{1,3}\.){3}\d{1,3}$` instead.
+
+  At render time a refused pattern imposes no constraint, and a value over
+  10,000 characters counts as `pattern_mismatch` without being tested. A
+  pattern accepted only because a bounded repeat keeps its backtracking small,
+  such as `^(\d{1,3}\.){3}\d{1,3}$`, tests at most 256 characters
+  (`PATTERN_GUARDED_INPUT_MAX_LENGTH`; `patternInputMaxLength(pattern)` returns
+  the cap). Dataset column patterns follow the same rules, and Studio's pattern
+  inputs say why a pattern is refused.
 - **Stricter format version parsing (breaking).** `format_version` must be
   `MAJOR` or `MAJOR.MINOR` in digits, surrounding spaces allowed. Values such
   as `1.7.3`, `1.0.0`, `1.7-beta` or `1.7garbage` used to be read as their
@@ -181,8 +202,9 @@ in the renderer or the importer.
   `TableLimitError` (code `limit_exceeded`, with `limit`, `actual` and `max`)
   from `@freshcoat-js/workspace/tabular`. A JSON list of objects counts its
   objects. Pass `limits` to `readTable` to raise one, or
-  `Number.POSITIVE_INFINITY` to lift it; `DEFAULT_TABLE_LIMITS` holds the
-  defaults. The limits were sized from measured peak memory, about 2 GB in a
+  `Number.POSITIVE_INFINITY` to lift the byte, zip entry or record limit;
+  the uncompressed, column and cell limits can be raised but not lifted, and
+  infinity takes their default. `DEFAULT_TABLE_LIMITS` holds the defaults. The limits were sized from measured peak memory, about 2 GB in a
   browser tab at the cell limit. Text too long for a JavaScript string, about
   512 MB in Node and Chromium, is refused with a size limit error rather than
   a raw Node error or Studio's "is empty". A workbook zip whose central
@@ -191,10 +213,10 @@ in the renderer or the importer.
 #### Output
 
 - **CSV and TSV export escape formula triggers (output change).** `writeTable`
-  prefixes `'` to a text cell that starts with `=`, `+`, `-`, `@`, a tab or a
-  carriage return, so a spreadsheet does not run it as a formula, and to one
-  that starts with `'` and then a trigger. Number values and image cells are
-  left alone. Phone numbers and signed amounts stored as text, such as
+  prefixes `'` to a text or image cell that starts with `=`, `+`, `-`, `@`, a
+  tab or a carriage return, so a spreadsheet does not run it as a formula, and
+  to one that starts with `'` and then a trigger. Number values are left
+  alone. Phone numbers and signed amounts stored as text, such as
   `+63 912 345 6789` or `-1,200.00`, show the `'` in a spreadsheet.
   `writeTable(dataset, format, { escapeFormulas: false })` writes them as
   before. `readTable` drops the first `'` from a CSV or TSV cell that starts
@@ -206,6 +228,8 @@ in the renderer or the importer.
   of the file body, as PDF/X requires. Numbers are never written in exponent
   form. Every PDF the engine writes changes, so tests that compare PDF bytes
   need new goldens; with a fixed `date` the bytes are still repeatable.
+  Studio and CLI PDFs, assembled by `assemblePdf`, carry an `/ID` too, the
+  MD5 of the content and the creation date.
 - **Fonts that forbid embedding are outlined (output change).** In a vector
   PDF, a font whose OS/2 `fsType` sets Restricted License, No Subsetting or
   Bitmap Only is not embedded: its text is drawn as glyph outlines, which
@@ -227,8 +251,10 @@ in the renderer or the importer.
   stay in the Cut optional content group at 0.25 pt. Only their colour space
   changed, from DeviceRGB to the separations, plus the overprint ExtGState.
   Presets take `cutSpots`, the CLI `--cut-spot`, and Studio's Output tab a
-  name per kind to rename them. PDFs without cut lines are unchanged, and so
-  are SVG and DXF cut files.
+  name per kind to rename them. `All` and `None`, which PDF reserves for every
+  or no plate, are refused in any case by the CLI and Studio; a saved preset
+  naming one opens with that kind on its default name and a warning. PDFs
+  without cut lines are unchanged, and so are SVG and DXF cut files.
 - **Template spot colours (format 1.7).** A `rect` or `vector` can print its
   fill or stroke in a named spot ink with `spot`, for white ink, foil or
   varnish. A vector PDF paints it as a Separation, overprinting on request;
@@ -236,11 +262,12 @@ in the renderer or the importer.
   mixed with white as the Separation's tint transform does.
 - **Rasterized layers in vector PDFs are reported.** A layer a vector PDF
   draws as an image (shadow, blur, grain, halftone, gradient text stroke and
-  the like) used to pass without a word in an export. One that paints a spot
-  ink now warns for each item with the engine's new `spot_rasterized`, naming
-  the layer and the ink, as the separation is lost. The rest are listed once
-  per side: in `JobResult.rasterized`, as an `info` row per side in
-  `export-report.csv`, after a CLI export, and in Studio's export checks.
+  the like, or inside a mask) used to pass without a word in an export. One
+  that paints a spot ink, in its content or its mask, now warns for each
+  item with the engine's new `spot_rasterized`, naming the layer and the
+  ink, as the separation is lost. The rest are listed once per side: in
+  `JobResult.rasterized`, as an `info` row per side in `export-report.csv`,
+  after a CLI export, and in Studio's export checks.
 
 #### New in the format and the engine
 
@@ -291,8 +318,9 @@ The engine and workspace also add:
   PDF is held in memory until it is built and goes on. `render --data` warns for
   a data file over 128 MiB and goes on. `--dry-run` gives both warnings, and
   renders the first 3 items of a PDF to do so. `render --data` reads a file
-  of any size; only `readTable`'s limits of 500 columns and 10,000 zip
-  entries apply.
+  of any size or number of records; `readTable`'s other limits apply, and a
+  file past 10,000,000 cells or 512 MiB uncompressed is refused with a
+  message to split it into files of fewer rows.
 - **Cancellation.** Ctrl-C (SIGINT) exits 130 and SIGTERM exits 143, after
   printing `freshcoat: cancelled`. A `.zip` or `.pdf` export writes a
   temporary file and renames it over `--out` only on success, so a cancelled
@@ -330,9 +358,12 @@ The engine and workspace also add:
   [`apps/editor/server.ts`](../apps/editor/server.ts) sends, including
   `'wasm-unsafe-eval'` and, on scripts, `'unsafe-eval'`.
 - **Autosave failures are shown, and stored work is kept.** A failed write shows a
-  persistent "Couldn't autosave" toast with Retry. An autosave that cannot be
-  read, or that a newer Studio wrote, is never overwritten. Pending changes are
-  saved when the tab is hidden or closed.
+  persistent "Couldn't autosave" toast with Retry. An autosave that a newer
+  Studio wrote is never overwritten, and one that cannot be read is never
+  overwritten unless you choose Discard old autosave. While it holds back new
+  edits, an "Autosave paused" indicator stays in the status bar with Retry and
+  Discard old autosave, and leaving the page with unsaved edits asks first.
+  Pending changes are saved when the tab is hidden or closed.
 - **Faster large exports.** The Export tab no longer re-renders settings,
   checks and records each time an item finishes, so the page stays responsive
   during large exports.

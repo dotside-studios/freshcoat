@@ -26,7 +26,7 @@ every change.
 | `setCpuFinish`, `setLayerBounds` | `switches: { cpuFinish, layerBounds }` per paint |
 | `createPaintCache`, `PaintCache` | removed; a renderer makes its own from `cache` |
 | `format_version: "1.7.0"` and other three-part or suffixed versions | `"1.7"` |
-| a field `pattern` with nested repetition or a backreference | a pattern without them, or a check in your own code |
+| a field `pattern` with nested or overlapping repetition, adjacent overlapping quantifiers, or a backreference | a pattern without them, or a check in your own code |
 | images of any size | up to `maxImageDecodePixels` (200,000,000) on `createRenderer` |
 | spreadsheets of any size | up to the `readTable` limits, raised with `limits` |
 | CSV and TSV export writing `=SUM(A1)` as is | `'=SUM(A1)`; `writeTable(dataset, format, { escapeFormulas: false })` for the old output |
@@ -173,13 +173,17 @@ try {
 | `maxColumns` | 500 | `columns` |
 | `maxCells` | 10,000,000 | `cells` |
 
-`DEFAULT_TABLE_LIMITS` holds these values. Text longer than a JavaScript
+`DEFAULT_TABLE_LIMITS` holds these values. `maxUncompressedBytes`,
+`maxColumns` and `maxCells` can be raised to any finite number, but
+`Number.POSITIVE_INFINITY` for one of them takes its default, as they bound
+the memory a workbook inflates to. Text longer than a JavaScript
 string can hold, about 512 MB, is refused whatever the limits.
 
 ### CLI
 
-`freshcoat render --data` reads a file of any size, warning past 128 MiB; of
-the limits above, only the 500 columns and 10,000 zip entries apply. A PDF
+`freshcoat render --data` reads a file of any size or number of records,
+warning past 128 MiB; the other limits above apply, and a file past the cell
+or uncompressed limit is refused with a message to split it. A PDF
 export warns when it is estimated past 1 GiB. Neither warning stops the job.
 
 ## Templates
@@ -187,11 +191,32 @@ export warns when it is estimated past 1 GiB. Neither warning stops the job.
 `format_version` must be `MAJOR` or `MAJOR.MINOR`. A file with `"1.7.0"` or
 `"1.7-beta"` is `unsupported_format_version`; write `"1.7"`.
 
-A field `pattern` fails `validate` with `unsafe_field_pattern` when it is over
-512 characters, repeats a group that already repeats (`(a+)+`,
-`^(\d+,)*\d+$`) or uses a backreference. Rewrite it without the nested
-repetition, or check the value in your own code. At render time such a pattern
-imposes no constraint.
+A field `pattern` fails `validate` with `unsafe_field_pattern` when it:
+
+- is over 512 characters;
+- repeats a group that already repeats (`(a+)+`, `^(\d+,)*\d+$`,
+  `(.*a){20}`), counting `{n}`, `{n,}` and `{n,m}` as repeats;
+- repeats a group whose alternatives may overlap (`(\w|\d)*`);
+- chains enough groups with overlapping alternatives to split a value more
+  than 1,024 ways (eleven `(?:.|a)` in a row);
+- puts two variable quantifiers able to match the same character next to each
+  other (`\d*\d*`, `.*a.*`);
+- uses an inline modifier group (`(?i:...)`);
+- uses a backreference.
+
+Some common patterns are refused by these rules:
+
+| Refused | Accepted equivalent |
+| --- | --- |
+| `^\S+@\S+\.\S+$` | `^[^\s@]+@[^\s@]+\.[^\s@.]+$` |
+| `^(\d+\.){3}\d+$` | `^\d+\.\d+\.\d+\.\d+$` or `^(\d{1,3}\.){3}\d{1,3}$` |
+| `^(?i:abc)$` | `^[aA][bB][cC]$` |
+
+Rewrite the pattern, or check the value in your own code. At render time a
+refused pattern imposes no constraint. A pattern accepted only because a
+bounded repeat keeps its backtracking small, such as
+`^(\d{1,3}\.){3}\d{1,3}$`, tests at most 256 characters of a value
+(`PATTERN_GUARDED_INPUT_MAX_LENGTH`, `patternInputMaxLength()`).
 
 `{{constructor}}`, `{{toString}}` and `{{__proto__}}` render empty unless the
 values have them as their own keys, and an empty record no longer meets
@@ -217,9 +242,9 @@ differ:
 - Cut lines stroke in overprinting `/Separation` spots (`CutContour`,
   `KissCut`, `Crease`, `Perfcut`) instead of DeviceRGB. They look the
   same; `cutSpots` or `--cut-spot` renames the spots.
-- CSV and TSV text cells starting with `=`, `+`, `-`, `@`, a tab or a
-  carriage return get a leading `'`, and so do cells starting with `'` and
-  then one of those. Image cells are left alone. Phone numbers and signed
+- CSV and TSV text and image cells starting with `=`, `+`, `-`, `@`, a tab
+  or a carriage return get a leading `'`, and so do cells starting with `'`
+  and then one of those. Phone numbers and signed
   amounts stored as text, such as `+63 912 345 6789` or `-1,200.00`, show the
   `'` in a spreadsheet. Machine consumers can pass `escapeFormulas: false` to
   `writeTable`; Studio always escapes. `readTable` drops the first `'` from a

@@ -1,5 +1,15 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+	chmod,
+	lstat,
+	mkdtemp,
+	readFile,
+	readlink,
+	rm,
+	stat,
+	symlink,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Renderer } from "@freshcoat-js/engine";
@@ -189,6 +199,34 @@ describe("exportWorkspace with fileOutput", () => {
 			REPORT_FILE_NAME,
 		);
 		expect(existsSync(output.temporary)).toBe(false);
+	});
+
+	it("replaces the file a symlinked output points to and keeps the link", async () => {
+		const real = join(dir, "real.zip");
+		const link = join(dir, "link.zip");
+		await writeFile(real, "old");
+		await symlink(real, link);
+		const output = fileOutput(link);
+		expect(output.temporary.startsWith(`${real}.`)).toBe(true);
+		await exportWorkspace(workspace, small, { renderer, fonts, output });
+		expect((await lstat(link)).isSymbolicLink()).toBe(true);
+		expect(await readlink(link)).toBe(real);
+		expect(unzipSync(new Uint8Array(await readFile(real)))).toHaveProperty(
+			REPORT_FILE_NAME,
+		);
+		expect(existsSync(output.temporary)).toBe(false);
+	});
+
+	it("keeps the mode of the file it replaces", async () => {
+		const out = join(dir, "mode.zip");
+		await writeFile(out, "old");
+		await chmod(out, 0o640);
+		const output = fileOutput(out);
+		await exportWorkspace(workspace, small, { renderer, fonts, output });
+		expect((await stat(out)).mode & 0o777).toBe(0o640);
+		expect(unzipSync(new Uint8Array(await readFile(out)))).toHaveProperty(
+			REPORT_FILE_NAME,
+		);
 	});
 
 	it("discards nothing it did not write", async () => {

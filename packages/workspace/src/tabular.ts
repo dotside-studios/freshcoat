@@ -116,6 +116,14 @@ export class TableLimitError extends TabularError {
 
 type Sheets = { sheets: TableSheet[] };
 
+/** The limits that bound how much a workbook inflates in memory. A
+ *  non-finite value takes the default, so they cannot be lifted. */
+const INFLATION_LIMITS = [
+	"maxUncompressedBytes",
+	"maxColumns",
+	"maxCells",
+] as const satisfies readonly (keyof TableLimits)[];
+
 const TEXT_FORMATS = new Set(["csv", "tsv", "txt"]);
 const ZIP_FORMATS = new Set(["xlsx", "xlsm", "ods"]);
 
@@ -387,7 +395,9 @@ function readNdjson(
  * cells, `unsupported_format` for an extension it does not read,
  * `invalid_file` when the contents do not parse, and a `TableLimitError`
  * (`limit_exceeded`) when the file is past `DEFAULT_TABLE_LIMITS` or the
- * `options.limits` that override them. Size limits are checked before any
+ * `options.limits` that override them. `maxUncompressedBytes`, `maxColumns`
+ * and `maxCells` can be raised but not lifted: a non-finite value for one of
+ * them takes its default. Size limits are checked before any
  * untrusted bytes are decoded or inflated. A CSV or TSV cell that starts with
  * `'` and then `=`, `+`, `-`, `@`, tab or CR loses that `'`, undoing
  * `writeTable`'s formula escaping, unless `options.unescapeFormulas` is false.
@@ -398,6 +408,9 @@ export async function readTable(
 	options: ReadTableOptions = {},
 ): Promise<Sheets> {
 	const limits: TableLimits = { ...DEFAULT_TABLE_LIMITS, ...options.limits };
+	for (const key of INFLATION_LIMITS) {
+		if (!Number.isFinite(limits[key])) limits[key] = DEFAULT_TABLE_LIMITS[key];
+	}
 	const fail = (
 		limit: TableLimitKind,
 		actual: number | undefined,
@@ -556,11 +569,10 @@ function delimited(
 		text.includes(separator) || /["\r\n]/.test(text)
 			? `"${text.replace(/"/g, '""')}"`
 			: text;
-	const guard = (text: string, column: Column, value: CellValue | undefined) =>
+	const guard = (text: string, value: CellValue | undefined) =>
 		escapeFormulas &&
 		typeof value !== "number" &&
-		(ESCAPED_FORMULA.test(text) ||
-			(column.type !== "image" && FORMULA_TRIGGER.test(text)))
+		(ESCAPED_FORMULA.test(text) || FORMULA_TRIGGER.test(text))
 			? `'${text}`
 			: text;
 	const lines = [
@@ -569,7 +581,7 @@ function delimited(
 			dataset.columns
 				.map((c) => {
 					const value = record.values[c.key];
-					return quote(guard(exportText(dataset, c, value), c, value));
+					return quote(guard(exportText(dataset, c, value), value));
 				})
 				.join(separator),
 		),
@@ -629,12 +641,12 @@ async function workbookBytes(
 /**
  * The dataset as a file. The header row is the column keys.
  *
- * In CSV and TSV, text cells starting with `=`, `+`, `-`, `@`, tab or CR get a
- * leading `'` so spreadsheets do not run them as formulas, and so do text
+ * In CSV and TSV, text and image cells starting with `=`, `+`, `-`, `@`, tab or
+ * CR get a leading `'` so spreadsheets do not run them as formulas, and so do
  * cells starting with `'` and then one of those, so the escape can be undone.
- * Numbers and image cells, which hold file names, are left alone, apart from
- * that second rule. `readTable` drops one leading `'` from a cell that starts
- * with `'` and a trigger, so the file reads back as written. Set
+ * Numbers are left alone. `readTable` drops one leading `'` from a cell that
+ * starts with `'` and a trigger, so the file reads back as written, an image
+ * named `-front.png` included. Set
  * `escapeFormulas: false` for machine consumers.
  */
 export async function writeTable(
