@@ -401,8 +401,8 @@ if (read.ok) validate(healElementIds(read.document));
 
 `saveTemplate(template, "coat" | "json")` is the rule for writing a template out:
 `writableTemplate` (unused assets pruned, `format_version` raised to cover the
-fields used), `validate`, then `packTemplate` or `serializeTemplate`. It returns
-`{ ok: true, data }` or `{ ok: false, errors }`. A refused
+fields used), `validate`, then `packTemplate` or `serializeTemplate`. It always
+returns a promise of `{ ok: true, data }` or `{ ok: false, errors }`. A refused
 write (a newer minor) is reported as an error on `/format_version`; any other
 pack failure is `write_failed` at the template root. `loadTemplate` is its counterpart for
 reading a file in.

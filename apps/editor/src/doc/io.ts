@@ -69,7 +69,7 @@ export function sendableTemplate(t: Template): SaveResult<Template> {
 }
 
 /** The `.coat.json` text. */
-export function saveJson(t: Template): SaveResult<string> {
+export function saveJson(t: Template): Promise<SaveResult<string>> {
 	return saveTemplate(t, "json");
 }
 

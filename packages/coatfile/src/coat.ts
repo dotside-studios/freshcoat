@@ -367,8 +367,7 @@ export type SaveResult<T> =
 /**
  * A template as it is saved: `writableTemplate`, validated, then the `.coat`
  * bytes or the `.coat.json` text. A template that does not validate, or that
- * cannot be written, comes back as errors. The text is ready at once; the
- * package is a promise.
+ * cannot be written, comes back as errors.
  */
 export function saveTemplate(
 	template: Template,
@@ -377,28 +376,23 @@ export function saveTemplate(
 export function saveTemplate(
 	template: Template,
 	as: "json",
-): SaveResult<string>;
-export function saveTemplate(
+): Promise<SaveResult<string>>;
+export async function saveTemplate(
 	template: Template,
 	as: "coat" | "json",
-): Promise<SaveResult<Uint8Array>> | SaveResult<string> {
+): Promise<SaveResult<Uint8Array> | SaveResult<string>> {
 	const writable = writableTemplate(template);
 	const checked = validate(writable);
-	if (!checked.ok) {
-		const failed = { ok: false as const, errors: checked.errors };
-		return as === "coat" ? Promise.resolve(failed) : failed;
+	if (!checked.ok) return { ok: false, errors: checked.errors };
+	try {
+		const data =
+			as === "json"
+				? serializeTemplate(writable)
+				: await packTemplate(writable);
+		return { ok: true, data } as SaveResult<Uint8Array> | SaveResult<string>;
+	} catch (err) {
+		return { ok: false, errors: [writeError(err)] };
 	}
-	if (as === "json") {
-		try {
-			return { ok: true, data: serializeTemplate(writable) };
-		} catch (err) {
-			return { ok: false, errors: [writeError(err)] };
-		}
-	}
-	return packTemplate(writable).then(
-		(data) => ({ ok: true as const, data }),
-		(err) => ({ ok: false as const, errors: [writeError(err)] }),
-	);
 }
 
 function writeError(err: unknown): ValidationError {

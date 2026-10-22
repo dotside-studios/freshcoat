@@ -72,7 +72,7 @@ async function encode(
 	if (!json && extname(out).toLowerCase() !== ".coat")
 		throw new UsageError("--out names a .coat or .coat.json file");
 	const saved = json
-		? saveTemplate(template, "json")
+		? await saveTemplate(template, "json")
 		: await saveTemplate(template, "coat");
 	if (saved.ok) return saved.data;
 	throw new CliError(

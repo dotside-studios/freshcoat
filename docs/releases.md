@@ -31,6 +31,10 @@ These land in the next release's notes.
   `err instanceof CoatError && err.code === "unknown_variant"`) instead of the
   message, which no longer starts with the code.
 
+- **`saveTemplate` is always async (breaking).** `saveTemplate(template,
+  "json")` now returns a promise, as the `"coat"` form already did. Migration:
+  `await` it.
+
 - **Safer defaults for untrusted templates.** The engine's default loader
   accepts only `data:`, `blob:` and `https:`. See
   [safer defaults](security-defaults.md).

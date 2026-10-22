@@ -1910,7 +1910,7 @@ export class EditorController {
 		if (active && !(await this.nameUnnamed([active]))) return false;
 		const t = this.base;
 		if (!t) return false;
-		const result = kind === "coat" ? await saveCoat(t) : saveJson(t);
+		const result = kind === "coat" ? await saveCoat(t) : await saveJson(t);
 		if (!result.ok) {
 			const first = result.errors[0];
 			toast(

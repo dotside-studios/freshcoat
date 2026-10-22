@@ -47,7 +47,7 @@ describe("round trip", () => {
 
 	test("saveJson then openFile gives the same template", async () => {
 		const t = frozenDoc();
-		const saved = saveJson(t);
+		const saved = await saveJson(t);
 		if (!saved.ok) throw new Error(JSON.stringify(saved.errors));
 		const opened = await openFile(saved.data, "doc.coat.json");
 		expect(opened.kind === "ok" && opened.template).toEqual(t);
@@ -64,9 +64,9 @@ describe("round trip", () => {
 		if (!saved.ok) throw new Error("save failed");
 		const opened = await openFile(saved.data, "x.coat");
 		expect(opened.kind === "ok" && opened.template.assets).toBeUndefined();
-		const json = saveJson(t);
+		const json = await saveJson(t);
 		expect(json.ok && JSON.parse(json.data).assets).toBeUndefined();
-		const kept = saveJson(frozenDoc());
+		const kept = await saveJson(frozenDoc());
 		expect(kept.ok && JSON.parse(kept.data).assets[0].sha256).toBe(PNG_SHA);
 	});
 });
@@ -85,32 +85,32 @@ describe("format_version", () => {
 		return deepFreeze(t);
 	};
 
-	test("saveJson keeps a version that already covers the fields", () => {
-		const saved = saveJson(frozenDoc());
+	test("saveJson keeps a version that already covers the fields", async () => {
+		const saved = await saveJson(frozenDoc());
 		expect(saved.ok && JSON.parse(saved.data).format_version).toBe("1.1");
 	});
 
-	test("saveJson raises an old version to cover new fields", () => {
+	test("saveJson raises an old version to cover new fields", async () => {
 		const t = withBarcode("1.1");
-		const saved = saveJson(t);
+		const saved = await saveJson(t);
 		if (!saved.ok) throw new Error(JSON.stringify(saved.errors));
 		expect(JSON.parse(saved.data).format_version).toBe("1.3");
 		expect(t.format_version).toBe("1.1");
 	});
 
-	test("saveJson never lowers the version", () => {
-		const saved = saveJson(withBarcode(FORMAT_VERSION));
+	test("saveJson never lowers the version", async () => {
+		const saved = await saveJson(withBarcode(FORMAT_VERSION));
 		expect(saved.ok && JSON.parse(saved.data).format_version).toBe(
 			FORMAT_VERSION,
 		);
 	});
 
-	test("saveJson raises for variant deltas", () => {
+	test("saveJson raises for variant deltas", async () => {
 		const t = doc();
 		const override = t.variants?.[0].overrides[0];
 		if (!override) throw new Error("fixture has no variant override");
 		override.elements = [{ id: "a", properties: {}, hidden: true }];
-		const saved = saveJson(deepFreeze(t));
+		const saved = await saveJson(deepFreeze(t));
 		if (!saved.ok) throw new Error(JSON.stringify(saved.errors));
 		expect(JSON.parse(saved.data).format_version).toBe("1.4");
 	});
@@ -132,7 +132,7 @@ describe("refusals", () => {
 		const coat = await saveCoat(bad);
 		expect(coat.ok).toBe(false);
 		expect(!coat.ok && coat.errors[0].code).toBe("invalid_dimension");
-		const json = saveJson(bad);
+		const json = await saveJson(bad);
 		expect(!json.ok && json.errors[0].code).toBe("invalid_dimension");
 	});
 
