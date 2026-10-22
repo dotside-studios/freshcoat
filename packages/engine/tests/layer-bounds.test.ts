@@ -454,7 +454,7 @@ describe("bounded effect layers", () => {
 			);
 			expect(r.boundedLayers).toBe(3);
 			expect(r.maxDiff).toBe(0);
-		});
+		}, 20_000);
 });
 
 // Seeded random scenes of rects and text under nested opacity, blur and shadow

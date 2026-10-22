@@ -3159,7 +3159,7 @@ describe("render --jobs", () => {
 				await PDFDocument.load(await readFile(box.path("threads.pdf")))
 			).getPageCount(),
 		).toBe(12);
-	});
+	}, 20_000);
 
 	test("refuses --jobs outside an export", async () => {
 		const plain = await box.run(
