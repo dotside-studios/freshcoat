@@ -168,22 +168,14 @@ named in an image field's column is read from the data file's directory. Files
 are named `<template id>-<row>-<frame>`, with the scale as a suffix for
 anything but 1x, unless `--name` says otherwise.
 
-A data file over the workspace package's import limits is refused with a
-message naming the limit that was passed, for example `people.csv is too large
-to import: 500,001 records is over the limit of 500,000 records; raise it with
---max-rows <n>, 0 for no limit`. The defaults are 128 MiB per file, and 500,000
-records, 500 columns and 10,000,000 cells per sheet. Records are the rows after
-the first, so the header row is not counted, and cells are records times
-columns. The limits are listed under Import limits in the
-`@freshcoat-js/workspace` README.
-
-`--max-rows <n>` sets the record limit. Above the default it raises the file
-size and cell limits in proportion, so `--max-rows 1000000` takes a file of
-twice the default size and cells; `0` lifts all three. The column limit stays.
-Memory grows with cells: a 500,000 by 20 file peaks near 2 GB while it is read,
-and a workbook takes two to three times a CSV's memory. Under Node a text file
-over about 512 MB is refused with a size limit message whatever the limits, as
-it is longer than a JavaScript string can be.
+A data file of any size is read. Past 128 MiB it warns, for example
+`warning: people.csv is 300.0 MB, and reading it takes many times that in
+memory, a workbook more than a CSV; if it runs out of memory, split the file`,
+and goes on. Memory grows with cells: a 500,000 by 20 file peaks near 2 GB
+while it is read, and a workbook takes two to three times a CSV's memory. A
+workbook over 500 columns or 10,000 zip entries is refused. Under Node a text
+file over about 512 MB is refused with a size limit message, as it is longer
+than a JavaScript string can be.
 
 `--where` keeps the rows that match, by field key, as for a workspace below.
 
@@ -211,7 +203,6 @@ These shape a zip, PDF or directory written from a template, with or without
 | `--cut-spot <[kind=]name>` | PDF only: the spot colour a kind of cut line is drawn in, `through` when no kind is named; repeatable, implies `--cut-lines` |
 | `--pdf-pages <png\|jpeg\|vector>` | PDF only: what each page holds, default `png` |
 | `--pdf-text <embed\|outline>` | with `--pdf-pages vector`: `embed` sets text in its fonts, selectable; `outline` draws each glyph as a shape, so the PDF holds no font, as print shops that want outlined text ask. Default `embed`. See [Text as outlines](../engine/README.md#text-as-outlines) |
-| `--max-pdf-pages <n>` | PDF only: refuse a PDF with more than this many pages, default 2000, 0 for no limit. Every page is held in memory until the PDF is assembled, so a very large export can exhaust memory; the check runs before anything is rendered or written, exits 1 with no output file, and applies to `--data`, `--sheets` and workspace PDF presets alike. Pages are counted as rendered (one per card side), before sheets are laid out |
 | `--sheets <paper>` | PDF only: lay the cards out at their trim size with crop marks on `a4`, `a5`, `a6`, `letter`, `legal`, `a3`, `tabloid` or `<width>x<height>` millimetre paper |
 | `--orientation <auto\|portrait\|landscape>` | with `--sheets`: turn the paper this way; default `auto`, whichever fits more cards, portrait on a tie |
 | `--duplex <long\|short>` | with `--sheets`: put each back behind its front, for a printer that flips on that edge |
@@ -240,6 +231,12 @@ A PDF's title, and the job in its slug, is the template's name, or the
 preset's PDF takes the preset's name, as in Studio. Its creator and producer
 name `Freshcoat CLI` and its version. While a PDF on sheets is assembled, the
 progress counts cards, each embedded once, rather than pages.
+
+A PDF is held in memory until it is built. Once an export has rendered 3 of
+its items it estimates the whole PDF's size, and past 1 GiB, where Studio asks
+first, it warns and goes on: `warning: this PDF is estimated at 3.4 GB, and it
+is held in memory until it is built; if the export runs out of memory, split it
+with --where`.
 
 ```sh
 freshcoat render badge.coat --data crew.csv --sheets a4 \
@@ -377,8 +374,9 @@ main thread. The files are the same either way.
 `--dry-run` lists what a render would write and writes nothing: a directory
 render's paths, or an export's file names and a line such as `4 items would be
 exported to cards.zip, 8 per sheet · 1 sheet`. Data, values and photos are still
-read and checked, and sheets that cannot be laid out still fail, but no font is
-fetched and nothing is rendered.
+read and checked, and sheets that cannot be laid out still fail. No font is
+fetched and nothing is rendered, except for a PDF of more than 3 items: its
+first 3 are rendered to give the same size warning the export would.
 
 ### validate
 

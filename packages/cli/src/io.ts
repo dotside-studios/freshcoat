@@ -11,6 +11,9 @@ export type Io = {
 	env?: Record<string, string | undefined>;
 	/** aborted when the command is cancelled */
 	signal?: AbortSignal;
+	/** the sizes past which a PDF or a --data file is warned about; lowered
+	 *  in tests */
+	largeBytes?: { pdf?: number; data?: number };
 };
 
 export function processIo(): Io {

@@ -32,7 +32,6 @@ const WORKSPACE_KEYS = [
 	"cutLines",
 	"cutSpot",
 	"minDpi",
-	"maxPdfPages",
 	"quiet",
 ];
 const WORKSPACE_ONLY = ["preset", "records", "save"];
@@ -54,7 +53,6 @@ const PDF_OPTIONS = [
 	"outputIntentId",
 	"cutLines",
 	"cutSpot",
-	"maxPdfPages",
 ];
 const SHEET_OPTIONS = [
 	"orientation",
@@ -122,9 +120,6 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 				...(rest.cutLines ? { cutLines: rest.cutLines } : {}),
 				...(rest.cutSpot ? { cutSpot: rest.cutSpot } : {}),
 				...(rest.minDpi !== undefined ? { minDpi: rest.minDpi } : {}),
-				...(rest.maxPdfPages !== undefined
-					? { maxPdfPages: rest.maxPdfPages }
-					: {}),
 				out,
 				quiet: input.quiet,
 			},
@@ -142,8 +137,6 @@ export function planRender(file: string, input: RenderInput): RenderPlan {
 		rest.format !== "png"
 	)
 		throw new UsageError("--png-alpha needs --format png");
-	if (rest.maxRows !== undefined && rest.data === undefined)
-		throw new UsageError("--max-rows needs --data");
 	if (rest.where !== undefined && rest.data === undefined)
 		throw new UsageError("--where needs --data or a .coatworkspace file");
 	if (rest.printProfile !== undefined && rest.printTarget === "none")

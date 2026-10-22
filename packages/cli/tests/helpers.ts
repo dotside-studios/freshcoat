@@ -118,7 +118,7 @@ export type Sandbox = {
 };
 
 export async function sandbox(
-	options: { cache?: boolean } = {},
+	options: { cache?: boolean; largeBytes?: Io["largeBytes"] } = {},
 ): Promise<Sandbox> {
 	const dir = await mkdtemp(join(tmpdir(), "freshcoat-cli-"));
 	const fetch = fontFetch();
@@ -146,6 +146,7 @@ export async function sandbox(
 			fetch,
 			...(signal ? { signal } : {}),
 			...(options.cache ? { cacheDir: join(dir, ".cache") } : {}),
+			...(options.largeBytes ? { largeBytes: options.largeBytes } : {}),
 		};
 		const code = await main(argv, io);
 		return { code, stdout, stderr };

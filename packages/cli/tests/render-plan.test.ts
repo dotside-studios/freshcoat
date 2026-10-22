@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_TABLE_LIMITS } from "@freshcoat-js/workspace/tabular";
-import { tableLimits } from "../src/commands/batch";
 import { planRender, type RenderInput } from "../src/commands/render-plan";
 import { UsageError } from "../src/io";
 
@@ -333,11 +331,6 @@ describe("planRender", () => {
 				"--size-from applies only to templates",
 			],
 			[
-				"club.coatworkspace",
-				{ out: "x.zip", maxRows: 10 },
-				"--max-rows applies only to templates",
-			],
-			[
 				"card.coat",
 				{ out: "x.zip", analyze: false },
 				"--no-analyze needs --print-target or --print-profile",
@@ -485,7 +478,6 @@ describe("planRender", () => {
 				{ out: "x.zip", where: [{ column: "name", op: "empty" }] },
 				"--where needs --data or a .coatworkspace file",
 			],
-			["card.coat", { out: "x.zip", maxRows: 10 }, "--max-rows needs --data"],
 			[
 				"card.coat",
 				{ out: "x.zip", outputIntent: "fogra.icc" },
@@ -632,31 +624,5 @@ describe("planRender", () => {
 		expect(refusal("card.coat", { cropMarks: false })).toBe(
 			"--no-crop-marks needs --data or a .zip or .pdf --out",
 		);
-	});
-});
-
-describe("tableLimits", () => {
-	test("keeps the defaults without --max-rows", () => {
-		expect(tableLimits(undefined)).toEqual({ ...DEFAULT_TABLE_LIMITS });
-	});
-
-	test("raises the byte and cell caps with the row cap", () => {
-		const limits = tableLimits(DEFAULT_TABLE_LIMITS.maxRows * 4);
-		expect(limits.maxRows).toBe(DEFAULT_TABLE_LIMITS.maxRows * 4);
-		expect(limits.maxCells).toBe(DEFAULT_TABLE_LIMITS.maxCells * 4);
-		expect(limits.maxBytes).toBe(DEFAULT_TABLE_LIMITS.maxBytes * 4);
-		expect(limits.maxColumns).toBe(DEFAULT_TABLE_LIMITS.maxColumns);
-	});
-
-	test("lowers only the row cap", () => {
-		expect(tableLimits(10)).toEqual({ ...DEFAULT_TABLE_LIMITS, maxRows: 10 });
-	});
-
-	test("lifts the row, cell and size caps for 0", () => {
-		const limits = tableLimits(0);
-		expect(limits.maxRows).toBe(Number.POSITIVE_INFINITY);
-		expect(limits.maxCells).toBe(Number.POSITIVE_INFINITY);
-		expect(limits.maxBytes).toBe(Number.POSITIVE_INFINITY);
-		expect(limits.maxColumns).toBe(DEFAULT_TABLE_LIMITS.maxColumns);
 	});
 });
