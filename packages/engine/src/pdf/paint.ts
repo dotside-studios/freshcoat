@@ -42,6 +42,7 @@ import {
 	SRGB_PROFILE,
 } from "../icc";
 import {
+	assertDecodableImage,
 	iccComponents,
 	jpegFrame,
 	jpegIccProfile,
@@ -372,6 +373,7 @@ export async function paintPdf(
 		warnings,
 		intent,
 		options.text ?? "embed",
+		rt.maxImageDecodePixels,
 	);
 	try {
 		const drawables = commands.filter(isDrawable);
@@ -589,6 +591,7 @@ class PageBuilder {
 		private warnings: PaintWarning[],
 		private intent: ResolvedOutputIntent | null,
 		private textMode: PdfTextMode,
+		private maxImagePixels: number | undefined,
 	) {
 		this.resources = w.reserve();
 	}
@@ -1720,6 +1723,12 @@ class PageBuilder {
 				height: jpeg.height,
 			};
 		const { ck } = this;
+		try {
+			assertDecodableImage(bytes, this.maxImagePixels);
+		} catch (e) {
+			this.warnings.push({ kind: "image_load_failed", src, error: String(e) });
+			return null;
+		}
 		const img = ck.MakeImageFromEncoded(bytes);
 		if (!img) {
 			this.warnings.push({

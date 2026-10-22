@@ -278,11 +278,17 @@ function reconstructGlyf(
 
 	const xMins = new Int16Array(numGlyphs);
 	const glyphs: Uint8Array[] = [];
+	let glyfSize = 0;
+	const push = (glyph: Uint8Array) => {
+		glyfSize += (glyph.length + 3) & ~3;
+		if (glyfSize > MAX_UNPACKED_FONT_BYTES) throw new Error("font too large");
+		glyphs.push(glyph);
+	};
 	for (let g = 0; g < numGlyphs; g++) {
 		const contours = nContour.i16();
 		if (contours === 0) {
 			if (hasBox(g)) throw new Error("empty glyph with a bbox");
-			glyphs.push(new Uint8Array(0));
+			push(new Uint8Array(0));
 			continue;
 		}
 		if (contours < 0) {
@@ -313,7 +319,7 @@ function reconstructGlyf(
 				w.bytes(program);
 			}
 			xMins[g] = box[0] as number;
-			glyphs.push(w.out);
+			push(w.out);
 			continue;
 		}
 
@@ -323,6 +329,9 @@ function reconstructGlyf(
 			total += nPoints.u255();
 			ends.push(total - 1);
 		}
+		// endPtsOfContours is 16-bit, and each point takes one flag byte.
+		if (total > 0x10000 || total > flagStream.end - flagStream.o)
+			throw new Error("point count past the flag stream");
 		const xs = new Int32Array(total);
 		const ys = new Int32Array(total);
 		const on = new Uint8Array(total);
@@ -352,7 +361,7 @@ function reconstructGlyf(
 		xMins[g] = box[0] as number;
 		const overlaps =
 			overlap !== null && ((overlap[g >> 3] ?? 0) & (0x80 >> (g & 7))) !== 0;
-		glyphs.push(simpleGlyph(ends, xs, ys, on, box, program, overlaps));
+		push(simpleGlyph(ends, xs, ys, on, box, program, overlaps));
 	}
 
 	const starts = [0];

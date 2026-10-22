@@ -402,6 +402,17 @@ function parseIco(b: Uint8Array): Parsed {
 			if (ascii(b, offset + 12, 4) !== "IHDR") return null;
 			width = u32be(b, offset + 16);
 			height = u32be(b, offset + 20);
+		} else {
+			// The decoder sizes a BMP entry by its BITMAPINFOHEADER, whose height
+			// covers the XOR and AND masks.
+			if (offset + 12 > b.length) return "more";
+			const header = u32le(b, offset);
+			if (!BMP_HEADER_SIZES.includes(header) || size < header) return null;
+			const core = header === 12;
+			const w = core ? u16le(b, offset + 4) : Math.abs(i32le(b, offset + 4));
+			const h = core ? u16le(b, offset + 6) : Math.abs(i32le(b, offset + 8));
+			width = Math.max(width, w);
+			height = Math.max(height, Math.ceil(h / 2));
 		}
 		if (width * height > best.width * best.height) best = { width, height };
 	}

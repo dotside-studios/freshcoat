@@ -9,6 +9,7 @@ import { decodePixels } from "../src/decode";
 import {
 	assertDecodableImage,
 	DEFAULT_MAX_IMAGE_DECODE_PIXELS,
+	parseImageInfo,
 } from "../src/image-info";
 import { createFrame, createImage } from "../src/node";
 import { createRenderer } from "../src/renderer";
@@ -139,6 +140,82 @@ describe("image pixel limit", () => {
 		expect(() => decodePixels(ck, new Uint8Array(8))).toThrow(/header/);
 		expect(decodePixels(ck, smallPng())?.width).toBe(2);
 		expect(() => assertDecodableImage(smallPng(), 3)).toThrow();
+	});
+});
+
+function icoOverBmp(dirSize: number, width: number, height: number) {
+	const b = new Uint8Array(22 + 40);
+	const dv = new DataView(b.buffer);
+	dv.setUint16(2, 1, true);
+	dv.setUint16(4, 1, true);
+	b[6] = dirSize;
+	b[7] = dirSize;
+	dv.setUint32(14, 40, true);
+	dv.setUint32(18, 22, true);
+	dv.setUint32(22, 40, true);
+	dv.setInt32(26, width, true);
+	dv.setInt32(30, height * 2, true);
+	dv.setUint16(34, 1, true);
+	dv.setUint16(36, 32, true);
+	return b;
+}
+
+describe("ICO entries", () => {
+	test("a BMP entry is sized by its embedded header", () => {
+		const lying = icoOverBmp(1, 50000, 50000);
+		expect(parseImageInfo(lying)).toMatchObject({
+			width: 50000,
+			height: 50000,
+		});
+		expect(() => assertDecodableImage(lying, 1e6)).toThrow(/50000x50000/);
+	});
+
+	test("the directory size still counts when it is the larger", () => {
+		expect(parseImageInfo(icoOverBmp(0, 16, 16))).toMatchObject({
+			width: 256,
+			height: 256,
+		});
+	});
+
+	test("a header past the end of the buffer is unreadable", () => {
+		expect(parseImageInfo(icoOverBmp(1, 50000, 50000).slice(0, 30))).toBe(null);
+	});
+});
+
+describe("vector PDF image limit", () => {
+	test("an over-cap image warns and is never decoded", async () => {
+		let decodes = 0;
+		const spy = Object.create(ck);
+		spy.MakeImageFromEncoded = (bytes: Uint8Array) => {
+			decodes++;
+			return ck.MakeImageFromEncoded(bytes);
+		};
+		const renderer = await createRenderer({
+			ck: spy,
+			maxImageDecodePixels: 3,
+		});
+		const frame = await renderer.renderPdf(scene("ok.png"), {
+			width: 20,
+			height: 20,
+			images: new Map([["ok.png", smallPng()]]),
+		});
+		expect(frame.bytes.length).toBeGreaterThan(0);
+		expect(frame.warnings).toMatchObject([
+			{ kind: "image_load_failed", src: "ok.png" },
+		]);
+		expect(decodes).toBe(0);
+		renderer.dispose();
+	});
+
+	test("an image under the cap still embeds", async () => {
+		const renderer = await createRenderer({ ck });
+		const frame = await renderer.renderPdf(scene("ok.png"), {
+			width: 20,
+			height: 20,
+			images: new Map([["ok.png", smallPng()]]),
+		});
+		expect(frame.warnings).toEqual([]);
+		renderer.dispose();
 	});
 });
 
@@ -274,3 +351,74 @@ const woff2Single = (
 	_length: number,
 	payload: Uint8Array,
 ) => woff2Tables([origLength], payload);
+
+function u255(n: number): number[] {
+	return n < 253 ? [n] : [253, n >> 8, n & 0xff];
+}
+
+async function woff2Glyf(contours: number, points: number, flags: number) {
+	const nContour = [contours >> 8, contours & 0xff];
+	const nPoints = Array.from({ length: contours }, () => u255(points)).flat();
+	const streams = [
+		nContour,
+		nPoints,
+		new Array(flags).fill(0),
+		new Array(flags + 1).fill(0),
+		[],
+		[0, 0, 0, 0],
+		[],
+	];
+	const glyf = new Uint8Array(36 + streams.reduce((n, x) => n + x.length, 0));
+	const gv = new DataView(glyf.buffer);
+	gv.setUint16(4, 1);
+	let at = 36;
+	streams.forEach((x, i) => {
+		gv.setUint32(8 + 4 * i, x.length);
+		glyf.set(x, at);
+		at += x.length;
+	});
+	const head = new Uint8Array(54);
+	const payload = new Uint8Array(head.length + glyf.length);
+	payload.set(head);
+	payload.set(glyf, head.length);
+	const packed = (await compress(payload)) as Uint8Array;
+	const entries = [
+		0x01,
+		...base128(head.length),
+		0x0a,
+		...base128(glyf.length),
+		...base128(glyf.length),
+		0x0b,
+		0,
+		0,
+	];
+	const out = new Uint8Array(48 + entries.length + packed.length);
+	const dv = new DataView(out.buffer);
+	out.set(new TextEncoder().encode("wOF2"));
+	dv.setUint32(4, 0x00010000);
+	dv.setUint16(12, 3);
+	dv.setUint32(20, packed.length);
+	out.set(entries, 48);
+	out.set(packed, 48 + entries.length);
+	return out;
+}
+
+describe("WOFF2 glyf reconstruction limits", () => {
+	test("point counts past the flag stream are rejected before allocating", async () => {
+		const font = await woff2Glyf(3000, 65535, 4);
+		expect(font.length).toBeLessThan(200);
+		const started = performance.now();
+		expect(() => sfntBytes(font)).toThrow(/flag stream/);
+		expect(performance.now() - started).toBeLessThan(100);
+	});
+
+	test("a simple glyph is held to 65536 points", async () => {
+		const font = await woff2Glyf(2, 40000, 80000);
+		expect(() => sfntBytes(font)).toThrow(/flag stream/);
+	});
+
+	test("points the flag stream covers still unpack", async () => {
+		const font = await woff2Glyf(1, 3, 3);
+		expect(sfntBytes(font).length).toBeGreaterThan(54);
+	});
+});

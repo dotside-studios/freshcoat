@@ -224,6 +224,7 @@ export async function createRenderer(
 ): Promise<Renderer> {
 	const { ck } = options;
 	const load = options.load ?? fetchLoader;
+	const { maxImageDecodePixels } = options;
 	const factory =
 		typeof options.surface === "function" ? options.surface : null;
 	const cache: PaintCache | null =
@@ -444,6 +445,7 @@ export async function createRenderer(
 				resolveFont: (req) => resolveFontRequest(req, fonts),
 				fonts,
 				loadBytes: mapLoader(images, load),
+				...(maxImageDecodePixels !== undefined ? { maxImageDecodePixels } : {}),
 			},
 			options,
 		);

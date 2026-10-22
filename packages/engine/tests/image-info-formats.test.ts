@@ -58,7 +58,10 @@ function ico(entries: IcoEntry[], type = 1): Uint8Array {
 	return b;
 }
 
-const dib = new Uint8Array(40).fill(1);
+const dib = new Uint8Array(40);
+new DataView(dib.buffer).setUint32(0, 40, true);
+new DataView(dib.buffer).setInt32(4, 1, true);
+new DataView(dib.buffer).setInt32(8, 2, true);
 
 function box(type: string, ...body: (Uint8Array | number[])[]): Uint8Array {
 	const parts = body.map((p) => Uint8Array.from(p));
