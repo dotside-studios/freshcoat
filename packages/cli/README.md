@@ -165,9 +165,19 @@ anything but 1x, unless `--name` says otherwise.
 
 A data file over the workspace package's import limits is refused with a
 message naming the limit that was passed, for example `people.csv is too large
-to import: 100,001 rows is over the limit of 100,000 rows`. The defaults are 64
-MiB per file, and 100,000 rows, 500 columns and 5,000,000 cells per sheet; they
-are listed under Import limits in the `@freshcoat-js/workspace` README.
+to import: 500,001 records is over the limit of 500,000 records; raise it with
+--max-rows <n>, 0 for no limit`. The defaults are 128 MiB per file, and 500,000
+records, 500 columns and 10,000,000 cells per sheet. Records are the rows after
+the first, so the header row is not counted, and cells are records times
+columns. The limits are listed under Import limits in the
+`@freshcoat-js/workspace` README.
+
+`--max-rows <n>` sets the record limit. Above the default it raises the file
+size and cell limits in proportion, so `--max-rows 1000000` takes a file of
+twice the default size and cells; `0` lifts all three. The column limit stays.
+Memory grows with cells: a 500,000 by 20 file peaks near 2 GB while it is read,
+and a workbook takes two to three times a CSV's memory. Under Node a text file
+over about 512 MB cannot be read, whatever the limits.
 
 `--where` keeps the rows that match, by field key, as for a workspace below.
 

@@ -399,7 +399,7 @@ describe("Import wizard: limits", () => {
 			</ControllerProvider>,
 		);
 		expect(screen.getByTestId("import-limits").textContent).toBe(
-			`Up to ${DEFAULT_TABLE_LIMITS.maxRows.toLocaleString("en-US")} records below the header, 500 columns and 64 MB`,
+			`Up to ${DEFAULT_TABLE_LIMITS.maxRows.toLocaleString("en-US")} records below the header, 500 columns and 128 MB`,
 		);
 	});
 });

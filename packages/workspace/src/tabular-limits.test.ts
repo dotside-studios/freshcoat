@@ -51,7 +51,14 @@ describe("readTable: limits", () => {
 	it("has defaults a modest file passes", async () => {
 		const { sheets } = await readTable("a,b\n1,2\n", "x.csv");
 		expect(sheets[0]?.rows).toHaveLength(2);
-		expect(DEFAULT_TABLE_LIMITS.maxBytes).toBe(64 * 1024 * 1024);
+		expect(DEFAULT_TABLE_LIMITS).toEqual({
+			maxBytes: 128 * 1024 * 1024,
+			maxUncompressedBytes: 512 * 1024 * 1024,
+			maxZipEntries: 10_000,
+			maxRows: 500_000,
+			maxColumns: 500,
+			maxCells: 10_000_000,
+		});
 	});
 
 	it("rejects a csv with too many rows", async () => {

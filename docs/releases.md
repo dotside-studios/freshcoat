@@ -56,6 +56,14 @@ These land in the next release's notes.
   the layer and the ink, as the separation is lost. The rest are listed once
   per side: in `JobResult.rasterized`, as an `info` row per side in
   `export-report.csv`, after a CLI export, and in Studio's export checks.
+- **Import limits count records.** `readTable`'s `maxRows` and `maxCells`
+  count the records below a sheet's header row, so a 100,000-record CSV is
+  100,000 records, not 100,001 rows; a JSON list of objects still counts its
+  objects. The defaults rise to 500,000 records, 10,000,000 cells and 128 MiB
+  per file, sized from measured peak memory (about 2 GB in a browser tab at
+  the cell limit). Limit messages say records. Studio's import wizard states
+  the limits, and `render --data` takes `--max-rows <n>`, which raises the
+  file size and cell limits in proportion, or lifts them with `0`.
 - **CLI parity with Studio.** `render` takes `--orientation`, `--size-from`
   and `--max-edge` (Studio's Match image) and `--no-analyze`, writing the
   preset fields Studio writes; `--print-target` takes for-print's target ids,

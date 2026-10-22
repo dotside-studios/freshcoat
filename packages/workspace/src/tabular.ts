@@ -58,12 +58,12 @@ export type TableLimits = {
 };
 
 export const DEFAULT_TABLE_LIMITS: Readonly<TableLimits> = {
-	maxBytes: 64 * 1024 * 1024,
+	maxBytes: 128 * 1024 * 1024,
 	maxUncompressedBytes: 512 * 1024 * 1024,
 	maxZipEntries: 10_000,
-	maxRows: 100_000,
+	maxRows: 500_000,
 	maxColumns: 500,
-	maxCells: 5_000_000,
+	maxCells: 10_000_000,
 };
 
 export type ReadTableOptions = { limits?: Partial<TableLimits> };
