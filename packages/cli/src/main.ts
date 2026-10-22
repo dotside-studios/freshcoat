@@ -6,6 +6,7 @@ import {
 } from "@commander-js/extra-typings";
 import { PRINT_TARGETS } from "@freshcoat-js/for-print";
 import { PRESET_SCALE } from "@freshcoat-js/workspace";
+import { DEFAULT_TABLE_LIMITS } from "@freshcoat-js/workspace/tabular";
 import {
 	ArgumentError,
 	collect,
@@ -19,6 +20,7 @@ import {
 	parseMarks,
 	parseMaxEdge,
 	parseMaxPdfPages,
+	parseMaxRows,
 	parseMinDpi,
 	parseOffset,
 	parsePaper,
@@ -151,6 +153,11 @@ function program(io: Io, onCommand: (name: string) => void, all: boolean) {
 		.option(
 			"--data <file>",
 			"CSV, TSV, Excel, .ods or JSON; the first row names the fields",
+		)
+		.option(
+			"--max-rows <n>",
+			`refuse a --data file with more records, not counting its header; default ${DEFAULT_TABLE_LIMITS.maxRows.toLocaleString("en-US")}, 0 for no limit. Raises the file size and cell caps in proportion`,
+			arg(parseMaxRows),
 		)
 		.option("--values <file>", "JSON file of field values")
 		.option(
