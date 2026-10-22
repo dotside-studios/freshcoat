@@ -274,7 +274,8 @@ an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
 it to `<path>.<pid>.tmp` beside the path, the zip as it renders, and renames
 that over the path once the job succeeds, so a cancelled or failed job leaves
 an existing file as it was and removes only the temporary file. A symlinked
-path keeps its link: the file it points to is replaced. The replaced file's
+path keeps its link: the file it points to is replaced, or created when the
+link dangles. A symlink loop throws. The replaced file's
 mode carries over. An `ExportOutput` of the host's own follows the same
 contract: after the last `sink()` write or `save()`, `exportWorkspace` calls
 `commit()` once the job finishes, even with failed items, to make the output
