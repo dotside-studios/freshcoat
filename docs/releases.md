@@ -270,7 +270,7 @@ Format 1.7 adds:
 
 The engine and workspace also add:
 
-- Vector PDF text drawn as glyph outlines on request (`text: "outlines"`).
+- Vector PDF text drawn as glyph outlines on request (`text: "outline"`).
   Font collections and CFF2 variable fonts are outlined instead of
   rasterized.
 - Print preflight warnings for small text, hairlines, rich black and missing

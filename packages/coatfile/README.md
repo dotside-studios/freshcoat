@@ -512,8 +512,8 @@ its own copy.
 A file that came from an authoring tool is often *nearly* a template.
 `decodeTemplate` takes whatever was handed over (a `.coat` or `.tkit`, JSON
 bytes, JSON text) and flattens the `{ schemaVersion: 1, template, assets, … }` wrapper the figma
-plugin wrote before it emitted templates directly. `./normalize` carries the
-remaining fix. Both are idempotent, so running them over already-clean input is
+plugin wrote before it emitted templates directly. `healElementIds` from
+`@freshcoat-js/coatfile` carries the remaining fix. Both are idempotent, so running them over already-clean input is
 free.
 
 ```ts
@@ -573,8 +573,7 @@ prunes each template it packs.
 `defineTemplate` types a template written as a script, the module form the
 [`freshcoat` command line](../cli/README.md#template-modules) evaluates before
 it renders. It takes a template, a promise of one, or a function that returns
-either, and returns it unchanged. `./define` also exports it and nothing else,
-for a script that should load no more than it needs.
+either, and returns it unchanged.
 
 ```ts
 import { defineTemplate } from "@freshcoat-js/coatfile";
@@ -820,7 +819,7 @@ The symbol compiles to one even-odd path in module units, with the logo as an
 image over it, inside a group whose `snap` grid is the symbol plus its quiet
 zone. A raster paint scales that group so every module covers whole output
 pixels when the code is upright, as a barcode's are; a vector PDF draws the
-modules as paths. `generateMatrix(value, ec)` gives the module matrix alone.
+modules as paths.
 
 ## Barcodes
 
@@ -1261,8 +1260,7 @@ patterns are cached in an LRU of 256 entries (`PATTERN_CACHE_MAX`).
 
 ## Fields a template reads
 
-`./fields` (also on the main entry) answers which fields a design uses, with
-no runtime dependency beyond the mustache parser.
+The main entry answers which fields a design uses.
 
 - `elementFieldRefs(element)` lists the fields one element reads itself:
   `{{tokens}}` in its own properties (text, image, QR and barcode sources,

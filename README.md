@@ -63,7 +63,7 @@ freshcoat render card.coat --set displayName="Alex" --out out
 freshcoat render card.coat --data people.csv --out cards.zip
 ```
 
-The first command writes one image per side into `out`. The second renders the
+The first `render` writes one image per side into `out`. The second renders the
 template once per row of a spreadsheet and zips the results. See the
 [CLI README](packages/cli/README.md) for every option.
 
