@@ -7,7 +7,6 @@ import {
 	fillsOf,
 	fillsPatch,
 	type Gradient,
-	type GradientStop,
 	isGradient,
 	type PatternFill,
 	type PatternName,
@@ -17,6 +16,7 @@ import {
 	withLinearAngle,
 	withStops,
 } from "@freshcoat-js/coatfile/fills";
+import type { GradientStop } from "@freshcoat-js/engine";
 import { ColorInput } from "@freshcoat-js/ui/color";
 import { IconButton } from "@freshcoat-js/ui/icon-button";
 import { NumberField } from "@freshcoat-js/ui/number-field";

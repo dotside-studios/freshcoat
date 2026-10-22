@@ -1,4 +1,4 @@
-import { googleCss2Url } from "@freshcoat-js/coatfile/fonts";
+import { googleCss2Url } from "@freshcoat-js/engine";
 import { describe, expect, it } from "vitest";
 import { collectFontDescriptors } from "~/lib/figma/transpiler/fonts";
 

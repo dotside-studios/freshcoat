@@ -1,5 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import { fontUsage, googleCss2Url } from "@freshcoat-js/coatfile/fonts";
+import { fontUsage } from "@freshcoat-js/coatfile/fonts";
+import { googleCss2Url } from "@freshcoat-js/engine";
 import { SYSTEM_SAFE } from "./font-catalog";
 
 export type GoogleFontDescriptor = {

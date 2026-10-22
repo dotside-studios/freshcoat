@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import type { RectNode } from "@freshcoat-js/engine";
 import { PATTERN_DEFAULTS } from "@freshcoat-js/engine";
 import { compile } from "../src/compile";
-import type { Fill, RectNode, Template } from "../src/types";
+import type { Fill, Template } from "../src/types";
 import { validate } from "../src/validate";
 
 function withFill(fill: unknown): Template {

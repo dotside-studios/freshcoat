@@ -1,31 +1,3 @@
-// The render vocabulary, re-exported so a consumer can import it from here.
-export {
-	type ApplyCaseOptions,
-	applyCase,
-	approxEngine,
-	createPaintCache,
-	ellipsePath,
-	encodePng,
-	exportPixelSize,
-	getFontMetrics,
-	isEllipsePath,
-	linearGradientAngle,
-	linearGradientPoints,
-	MAX_EXPORT_DIMENSION,
-	MAX_SUPERSAMPLE,
-	type MeasureText,
-	type PaintCache,
-	type PaintCacheOptions,
-	type PaintCacheStats,
-	type Renderer,
-	readFontMetrics,
-	registerFontMetrics,
-	resolveExportScale,
-	resolveSupersample,
-	type SpanFont,
-	type TextCase,
-	type TextEngine,
-} from "@freshcoat-js/engine";
 export {
 	ASSET_URI_PREFIX,
 	type AssetHashMismatch,
@@ -33,8 +5,6 @@ export {
 	assetDataUri,
 	assetUri,
 	attachAssets,
-	base64ToBytes,
-	bytesToBase64,
 	collectAssetRefs,
 	detachAssets,
 	inlineAssetUrls,
@@ -70,16 +40,11 @@ export {
 	bleedMm,
 	bleedSize,
 	type CardSizeMm,
-	CR80_CORNER_MM,
-	CR80_LONG_MM,
-	CR80_SAFE_MM,
-	CR80_SHORT_MM,
 	cardSizeMm,
 	compactInsets,
 	extendIntoBleed,
 	hasInsets,
 	isPrintedCard,
-	MM_PER_INCH,
 	maxInsets,
 	NO_BLEED,
 	type PrintGuideMetrics,
@@ -94,12 +59,7 @@ export {
 	templateBleed,
 	templateSafeArea,
 } from "./bleed";
-export {
-	applyBooleans,
-	cachePathOp,
-	canvasKitPathOp,
-	type PathOp,
-} from "./boolean";
+export { canvasKitPathOp, type PathOp } from "./boolean";
 export {
 	CoatError,
 	type CoatErrorCode,
@@ -109,15 +69,7 @@ export {
 	writableTemplate,
 } from "./coat";
 export { compile } from "./compile";
-export {
-	barcodeBox,
-	constrainBox,
-	fitDesignSize,
-	resizeElements,
-	resizeTemplate,
-	resizeVectorBoolean,
-	resizeVectorPath,
-} from "./constraints";
+export { fitDesignSize, resizeTemplate } from "./constraints";
 export { defineTemplate, type TemplateModule } from "./define";
 export { effectsOf } from "./effects";
 export {
@@ -131,14 +83,7 @@ export {
 	variantFieldRefs,
 	visibilityFieldRefs,
 } from "./fields";
-export {
-	defaultFontFamily,
-	type FontUsage,
-	fontRequestKey,
-	fontUsage,
-	googleCss2Url,
-	googleFamilyParam,
-} from "./font-usage";
+export { defaultFontFamily, type FontUsage, fontUsage } from "./font-usage";
 export {
 	collectFontBytes,
 	collectFontRequests,
@@ -197,6 +142,7 @@ export {
 	wholeToken,
 } from "./mustache";
 export {
+	type FreeIdOptions,
 	type HealOptions,
 	healElementIds,
 	type IdSeparator,
@@ -205,17 +151,11 @@ export {
 	uniquifyElementIds,
 	uniquifyElementIdsDeep,
 } from "./normalize";
-export { pieceSize, pieceSpec } from "./piece";
-export {
-	fieldContext,
-	type PrepareOptions,
-	prepareTemplate,
-} from "./prepare";
+export { pieceSize } from "./piece";
+export { type PrepareOptions, prepareTemplate } from "./prepare";
 export {
 	describePrintIssue,
-	isLightFace,
 	isRichBlack,
-	POINTS_PER_INCH,
 	PRINT_CHECK_DEFAULTS,
 	type PrintCheckOptions,
 	type PrintCheckWarning,
@@ -227,7 +167,7 @@ export {
 	unitsToMm,
 	unitsToPt,
 } from "./print-checks";
-export { generateMatrix, MAX_QR_LOGO_SIZE, QR_LOGO_H_COVERAGE } from "./qr";
+export { MAX_QR_LOGO_SIZE, QR_LOGO_H_COVERAGE } from "./qr";
 export {
 	describeQrIssue,
 	MIN_QR_CONTRAST,
@@ -245,70 +185,40 @@ export {
 	type ResolvedSlice,
 	type ResolveSlicesOptions,
 	resolveSlices,
-	sliceLayers,
 } from "./slices";
-export {
-	parseTrimValue,
-	type ResolvedStrokeTrim,
-	resolveStrokeTrim,
-	type StrokeTrimInput,
-} from "./stroke-trim";
 export { strokeSides, widestStroke } from "./stroke-width";
 export {
-	compiledPattern,
 	PATTERN_CACHE_MAX,
 	patternProblem,
-	type TextRuleBreak,
 	type TextRules,
-	textRuleBreaks,
 } from "./text-rules";
 export { allElements, childElements, walkElements } from "./tree";
 export type {
 	BackdropBlurEffect,
 	Background,
-	BakedTextLayout,
 	BarcodeElement,
 	BarcodeProperties,
 	BearerBars,
-	BitmapRole,
-	BlendMode,
 	BlurEffect,
 	BooleanOp,
 	BooleanOperandElement,
 	BoxStroke,
-	Command,
 	CompiledFrame,
 	CompiledTemplate,
 	CompileOptions,
 	CompileWarning,
 	Constraint,
 	Constraints,
-	DrawBitmapCommand,
-	DrawCommand,
-	DrawGroupCommand,
-	DrawImageCommand,
-	DrawPathCommand,
-	DrawQrCommand,
-	DrawRectCommand,
-	DrawTextCommand,
 	Effect,
 	Element,
 	ElementAdjust,
 	ElementShell,
 	ElementType,
-	EncodePngOptions,
-	ExportConstraint,
-	ExportSetting,
 	FieldDefinition,
 	FieldFormat,
 	FieldReferenceRole,
 	FieldsSchema,
 	Fill,
-	FontDescriptor,
-	FontFile,
-	FontRequest,
-	FontResolution,
-	FontVMetrics,
 	FrameAssets,
 	FrameElement,
 	FrameFlexLayout,
@@ -316,11 +226,9 @@ export type {
 	FrameProperties,
 	FrameWarning,
 	Gradient,
-	GradientStop,
 	GrainEffect,
 	GridTrack,
 	HalftoneEffect,
-	ImageCrop,
 	ImageElement,
 	ImageProperties,
 	InlineAsset,
@@ -331,7 +239,6 @@ export type {
 	LeafElement,
 	MaskElement,
 	MaskProperties,
-	PaintWarning,
 	PrintWarning,
 	QrCodeElement,
 	QrCodeProperties,
@@ -341,17 +248,10 @@ export type {
 	QrModuleShape,
 	RectElement,
 	RectProperties,
-	ResolvedFill,
-	ResolvedFont,
-	SetupCommand,
-	Shadow,
 	ShadowEffect,
-	ShapeMask,
 	Sides,
-	Size,
 	SliceModifier,
 	SpotColor,
-	Stroke,
 	StrokeSideWidths,
 	Symbology,
 	Template,
@@ -359,13 +259,10 @@ export type {
 	TemplateSource,
 	TemplateWarning,
 	TextElement,
-	TextLine,
-	TextLineSpan,
 	TextProperties,
 	ValidationError,
 	ValidationResult,
 	Variant,
-	Vec2,
 	VectorBoolean,
 	VectorElement,
 	VectorProperties,
@@ -387,7 +284,6 @@ export {
 export { validate, validateValues } from "./validate";
 export {
 	type ApplyVariantOptions,
-	activeVariantId,
 	applyVariant,
 	backgroundSwatch,
 	checkVariants,

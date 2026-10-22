@@ -1,4 +1,4 @@
-import { assetUri, type PendingAsset } from "@freshcoat-js/coatfile/assets";
+import { assetUri, type PendingAsset } from "@freshcoat-js/coatfile";
 import type { FlattenMarker } from "./coalesce";
 
 export type RenderRequest = {

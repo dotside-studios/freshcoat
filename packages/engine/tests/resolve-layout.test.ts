@@ -4,16 +4,17 @@
 // text width→height coupling — with a deterministic stub `measure` so the
 // geometry is exact (no font/CanvasKit dependency).
 import { describe, expect, test } from "bun:test";
-import type { MeasureText, ResolvedFont } from "../src/index";
+import type { MeasureText } from "../src/index";
 import {
 	autoLayout,
 	createGroup,
 	createRect,
 	createText,
 	gridLayout,
-	resolveLayout,
 } from "../src/index";
 import type { GridLayout, GroupNode, Node } from "../src/node";
+import { resolveLayout } from "../src/resolve-layout";
+import type { ResolvedFont } from "../src/types";
 
 // A stub metric: every glyph is `size`×`size`; a single line is chars*size wide
 // and `size` tall. With a maxWidth, wrap greedily by whole chars (word-blind —

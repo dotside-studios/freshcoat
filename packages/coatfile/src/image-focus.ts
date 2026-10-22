@@ -1,4 +1,4 @@
-import type { Vec2 } from "./types";
+import type { Vec2 } from "@freshcoat-js/engine";
 
 const PAIR =
 	/^\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,\s]\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+))\s*$/;

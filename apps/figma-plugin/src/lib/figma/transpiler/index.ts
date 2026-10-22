@@ -1,3 +1,4 @@
+import type { PendingAsset } from "@freshcoat-js/coatfile";
 import {
 	type Background,
 	backgroundSwatch,
@@ -10,7 +11,6 @@ import {
 	type VariantElementDelta,
 	variantIdFor,
 } from "@freshcoat-js/coatfile";
-import type { PendingAsset } from "@freshcoat-js/coatfile/assets";
 import {
 	buildFieldMeta,
 	createBindingResolver,

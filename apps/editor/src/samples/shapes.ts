@@ -1,4 +1,4 @@
-import { ellipsePath } from "@freshcoat-js/coatfile";
+import { ellipsePath } from "@freshcoat-js/engine/internal";
 
 /** A four-point sparkle filling a `s`×`s` box. */
 export function sparklePath(s: number): string {

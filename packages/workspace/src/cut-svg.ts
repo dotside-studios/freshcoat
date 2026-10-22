@@ -1,4 +1,4 @@
-import { MM_PER_INCH } from "@freshcoat-js/coatfile";
+import { MM_PER_INCH } from "@freshcoat-js/engine";
 import { CUT_KINDS, CUT_STYLES, type ItemCuts } from "./cut";
 
 /** The stroke of a cut line: a quarter point, the PDF's hairline. */

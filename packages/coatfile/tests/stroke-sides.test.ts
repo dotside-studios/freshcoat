@@ -1,13 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import type { GroupNode, RectNode } from "@freshcoat-js/engine";
 import { compile } from "../src/compile";
 import { minimumFormatVersion } from "../src/format";
-import type {
-	Element,
-	GroupNode,
-	RectNode,
-	Template,
-	Variant,
-} from "../src/types";
+import type { Element, Template, Variant } from "../src/types";
 import { validate } from "../src/validate";
 
 const sides = { top: 1, right: 2, bottom: 3 };

@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { type FontFetch, policyFetch } from "@freshcoat-js/engine";
+import type { FontFetch } from "@freshcoat-js/engine";
+import { policyFetch } from "@freshcoat-js/engine/internal";
 import type { Io } from "./io";
 
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;

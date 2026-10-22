@@ -1,12 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import {
-	compileScene,
-	createImage,
-	fitRect,
-	type ImageNode,
-	validateCommands,
-} from "../src/index";
+import { compileScene, createImage, type ImageNode } from "../src/index";
+import { fitRect } from "../src/paint-helpers";
+import { validateCommands } from "../src/validate-commands";
 import { createHeadlessEnv } from "./helpers/headless";
 
 let ck: any;

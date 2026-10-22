@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { setCpuFinish } from "../src/canvaskit";
+import type { PaintSwitches } from "../src/canvaskit";
 import { createFrame, createRect } from "../src/node";
 import type { EncodedPaintResult } from "../src/runtime-types";
 import type { FrameFinish } from "../src/types";
@@ -52,12 +52,17 @@ const swatchScene = () =>
 		],
 	});
 
-const render = async (ck: unknown, finish?: FrameFinish) =>
+const render = async (
+	ck: unknown,
+	finish?: FrameFinish,
+	switches?: PaintSwitches,
+) =>
 	(await renderSceneToPng(swatchScene(), {
 		width: 60,
 		height: 20,
 		ck,
 		finish,
+		switches,
 	})) as EncodedPaintResult;
 
 describe("FrameFinish", () => {
@@ -126,24 +131,22 @@ describe("FrameFinish", () => {
 
 	test("a curve whose table can't be uploaded leaves the frame as it was", async () => {
 		const ck = await loadCanvasKit();
-		setCpuFinish(false);
-		try {
-			const control = await render(ck);
-			const noTable = Object.create(ck);
-			noTable.MakeImage = (info: any, pixels: Uint8Array, rowBytes: number) =>
-				info.width === 256 && info.height === 1
-					? null
-					: ck.MakeImage(info, pixels, rowBytes);
-			const invert = Uint8Array.from({ length: 256 }, (_, i) => 255 - i);
-			const finished = await render(noTable, {
-				curve: { r: invert, g: invert, b: invert },
-			});
-			for (const x of [10, 30, 50])
-				expect(pixelAt(ck, finished.bytes, x, 10)).toEqual(
-					pixelAt(ck, control.bytes, x, 10),
-				);
-		} finally {
-			setCpuFinish(true);
-		}
+		const shader = { cpuFinish: false };
+		const control = await render(ck, undefined, shader);
+		const noTable = Object.create(ck);
+		noTable.MakeImage = (info: any, pixels: Uint8Array, rowBytes: number) =>
+			info.width === 256 && info.height === 1
+				? null
+				: ck.MakeImage(info, pixels, rowBytes);
+		const invert = Uint8Array.from({ length: 256 }, (_, i) => 255 - i);
+		const finished = await render(
+			noTable,
+			{ curve: { r: invert, g: invert, b: invert } },
+			shader,
+		);
+		for (const x of [10, 30, 50])
+			expect(pixelAt(ck, finished.bytes, x, 10)).toEqual(
+				pixelAt(ck, control.bytes, x, 10),
+			);
 	});
 });

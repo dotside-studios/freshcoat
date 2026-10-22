@@ -13,10 +13,10 @@ import {
 	createGroup,
 	createRect,
 	createText,
-	validateCommands,
 } from "../src/index";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import type { Command, DrawRectCommand } from "../src/types";
+import { validateCommands } from "../src/validate-commands";
 
 const FONT = testFontPath("Geist-Regular.ttf");
 const FAMILY = "ValidateFont";

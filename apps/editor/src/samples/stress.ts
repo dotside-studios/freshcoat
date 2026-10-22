@@ -1,5 +1,6 @@
 import type { Element, Template } from "@freshcoat-js/coatfile";
-import { bytesToBase64, FORMAT_VERSION } from "@freshcoat-js/coatfile";
+import { FORMAT_VERSION } from "@freshcoat-js/coatfile";
+import { bytesToBase64 } from "@freshcoat-js/engine/internal";
 import { sha256Hex } from "@freshcoat-js/workspace";
 import { VEND_SANS, VEND_SANS_FAMILY } from "./vend-sans";
 

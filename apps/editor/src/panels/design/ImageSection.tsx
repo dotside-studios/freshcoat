@@ -1,5 +1,4 @@
 import {
-	type ImageCrop,
 	type ImageElement,
 	type ImageProperties,
 	parseAssetUri,
@@ -7,6 +6,7 @@ import {
 	type Template,
 } from "@freshcoat-js/coatfile";
 import { wholeToken } from "@freshcoat-js/coatfile/mustache";
+import type { ImageCrop } from "@freshcoat-js/engine";
 import { Button } from "@freshcoat-js/ui/button";
 import { Checkbox } from "@freshcoat-js/ui/checkbox";
 import { TextField } from "@freshcoat-js/ui/field";

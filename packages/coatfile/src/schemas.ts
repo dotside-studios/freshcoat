@@ -1,4 +1,4 @@
-import { parseColor } from "@freshcoat-js/engine";
+import { parseColor } from "@freshcoat-js/engine/internal";
 import { z } from "zod";
 import {
 	FORMAT_MAJOR,

@@ -1,5 +1,4 @@
-import type { TemplateWarning } from "@freshcoat-js/coatfile";
-import type { PendingAsset } from "@freshcoat-js/coatfile/assets";
+import type { PendingAsset, TemplateWarning } from "@freshcoat-js/coatfile";
 import {
 	type BindingResolver,
 	type FieldMeta,

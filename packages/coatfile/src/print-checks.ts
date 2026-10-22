@@ -1,11 +1,11 @@
 import {
 	type DrawCommand,
 	MM_PER_INCH,
-	parseColor,
 	type ResolvedFont,
 	type Stroke,
 	type TextStroke,
 } from "@freshcoat-js/engine";
+import { parseColor } from "@freshcoat-js/engine/internal";
 import {
 	extendable,
 	rotatedBox,

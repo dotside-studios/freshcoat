@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import type { RectNode } from "@freshcoat-js/engine";
 import { compile } from "../src/compile";
-import type { RectNode, Template } from "../src/types";
+import type { Template } from "../src/types";
 import { validate } from "../src/validate";
 
 const stops = [

@@ -188,25 +188,6 @@ function hasFinishOp(f: FrameFinish): boolean {
 	);
 }
 
-// The fonts and images a scene references — the same walk compileScene runs for
-// its own setup commands, exposed for callers that must declare a frame's assets
-// up front (coatfile's CompiledFrame, the worker's raw render source). Those
-// callers hand the result back as `fonts`/`images`, which are OVERRIDES: an empty
-// list means "load nothing", not "nothing found", so a second walk that drifted
-// would silently render text in no font at all.
-export function sceneAssets(node: Node): {
-	fonts: FontRequest[];
-	images: string[];
-} {
-	const images = new Set<string>();
-	const fonts = new Set<string>();
-	collectAssets(node, images, fonts);
-	return {
-		fonts: [...fonts].map((family) => ({ family })),
-		images: [...images],
-	};
-}
-
 function collectAssets(
 	node: Node,
 	images: Set<string>,

@@ -2,8 +2,8 @@
 // base64url-encoded without padding, carried in the fragment of
 // `<address>/edit#coat=<data>` so it never reaches a server.
 
+import { base64ToBytes, bytesToBase64 } from "@freshcoat-js/engine/internal";
 import { deflateSync, Inflate, strFromU8, strToU8 } from "fflate";
-import { base64ToBytes, bytesToBase64 } from "./assets";
 
 /** The longest `coat` value sent as a link. Chromium accepts URLs up to 2 MB;
  *  this leaves room for the address and for browsers that allow less. */

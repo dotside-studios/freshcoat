@@ -1,4 +1,4 @@
-import { assetUri } from "@freshcoat-js/coatfile/assets";
+import { assetUri } from "@freshcoat-js/coatfile";
 import type { BindingResolver } from "../binding";
 import type { FigmaContainerNode } from "../types";
 import { dedupeFlattenMarkers } from "./coalesce";

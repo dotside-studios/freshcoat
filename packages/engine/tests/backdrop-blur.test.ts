@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { buildAdjust } from "../src/adjust";
-import { auditAdjustedBounds, setLayerBounds } from "../src/canvaskit";
+import { auditAdjustedBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
 import {
 	createEllipse,
@@ -382,20 +382,16 @@ describe("backdrop blur", () => {
 				{ opacity: 0.8 },
 			),
 		]);
-		const bytes = async () =>
+		const bytes = async (layerBounds: boolean) =>
 			(
 				(await renderSceneToPng(scene, {
 					width: W,
 					height: H,
 					ck,
+					switches: { layerBounds },
 				})) as EncodedPaintResult
 			).bytes;
-		const bounded = await bytes();
-		setLayerBounds(false);
-		try {
-			expect(await bytes()).toEqual(bounded);
-		} finally {
-			setLayerBounds(true);
-		}
+		const bounded = await bytes(true);
+		expect(await bytes(false)).toEqual(bounded);
 	});
 });

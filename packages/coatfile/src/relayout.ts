@@ -3,17 +3,16 @@
 // `constraints`, as Figma does, and a frame or mask whose own box changed
 // re-places its children the same way.
 
-import { scalePathData } from "@freshcoat-js/engine";
+import type { Size, Vec2 } from "@freshcoat-js/engine";
+import { scalePathData } from "@freshcoat-js/engine/path";
 import { isSquareSymbology } from "./barcode-encoder";
 import type {
 	BooleanOperandElement,
 	Constraint,
 	Element,
-	Size,
 	Symbology,
 	Template,
 	TemplateFrame,
-	Vec2,
 	VectorElement,
 } from "./types";
 

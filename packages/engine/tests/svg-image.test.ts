@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
-import { compileScene, createImage, createPaintCache } from "../src/index";
+import { compileScene, createImage } from "../src/index";
 import type { ImageNode, MaskNode, PathNode } from "../src/node";
+import { createPaintCache } from "../src/paint-cache";
 import { parseSvg, svgToNode } from "../src/svg";
 import { createHeadlessEnv } from "./helpers/headless";
 

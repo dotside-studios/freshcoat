@@ -14,12 +14,12 @@
 
 import {
 	type Adjust,
-	applyAdjustColor,
 	composeAdjust,
 	type FrameFinish,
 	type ImageNode,
 	type Node,
 } from "@freshcoat-js/engine";
+import { applyAdjustColor } from "@freshcoat-js/engine/internal";
 import { analyzePixels, correctionMatrix } from "./analyze";
 import { DEFAULT_PRINT_TARGET, type PrintTarget } from "./target";
 import type {

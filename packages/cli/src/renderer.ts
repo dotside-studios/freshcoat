@@ -2,9 +2,9 @@ import {
 	type ByteLoader,
 	createFetchLoader,
 	createRenderer,
-	inheritLoaderPolicy,
 	type Renderer,
 } from "@freshcoat-js/engine";
+import { inheritLoaderPolicy } from "@freshcoat-js/engine/internal";
 import {
 	type CanvasKitBuild,
 	fileLoader,

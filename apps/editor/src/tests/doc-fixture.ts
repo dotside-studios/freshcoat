@@ -1,12 +1,8 @@
 import { createHash } from "node:crypto";
 import type { Element, Template, TemplateFrame } from "@freshcoat-js/coatfile";
-import {
-	approxEngine,
-	bytesToBase64,
-	compile,
-	sampleValues,
-} from "@freshcoat-js/coatfile";
-import { resolveLayout } from "@freshcoat-js/engine";
+import { compile, sampleValues } from "@freshcoat-js/coatfile";
+import { approxEngine } from "@freshcoat-js/engine";
+import { bytesToBase64, resolveLayout } from "@freshcoat-js/engine/internal";
 import { collectGeometry, type LayerGeometry } from "../doc/geometry";
 import { buildPreview } from "../doc/preview";
 

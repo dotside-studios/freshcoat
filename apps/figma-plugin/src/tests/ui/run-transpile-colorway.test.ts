@@ -1,4 +1,4 @@
-import { base64ToBytes } from "@freshcoat-js/coatfile/assets";
+import { base64ToBytes } from "@freshcoat-js/engine/internal";
 import { sha256 } from "js-sha256";
 import { describe, expect, it } from "vitest";
 import { fixtures } from "~/lib/figma/transpiler/fixtures";

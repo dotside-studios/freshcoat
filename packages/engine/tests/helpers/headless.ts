@@ -1,3 +1,4 @@
+import type { PaintSwitches } from "../../src/canvaskit";
 import type { Precision } from "../../src/color-policy";
 import { compileScene } from "../../src/compile-scene";
 import { resolveFontRequest } from "../../src/font-bytes";
@@ -25,6 +26,7 @@ export function createHeadlessEnv(opts?: {
 	cache?: PaintCache;
 	// Decoded images the caller owns (see PaintRuntime.loadImage).
 	loadImage?: PaintRuntime["loadImage"];
+	switches?: PaintSwitches;
 }): PaintRuntime {
 	return makeRuntime(
 		{
@@ -38,6 +40,8 @@ export function createHeadlessEnv(opts?: {
 		},
 		"encode",
 		opts?.encode,
+		undefined,
+		opts?.switches,
 	);
 }
 
@@ -67,6 +71,7 @@ export async function renderSceneToPng(
 		supersample?: number;
 		// Working precision (see ./color-policy). Omit = "u8".
 		precision?: Precision;
+		switches?: PaintSwitches;
 	},
 ): Promise<EncodedPaintResult> {
 	const fonts = opts.fonts ?? new Map<string, Uint8Array[]>();
@@ -88,6 +93,7 @@ export async function renderSceneToPng(
 			fonts,
 			images: opts.images,
 			encode: opts.encode,
+			switches: opts.switches,
 		});
 		return (await env.paint(commands, opts.ck)) as EncodedPaintResult;
 	} finally {

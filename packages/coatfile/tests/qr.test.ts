@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Command, DrawCommand } from "@freshcoat-js/engine";
 import {
 	BinaryBitmap,
 	HybridBinarizer,
@@ -13,7 +14,7 @@ import {
 	qrCacheBytes,
 	qrSymbol,
 } from "../src/qr";
-import type { Command, DrawCommand, Template } from "../src/types";
+import type { Template } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 
 // Recursively find the first draw command matching `op` (QR lowers to a path

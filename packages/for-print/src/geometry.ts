@@ -1,4 +1,4 @@
-import { cr80Pixels } from "@freshcoat-js/engine";
+import { cr80Pixels } from "@freshcoat-js/engine/internal";
 import type { CardOrientation, CropRegion } from "./types";
 
 // CR80 card dimensions at 300dpi

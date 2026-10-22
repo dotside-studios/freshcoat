@@ -4,7 +4,7 @@ import {
 	contrastMatrix,
 	identityColorMatrix,
 	saturationMatrix,
-} from "@freshcoat-js/engine";
+} from "@freshcoat-js/engine/internal";
 import { detectOrientation } from "./geometry";
 import { type PrintTarget, YMCKO_DYE_SUB } from "./target";
 import type {

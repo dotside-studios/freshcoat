@@ -190,6 +190,7 @@ type Frame = {
 	scale: number;
 	grid?: number;
 	precision?: Precision;
+	layerBounds?: boolean;
 };
 
 // Canvas2D shadowBlur ≈ 2·sigma. Figma's layer-blur value is ~2.27× the
@@ -4482,6 +4483,7 @@ function applyFrameFinish(
 	// pixels, so it works in device pixels whatever density the scene exported at.
 	device: Size,
 	cache: PaintCacheState | null,
+	cpuFinish: boolean,
 ) {
 	const u = finishUniforms(finish);
 	const effect = finishEffect(ck, u.curve ? "finish-curve" : "finish");
@@ -4530,13 +4532,6 @@ function applyFrameFinish(
 }
 
 const UNIT = f32(1 / 255);
-
-// Test hook: run every finish through the shader.
-let cpuFinish = true;
-
-export function setCpuFinish(enabled: boolean): void {
-	cpuFinish = enabled;
-}
 
 // How many paints of a frame size that last had translucent pixels go
 // straight to the shader before one reads the frame back to look again.
@@ -4731,13 +4726,6 @@ function linearBurnBlender(ck: CanvasKit, bin: Bin): Blender | null {
 	return eff ? bin.track(eff.makeBlender([])) : null;
 }
 
-// Test hook: paint every layer unbounded.
-let boundLayers = true;
-
-export function setLayerBounds(enabled: boolean): void {
-	boundLayers = enabled;
-}
-
 // Conservative local bounds for a layer holding `inner`, so it is allocated and
 // filtered over its content rather than the whole surface. Skia grows them for
 // the layer paint's image filter itself. Padded by a device pixel. Null leaves
@@ -4752,7 +4740,7 @@ function layerBounds(
 	inner: DrawCommand,
 	frame: Frame,
 ): Rect | null {
-	if (!boundLayers || measuring.has(canvas)) return null;
+	if (frame.layerBounds === false || measuring.has(canvas)) return null;
 	const matrix = canvas.getTotalMatrix() as number[];
 	if (matrix[1] !== 0 || matrix[3] !== 0) return null;
 	if (!(matrix[0] > 0 && matrix[4] > 0)) return null;
@@ -5487,11 +5475,21 @@ export type PaintOrigin = { x: number; y: number };
 // rt.cache, all three are kept by the cache instead and reused by the next paint.
 // `fontProvider` holds every face in rt.fonts; a paint whose fonts all come
 // from there uses it rather than registering its own.
+// Internal test switches, on by default: cpuFinish false runs every finish
+// through the shader, layerBounds false paints every layer unbounded.
+export type PaintSwitches = { cpuFinish?: boolean; layerBounds?: boolean };
+
+type PaintSceneOptions = {
+	fontProvider?: SharedFontProvider;
+	origin?: PaintOrigin;
+	switches?: PaintSwitches;
+};
+
 export async function paintScene(
 	canvasKit: unknown,
 	commands: Command[],
 	rt: PaintTarget,
-	opts?: { fontProvider?: SharedFontProvider; origin?: PaintOrigin },
+	opts?: PaintSceneOptions,
 ): Promise<PaintOutput> {
 	const ck = canvasKit as CanvasKit;
 	const cache = rt.cache ? paintCacheState(rt.cache) : null;
@@ -5517,7 +5515,7 @@ async function paintSceneIn(
 	ck: CanvasKit,
 	commands: Command[],
 	rt: PaintTarget,
-	opts: { fontProvider?: SharedFontProvider; origin?: PaintOrigin } | undefined,
+	opts: PaintSceneOptions | undefined,
 	cache: PaintCacheState | null,
 	bin: Bin,
 	rollback: (() => void)[],
@@ -5671,6 +5669,7 @@ async function paintSceneIn(
 		scale: renderScale,
 		grid: supersample,
 		precision,
+		layerBounds: opts?.switches?.layerBounds ?? true,
 	};
 
 	// A working surface apart from the output, when the render is denser than
@@ -5844,7 +5843,15 @@ async function paintSceneIn(
 			| { op: "finishFrame"; finish: FrameFinish }
 			| undefined;
 		if (finishCmd)
-			applyFrameFinish(ck, surface, bin, finishCmd.finish, device, cache);
+			applyFrameFinish(
+				ck,
+				surface,
+				bin,
+				finishCmd.finish,
+				device,
+				cache,
+				opts?.switches?.cpuFinish ?? true,
+			);
 		// Flush before the bin frees the provider/images: on the WebGL path the GPU
 		// still references the decoded images until the surface is flushed.
 		surface.flush();

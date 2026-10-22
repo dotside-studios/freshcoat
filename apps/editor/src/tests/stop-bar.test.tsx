@@ -1,5 +1,6 @@
 import type { Template } from "@freshcoat-js/coatfile";
-import type { Gradient, GradientStop } from "@freshcoat-js/coatfile/fills";
+import type { Gradient } from "@freshcoat-js/coatfile/fills";
+import type { GradientStop } from "@freshcoat-js/engine";
 import {
 	act,
 	cleanup,

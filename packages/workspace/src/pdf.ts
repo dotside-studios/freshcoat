@@ -2,9 +2,9 @@ import {
 	type BleedMm,
 	type CardSizeMm,
 	cardSizeMm,
-	MM_PER_INCH,
 	resolveBleedMm,
 } from "@freshcoat-js/coatfile";
+import { MM_PER_INCH } from "@freshcoat-js/engine";
 import {
 	type OutputIntent,
 	type ResolvedOutputIntent,

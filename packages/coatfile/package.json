@@ -12,22 +12,18 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./assets": "./src/assets.ts",
 		"./barcode-encoder": "./src/barcode-encoder.ts",
 		"./bleed": "./src/bleed.ts",
 		"./fills": "./src/fills.ts",
 		"./fonts": "./src/font-usage.ts",
 		"./render": "./src/render.ts",
-		"./slices": "./src/slices.ts",
 		"./svg": "./src/svg.ts",
-		"./normalize": "./src/normalize.ts",
 		"./coat": "./src/coat.ts",
-		"./define": "./src/define.ts",
-		"./fields": "./src/fields.ts",
 		"./handoff": "./src/handoff.ts",
 		"./mustache": "./src/mustache.ts",
 		"./fixtures": "./fixtures/index.ts",
-		"./schema/*": "./schema/*"
+		"./schema/*": "./schema/*",
+		"./internal": "./src/internal.ts"
 	},
 	"scripts": {
 		"test": "bun test",

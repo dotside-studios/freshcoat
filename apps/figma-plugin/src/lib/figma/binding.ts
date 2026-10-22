@@ -7,7 +7,7 @@ import type {
 	Symbology,
 	VisibilityCondition,
 } from "@freshcoat-js/coatfile";
-import { fieldTitle } from "@freshcoat-js/coatfile/fields";
+import { fieldTitle } from "@freshcoat-js/coatfile";
 import { tokenIds, wholeToken } from "@freshcoat-js/coatfile/mustache";
 import { parseBarcodeLayerName } from "./transpiler/barcode-name";
 import { canHoldImage } from "./transpiler/image-shape";

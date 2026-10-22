@@ -2,11 +2,13 @@ import {
 	type Element,
 	extendIntoBleed,
 	hasInsets,
-	resizeVectorBoolean,
-	resizeVectorPath,
 	type Sides,
 	type Template,
 } from "@freshcoat-js/coatfile";
+import {
+	resizeVectorBoolean,
+	resizeVectorPath,
+} from "@freshcoat-js/coatfile/internal";
 import type { Node } from "@freshcoat-js/engine";
 import { round2 } from "./factories";
 import {

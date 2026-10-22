@@ -1,5 +1,5 @@
 import type { VectorElement } from "@freshcoat-js/coatfile";
-import { scalePathData } from "@freshcoat-js/engine";
+import { scalePathData } from "@freshcoat-js/engine/path";
 import { TextArea } from "@freshcoat-js/ui/field";
 import { NumberField } from "@freshcoat-js/ui/number-field";
 import { Select, SelectItem } from "@freshcoat-js/ui/select";

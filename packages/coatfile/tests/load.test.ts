@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { bytesToBase64 } from "@freshcoat-js/engine/internal";
 import { fixtures } from "../fixtures";
-import { assetUri, bytesToBase64 } from "../src/assets";
+import { assetUri } from "../src/assets";
 import { packTemplate, pruneUnusedAssets } from "../src/coat";
 import { loadTemplate } from "../src/load";
 import type { Template } from "../src/types";

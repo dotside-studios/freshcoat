@@ -1,9 +1,9 @@
 import {
-	type Renderer,
 	type ResolvedTemplateFonts,
 	type ResolveTemplateFontsOptions,
 	resolveTemplateFonts,
 } from "@freshcoat-js/coatfile";
+import type { Renderer } from "@freshcoat-js/engine";
 import { planExport } from "../plan";
 import type { ExportPreset, Workspace } from "../types";
 import { checkAllGlyphs, type GlyphIssue } from "./glyph-preflight";

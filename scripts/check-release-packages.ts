@@ -3,6 +3,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -72,6 +73,32 @@ try {
 			for (const path of Object.values(value as Record<string, string>)) {
 				if (!entries.includes(`package/${path.replace(/^\.\//, "")}`))
 					throw new Error(`Missing export target ${path}`);
+			}
+		}
+	}
+	// A published package may import another's subpath, `./internal` included,
+	// only if that package's published manifest exports it.
+	const published = new Map(
+		packages.map((directory) => {
+			const staged = JSON.parse(
+				readFileSync(join(stagingRoot, directory, "package.json"), "utf8"),
+			);
+			return [staged.name as string, Object.keys(staged.exports)];
+		}),
+	);
+	for (const directory of packages) {
+		const dir = join(stagingRoot, directory, "src");
+		for (const file of readdirSync(dir, { recursive: true }) as string[]) {
+			if (!/\.(js|d\.ts)$/.test(file)) continue;
+			const text = readFileSync(join(dir, file), "utf8");
+			for (const [, name, sub] of text.matchAll(
+				/["'](@freshcoat-js\/[a-z-]+)(\/[^"']+)?["']/g,
+			)) {
+				const keys = published.get(name);
+				if (keys && !keys.includes(`.${sub ?? ""}`))
+					throw new Error(
+						`${directory}/src/${file} imports ${name}${sub ?? ""}, which is not exported`,
+					);
 			}
 		}
 	}

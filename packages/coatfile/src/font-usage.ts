@@ -2,12 +2,6 @@ import { walkElements } from "./tree";
 import type { BarcodeElement, Element, Template } from "./types";
 import { applyVariant } from "./variants";
 
-export {
-	fontRequestKey,
-	googleCss2Url,
-	googleFamilyParam,
-} from "@freshcoat-js/engine";
-
 export type FontUsage = { weights: number[]; italic: boolean };
 
 // The family a barcode's text and placeholder label use when the element names

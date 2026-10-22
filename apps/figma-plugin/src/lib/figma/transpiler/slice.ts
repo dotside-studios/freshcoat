@@ -1,5 +1,5 @@
 import type { Element, TemplateWarning } from "@freshcoat-js/coatfile";
-import { isOpenVector } from "@freshcoat-js/coatfile/slices";
+import { isOpenVector } from "@freshcoat-js/coatfile/internal";
 import type { FigmaContainerNode, FigmaNode, FigmaSliceNode } from "../types";
 import { isContainerNode, isSliceNode } from "../types";
 import { FlattenFallbackError, placeWorld } from "./coordinates";

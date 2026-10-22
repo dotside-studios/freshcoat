@@ -6,10 +6,10 @@ import type {
 } from "@freshcoat-js/coatfile";
 import {
 	applyVariant,
-	base64ToBytes,
 	hiddenElementIds,
 	templateFieldRefs,
 } from "@freshcoat-js/coatfile";
+import { base64ToBytes } from "@freshcoat-js/engine/internal";
 import { childEntries, isBooleanVector, keyOf, MASK_SOURCE } from "./path";
 
 export type PreviewOptions = {

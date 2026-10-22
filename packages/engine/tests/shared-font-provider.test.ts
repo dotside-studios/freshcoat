@@ -3,18 +3,13 @@ import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { paintScene } from "../src/canvaskit";
 import { createSharedFontProvider } from "../src/font-collection";
 import { deriveFontMetrics } from "../src/font-metrics";
-import {
-	type Command,
-	compileScene,
-	createFrame,
-	createPaintCache,
-	createText,
-	encodePng,
-} from "../src/index";
+import { compileScene, createFrame, createText, encodePng } from "../src/index";
 import type { Node } from "../src/node";
+import { createPaintCache } from "../src/paint-cache";
 import { createParagraphEngine } from "../src/paragraph-layout";
 import { initCanvasKit } from "../src/platform/node";
 import { createRenderer } from "../src/renderer";
+import type { Command } from "../src/types";
 import { createHeadlessEnv } from "./helpers/headless";
 import { heapInUse } from "./helpers/heap";
 

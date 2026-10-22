@@ -1,4 +1,9 @@
 import { beforeAll, describe, expect, test } from "bun:test";
+import type {
+	Command,
+	DrawCommand,
+	DrawRectCommand,
+} from "@freshcoat-js/engine";
 import {
 	createRenderer,
 	decodePixels,
@@ -8,9 +13,6 @@ import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { compile } from "../src/compile";
 import { renderTemplate } from "../src/render";
 import type {
-	Command,
-	DrawCommand,
-	DrawRectCommand,
 	Element,
 	FrameElement,
 	Layout,

@@ -2,15 +2,11 @@ import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
 import { paintScene } from "../src/canvaskit";
 import { deriveFontMetrics } from "../src/font-metrics";
-import {
-	type Command,
-	compileScene,
-	createFrame,
-	createPaintCache,
-	createText,
-} from "../src/index";
+import { compileScene, createFrame, createText } from "../src/index";
 import type { Node } from "../src/node";
+import { createPaintCache } from "../src/paint-cache";
 import { createParagraphEngine } from "../src/paragraph-layout";
+import type { Command } from "../src/types";
 import { createHeadlessEnv } from "./helpers/headless";
 
 const GEIST = testFontBytes("Geist-Regular.ttf");

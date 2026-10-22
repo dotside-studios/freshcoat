@@ -1,5 +1,5 @@
-import { linearGradientAngle } from "@freshcoat-js/coatfile";
 import { type Gradient, linearPoints } from "@freshcoat-js/coatfile/fills";
+import { linearGradientAngle } from "@freshcoat-js/engine/internal";
 import {
 	ancestorRects,
 	centreOf,

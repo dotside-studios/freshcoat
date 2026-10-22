@@ -1,5 +1,5 @@
 import type { VisibilityCondition } from "@freshcoat-js/coatfile";
-import { uniquifyElementIdsDeep as uniquifyIdsDeep } from "@freshcoat-js/coatfile/normalize";
+import { uniquifyElementIdsDeep as uniquifyIdsDeep } from "@freshcoat-js/coatfile";
 import type { FigmaNode } from "../types";
 
 // Figma masks the layers ABOVE a mask layer in the same parent, up to the next

@@ -3,10 +3,10 @@ import {
 	DEFAULT_MIN_IMAGE_DPI,
 	hasToken,
 	imagePixelSize,
-	type Size,
 	type Template,
 	walkElements,
 } from "@freshcoat-js/coatfile";
+import type { Size } from "@freshcoat-js/engine";
 import { fileLoader } from "@freshcoat-js/engine/node";
 import { WORKSPACE_EXTENSION } from "@freshcoat-js/workspace/archive";
 import { CliError, createLog, type Io, type Log } from "../io";

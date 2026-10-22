@@ -1,6 +1,9 @@
 import type { Element, Template, VectorElement } from "@freshcoat-js/coatfile";
 import { canvasKitPathOp, type PathOp, validate } from "@freshcoat-js/coatfile";
-import { type BooleanOperand, combineShapes } from "@freshcoat-js/engine";
+import {
+	type BooleanOperand,
+	combineShapes,
+} from "@freshcoat-js/engine/internal";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { CanvasKit } from "canvaskit-wasm";

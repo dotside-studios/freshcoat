@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import type { PathNode, RectNode } from "@freshcoat-js/engine";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import { compile } from "../src/compile";
 import { minimumFormatVersion } from "../src/format";
 import { renderCompiledPdf } from "../src/render";
-import type { PathNode, RectNode, Template } from "../src/types";
+import type { Template } from "../src/types";
 import { validate } from "../src/validate";
 
 const stops = [

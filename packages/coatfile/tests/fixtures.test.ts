@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import type { Command, DrawCommand } from "@freshcoat-js/engine";
 import { fixtures } from "../fixtures";
 import { validate } from "../src";
-import type { Command, DrawCommand } from "../src/types";
 import { compileToCommands } from "./helpers/compile-commands";
 
 // Collect every drawText command, recursing into groups.

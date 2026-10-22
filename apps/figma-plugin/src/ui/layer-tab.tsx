@@ -15,11 +15,11 @@ import {
 	Textbox,
 } from "@create-figma-plugin/ui";
 import {
+	fieldTitle,
 	SYMBOLOGIES,
 	type Symbology,
 	symbologyLabel,
 } from "@freshcoat-js/coatfile";
-import { fieldTitle } from "@freshcoat-js/coatfile/fields";
 import {
 	fieldKeyFrom,
 	renameToken,

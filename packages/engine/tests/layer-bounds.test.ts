@@ -1,8 +1,7 @@
 // Effect layers bounded to their content paint what an unbounded layer paints.
 
-import { afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { loadCanvasKit, testFontBytes } from "@freshcoat-js/test-utils";
-import { setLayerBounds } from "../src/canvaskit";
 import { compileScene } from "../src/compile-scene";
 import { decodePixels } from "../src/decode";
 import { deriveFontMetrics } from "../src/font-metrics";
@@ -27,7 +26,6 @@ let ck: any;
 beforeAll(async () => {
 	ck = await loadCanvasKit();
 });
-afterEach(() => setLayerBounds(true));
 
 const solid = (color: string) => [{ kind: "solid" as const, color }];
 const box = (x: number, y: number, width: number, height: number) => ({
@@ -50,7 +48,6 @@ async function render(
 	scale = 1,
 	fonts = FONTS(),
 ): Promise<{ data: Uint8Array; boundedLayers: number }> {
-	setLayerBounds(bounded);
 	let boundedLayers = 0;
 	const saveLayer = ck.Canvas.prototype.saveLayer;
 	ck.Canvas.prototype.saveLayer = function (paint: unknown, bounds: unknown) {
@@ -80,10 +77,10 @@ async function render(
 		} finally {
 			textEngine.dispose();
 		}
-		const out = (await createHeadlessEnv({ fonts }).paint(
-			commands,
-			ck,
-		)) as EncodedPaintResult;
+		const out = (await createHeadlessEnv({
+			fonts,
+			switches: { layerBounds: bounded },
+		}).paint(commands, ck)) as EncodedPaintResult;
 		const px = decodePixels(ck, out.bytes);
 		if (!px) throw new Error("decode failed");
 		return { data: px.data, boundedLayers };

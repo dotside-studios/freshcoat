@@ -13,7 +13,6 @@
 // So "best" encodes the plausible candidates and keeps the smallest; "fast"
 // encodes one. Deflate is the platform's own (CompressionStream), which keeps
 // this dependency-free and identical in a browser and on a server.
-import type { DecodedPixels } from "./decode";
 
 export type PngEffort =
 	// One deflate, unfiltered: RGB when the frame is opaque, RGBA otherwise.
@@ -114,15 +113,6 @@ export async function encodePng(
 	}
 	if (!best) throw new Error("No PNG encoding plan");
 	return assemble(best.stream, width, height, best.channels);
-}
-
-// Read a frame's pixels straight out of a decode and encode them. The pairing
-// the callers actually want: decodePixels → encodePng.
-export function encodeDecodedPng(
-	decoded: DecodedPixels,
-	opts?: EncodePngOptions,
-): Promise<Uint8Array> {
-	return encodePng(decoded.data, decoded.width, decoded.height, opts);
 }
 
 function isOpaque(pixels: Uint8Array, length: number): boolean {

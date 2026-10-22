@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import type { GroupNode } from "@freshcoat-js/engine";
 import { compile } from "../src/compile";
 import { fieldContext } from "../src/prepare";
-import type { Element, GroupNode, Template } from "../src/types";
+import type { Element, Template } from "../src/types";
 import { validate, validateValues } from "../src/validate";
 import { fieldIsSet, isElementVisible } from "../src/visibility";
 

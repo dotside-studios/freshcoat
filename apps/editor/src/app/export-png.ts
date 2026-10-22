@@ -1,4 +1,5 @@
-import { activeVariantId, type Template } from "@freshcoat-js/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
+import { activeVariantId } from "@freshcoat-js/coatfile/internal";
 import { renderTemplate } from "@freshcoat-js/coatfile/render";
 import { createRenderer } from "@freshcoat-js/engine";
 import { exportFileName } from "~/doc/io";

@@ -2,7 +2,7 @@ import {
 	type FontDescriptor,
 	googleCss2Url,
 	googleFamilyParam,
-} from "@freshcoat-js/coatfile";
+} from "@freshcoat-js/engine";
 
 export type FontCategory =
 	| "sans"

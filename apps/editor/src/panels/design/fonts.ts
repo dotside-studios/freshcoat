@@ -1,8 +1,5 @@
-import {
-	type FontDescriptor,
-	googleCss2Url,
-	type Template,
-} from "@freshcoat-js/coatfile";
+import type { Template } from "@freshcoat-js/coatfile";
+import { type FontDescriptor, googleCss2Url } from "@freshcoat-js/engine";
 
 export const WEIGHTS: [number, string][] = [
 	[100, "Thin"],

@@ -1,4 +1,4 @@
-import { linearGradientAngle } from "@freshcoat-js/coatfile";
+import { linearGradientAngle } from "@freshcoat-js/engine/internal";
 import { describe, expect, it } from "vitest";
 import {
 	figmaColorToHex,

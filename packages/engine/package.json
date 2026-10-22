@@ -15,6 +15,7 @@
 		"./browser": "./src/platform/browser.ts",
 		"./icc": "./src/icc.ts",
 		"./image": "./src/image-info.ts",
+		"./internal": "./src/internal.ts",
 		"./node": "./src/platform/node.ts",
 		"./path": "./src/path-data.ts",
 		"./pdf": "./src/pdf/index.ts",

@@ -13,9 +13,9 @@ import {
 	createImage,
 	createMask,
 	createRect,
-	resolveLayout,
 } from "../src/index";
 import type { GroupNode, MaskNode, Node } from "../src/node";
+import { resolveLayout } from "../src/resolve-layout";
 import type { Command, DrawCommand } from "../src/types";
 import { createHeadlessEnv } from "./helpers/headless";
 

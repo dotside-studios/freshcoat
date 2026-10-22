@@ -2,7 +2,9 @@
 // operands, and the path compile rebuilds from them.
 
 import { beforeAll, describe, expect, test, vi } from "bun:test";
-import { type BooleanOperand, createRenderer } from "@freshcoat-js/engine";
+import type { GroupNode, PathNode } from "@freshcoat-js/engine";
+import { createRenderer } from "@freshcoat-js/engine";
+import type { BooleanOperand } from "@freshcoat-js/engine/internal";
 import { loadCanvasKit } from "@freshcoat-js/test-utils";
 import {
 	applyBooleans,
@@ -14,14 +16,7 @@ import { compile } from "../src/compile";
 import { resizeElements } from "../src/relayout";
 import { renderTemplate } from "../src/render";
 import { childElements } from "../src/tree";
-import type {
-	BooleanOp,
-	Element,
-	GroupNode,
-	PathNode,
-	Template,
-	VectorElement,
-} from "../src/types";
+import type { BooleanOp, Element, Template, VectorElement } from "../src/types";
 import { validate } from "../src/validate";
 
 const CACHED = "M0 0L5 0L5 5Z";

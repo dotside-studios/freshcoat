@@ -2,23 +2,18 @@
 // solid `color` or its gradient `fill`; shapes, frames and backgrounds paint
 // `fill` as one value or a list, bottom first.
 
+import type { GradientStop } from "@freshcoat-js/engine";
+import { PATTERN_DEFAULTS } from "@freshcoat-js/engine";
 import {
 	linearGradientAngle,
 	linearGradientPoints,
 	mixColor,
-	PATTERN_DEFAULTS,
 	parseColor,
 	toHex,
-} from "@freshcoat-js/engine";
-import type {
-	Background,
-	Element,
-	Fill,
-	Gradient,
-	GradientStop,
-} from "./types";
+} from "@freshcoat-js/engine/internal";
+import type { Background, Element, Fill, Gradient } from "./types";
 
-export type { Gradient, GradientStop } from "./types";
+export type { Gradient } from "./types";
 
 export type FillKind = "solid" | "linear" | "radial" | "angular" | "pattern";
 export type PatternFill = Extract<Fill, { kind: "pattern" }>;

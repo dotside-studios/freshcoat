@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import type { Node, TextNode } from "@freshcoat-js/engine";
 import { compile } from "../src/compile";
-import type { Node, Template, TextNode, TextProperties } from "../src/types";
+import type { Template, TextProperties } from "../src/types";
 import { validate } from "../src/validate";
 
 function template(props: Partial<TextProperties>): Template {
