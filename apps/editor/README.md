@@ -10,8 +10,8 @@ badges, certificates, labels and watermarked photos. Build a template, preview
 it with real records, and export the selected records, sides and variants as
 images or PDFs.
 
-Layers, snapping and an inspector handle the design. Typed datasets and field
-bindings handle the changing content. Export presets keep the dimensions,
+Design with layers, snapping and an inspector, then use typed datasets and field
+bindings for the content that changes. Export presets keep the dimensions,
 formats and file names ready for the next run.
 
 ![The Edit section with a membership card open and its name layer selected](docs/images/editor.png)
@@ -38,6 +38,18 @@ and batch exports.
 
 ## Quick start
 
+Open [Freshcoat Studio](https://freshcoat.dotsidestudios.com), pick a sample or
+a starter on the welcome screen, and start editing. Press `?` to list the
+keyboard shortcuts.
+
+For a first batch, use a card or badge starter. Edit its design in **Edit**,
+import your records in **Data**, and bind dataset columns to the template's
+fields. Preview a few records to check wrapping and photo crops, then choose
+the records and output settings in **Export**. You can also open a `.coat`
+exported by [Freshcoat for Figma](../figma-plugin/).
+
+### Run locally
+
 You need [Bun](https://bun.sh) 1.3.13 or later. Install from the repository
 root:
 
@@ -46,14 +58,7 @@ bun install
 bun run dev                                    # http://localhost:3010
 ```
 
-Open <http://localhost:3010>, pick a sample or a starter on the welcome
-screen, and start editing. Press `?` to list the keyboard shortcuts.
-
-For a first batch, use a card or badge starter. Edit its design in **Edit**,
-import your records in **Data**, and bind dataset columns to the template's
-fields. Preview a few records to check wrapping and photo crops, then choose
-the records and output settings in **Export**. You can also open a `.coat`
-exported by [Freshcoat for Figma](../figma-plugin/).
+Open <http://localhost:3010> to use your local copy.
 
 ```sh
 bun run build                                  # static site in apps/editor/dist
