@@ -4,70 +4,90 @@
 
 <p><strong>Create designs that scale.</strong></p>
 
-Freshcoat is an open-source design and rendering stack for creating cards,
-badges, certificates, labels and watermarked photos from reusable templates.
-A portable format describes each design, a Skia renderer turns it into pixels,
-and print and workspace utilities help produce the output in batches.
+![Freshcoat Studio showing a membership card design](apps/editor/docs/images/editor.png)
 
-Use the packages in your own application, render from a terminal with the
-`freshcoat` command, create templates in Figma, or design and export in
-Freshcoat Studio. The format and renderer also power
-[Davi](https://davi.social)'s card production system.
+Freshcoat is an open-source, end-to-end design tool for producing print designs
+in batches. Create a design, add template placeholders, and generate an output
+for each record in your dataset. Perfect for creating cards, badges,
+certificates, and even watermarking images!
+
+Freshcoat uses portable [template](packages/coatfile/) and
+[workspace](packages/workspace/) formats. You can design and export in
+[Studio](https://freshcoat.dotsidestudios.com), work from the
+[command line](packages/cli/), or use the packages in your own application.
+
+## What Freshcoat is for
+
+Freshcoat is built around reusable designs and batch production. Its editing
+features are more focused than those of tools like Figma, Canva, or Adobe's
+design apps, which helps keep designs portable across Freshcoat's tools.
+
+You can use it for other kinds of design work too, and we'd love to see what
+you make with it!
 
 ## Why we're open sourcing it
 
-Freshcoat grew out of our own production needs as a small team. We struggled
-to find a design and rendering solution that fit our workflow, so we built one.
-We're sharing it so others can build on it and adapt it to their own needs.
-We want design files to be portable and the code that interprets them to be
-understandable and open to change, without depending on proprietary formats.
+We originally built Freshcoat for [Davi](https://shop.davi.social)'s card
+production pipeline after struggling to find a tool that fit our needs. We're
+sharing it so others can build on it and adapt it to their own workflows. We
+also want the format and the code that interprets it to be open and
+understandable.
 
-We're not experts in graphics engines or compiler design, and most of the
-work on Freshcoat has been AI-assisted. Our design decisions draw on working
-knowledge of compilers, experience with Canvas2D rendering and the practical
-demands of producing designs at scale. There is still plenty for us to learn.
+We're not experts in graphics engines or compiler design, and most of the work
+on Freshcoat has been AI-assisted. Our decisions draw on our experience with
+compilers, existing design tools, Canvas2D image generation, and producing
+designs at scale. There's still plenty for us to learn.
 
-We'd welcome help from people with deeper experience in these areas: finding
-mistakes, questioning assumptions and improving the template format, renderer
-and print workflows. If that sounds like your kind of work, see the
+We'd welcome help finding mistakes, questioning assumptions, and improving
+Freshcoat's components. If that sounds like your kind of work, see the
 [contribution guide](CONTRIBUTING.md).
 
-## Choose your starting point
+## Getting started
+
+Whether you're designing cards or building an application, here's where to
+start.
 
 | If you want to | Start with |
 |---|---|
-| Fill a template with data and render it | [`@freshcoat-js/coatfile`](packages/coatfile/) |
-| Render your own 2D scene graph with CanvasKit | [`@freshcoat-js/engine`](packages/engine/) |
-| Analyze images and plan corrections for card printers | [`@freshcoat-js/for-print`](packages/for-print/) |
-| Bind datasets to templates and batch-export them to ZIPs or PDFs | [`@freshcoat-js/workspace`](packages/workspace/) |
-| Render, validate and batch-export from a terminal or CI | [`@freshcoat-js/cli`](packages/cli/) |
-| Design, preview and batch-export in a browser | [Freshcoat Studio](apps/editor/) |
-| Turn Figma frames and field markers into templates | [Freshcoat for Figma](apps/figma-plugin/) ([Figma Community](https://www.figma.com/community/plugin/1685967766479998641)) |
+| Try creating and exporting designs yourself | [Freshcoat Studio](https://freshcoat.dotsidestudios.com) |
+| Turn your existing Figma designs into templates | [Freshcoat for Figma plugin](#figma-plugin) |
+| Render templates from a terminal or your CI | [Freshcoat CLI](#cli) |
+| Render templates in your own applications | [Freshcoat Coatfile SDK](#sdk) |
+| Prepare images for card printers | [Freshcoat for Print SDK](packages/for-print/) |
+| Bind datasets to templates and batch-export them to ZIPs or PDFs | [Freshcoat Workspace SDK](packages/workspace/) |
+| Build your own template format on a 2D renderer | [Freshcoat Engine](packages/engine/) |
 
 ## Quick start
 
-The npm packages run on Node 22 or later and Bun 1.3.13 or later. On Node 22,
-npm prints an `EBADENGINE` warning for `hucre`, the spreadsheet dependency,
-which declares Node 24; spreadsheet import and export work on Node 22, so the
-warning is safe to ignore.
+### CLI
+
+> The CLI and its packages require Node 22 or later or Bun 1.3.13 or later.
+> On Node 22, npm may show an `EBADENGINE` warning for `hucre`, the spreadsheet
+> dependency, which declares Node 24. Spreadsheet import and export work on
+> Node 22, so the warning is safe to ignore.
 
 From a terminal, install the command line and render a template. To try it
 without a template of your own, download
-[`minimal-card.json`](packages/coatfile/fixtures/minimal-card.json) and pack
-it first:
+[`minimal-card.json`](packages/coatfile/fixtures/minimal-card.json) into your
+working directory:
 
 ```sh
+# Install the CLI package
 npm install --global @freshcoat-js/cli
-freshcoat pack minimal-card.json --out card.coat
-freshcoat render card.coat --set displayName="Alex" --out out
-freshcoat render card.coat --data people.csv --out cards.zip
+
+# Render a card with "Alex" as its display name to `out`
+freshcoat render minimal-card.json --set displayName="Alex" --out out
+
+# Render a card for each row in a CSV with a `displayName` column
+freshcoat render minimal-card.json --data people.csv --out cards.zip
 ```
 
-The first `render` writes one image per side into `out`. The second renders the
-template once per row of a spreadsheet and zips the results. See the
-[CLI README](packages/cli/README.md) for every option.
+See the [CLI README](packages/cli/README.md) for more details.
 
-From code, install the template package and the renderer:
+### SDK
+
+Using the same [`minimal-card.json`](packages/coatfile/fixtures/minimal-card.json)
+template, install the Coatfile SDK and engine packages:
 
 ```sh
 npm install @freshcoat-js/coatfile @freshcoat-js/engine
@@ -80,8 +100,8 @@ import { renderTemplate } from "@freshcoat-js/coatfile/render";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/engine/node";
 
-const loaded = await loadTemplate(await readFile("card.coat"));
-if (!loaded.ok) throw new Error("Could not read card.coat");
+const loaded = await loadTemplate(await readFile("minimal-card.json"));
+if (!loaded.ok) throw new Error("Could not read minimal-card.json");
 
 const renderer = await createRenderer({ ck: await loadCanvasKit() });
 const [front] = await renderTemplate(renderer, loaded.template, { displayName: "Alex" });
@@ -89,51 +109,16 @@ await writeFile("front.png", front.bytes);
 ```
 
 Create the renderer once and reuse it. See the
-[coatfile README](packages/coatfile/README.md) for variants, export sizes and
+[Coatfile SDK README](packages/coatfile/README.md) for variants, export sizes and
 batch rendering.
 
-## How the stack fits together
+## Figma plugin
 
-- **Templates:** layers, fields, fonts, sides and variants define a reusable
-  design. Templates are described in JSON; a `.coat` archive can bundle their
-  assets.
-- **Scenes and rendering:** coatfile compiles a template and values into a
-  scene. The engine lays out and paints that scene through CanvasKit, which
-  brings Skia to WebAssembly. The host creates one renderer with
-  `createRenderer`, giving it a CanvasKit instance and fonts, and keeps it for
-  the life of the process or worker. The renderer owns text shaping, the paint
-  cache and image decoding.
-- **Production utilities:** print analysis and correction are separate from
-  authoring. The workspace package adds datasets, bindings, export plans,
-  PDF assembly and sheet imposition for applications that need batch output.
-- **Command line:** the CLI puts coatfile, the engine and workspace behind one
-  `freshcoat` command, so a script or CI job can render without any code.
+To make it easier to use your existing Figma designs in Freshcoat, we provide a
+[Figma plugin](https://www.figma.com/community/plugin/1685967766479998641)
+that lets you export them as Freshcoat templates.
 
-The [UI](packages/ui/) and [test-utils](packages/test-utils/) packages are
-internal packages and are not currently included in npm releases.
-The workspace model is independent of React; the UI kit supplies Studio's
-React controls and themes.
-
-## Apps and tools
-
-The [command line](packages/cli/) renders a template to images, once per
-spreadsheet row, or runs a workspace's export preset to a zip or PDF. It also
-validates and inspects templates and workspaces, and packs a template with its
-images into one `.coat` file. A template can be JSON, a `.coat` file, or a
-TypeScript or JavaScript module that builds one. See the
-[CLI README](packages/cli/README.md) for commands and options.
-
-[Studio](apps/editor/) combines template editing, typed datasets and worker-based
-exports in a browser. Imported files and autosaved work stay in browser
-storage; URL-referenced fonts and images can still be fetched from their hosts.
-See the [Studio README](apps/editor/README.md) for features, screenshots,
-limitations and development instructions.
-
-[Freshcoat for Figma](apps/figma-plugin/) exports frames as `.coat` templates
-with optional field bindings and can send them to Studio. Install it from the
-[Figma Community listing](https://www.figma.com/community/plugin/1685967766479998641).
-See the [plugin README](apps/figma-plugin/README.md) for layer naming, supported Figma
-features and installation.
+[Figma screenshot goes here]
 
 ## Develop
 
