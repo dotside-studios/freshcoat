@@ -68,8 +68,9 @@ start.
 
 From a terminal, install the command line and render a template. To try it
 without a template of your own, download
-[`minimal-card.json`](packages/coatfile/fixtures/minimal-card.json) into your
-working directory:
+[`minimal-card.json`](packages/coatfile/fixtures/minimal-card.json) and
+[`people.csv`](packages/coatfile/fixtures/people.csv) into your working
+directory:
 
 ```sh
 # Install the CLI package
