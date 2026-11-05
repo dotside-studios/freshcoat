@@ -1008,7 +1008,10 @@ export type ShapedTextLine = {
 
 let utf8Encoder: TextEncoder | undefined;
 const utf8 = {
-	encode: (text: string) => (utf8Encoder ??= new TextEncoder()).encode(text),
+	encode(text: string): Uint8Array {
+		utf8Encoder ??= new TextEncoder();
+		return utf8Encoder.encode(text);
+	},
 };
 
 // A straight text command's lines shaped as drawText shapes them, for a

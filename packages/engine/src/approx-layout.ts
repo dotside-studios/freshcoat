@@ -101,8 +101,10 @@ const measureSpanWidth: TextEngine["measureSpanWidth"] = (
 ) => advance(collapse(text), font.size, font.letterSpacing ?? 0);
 
 let graphemes: Intl.Segmenter | undefined;
-const segmenter = () =>
-	(graphemes ??= new Intl.Segmenter(undefined, { granularity: "grapheme" }));
+const segmenter = (): Intl.Segmenter => {
+	graphemes ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
+	return graphemes;
+};
 
 const clusterAdvances: NonNullable<TextEngine["clusterAdvances"]> = (
 	text,
