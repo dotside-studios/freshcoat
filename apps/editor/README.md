@@ -17,7 +17,9 @@ formats and file names ready for the next run.
 ![The Edit section with a membership card open and its name layer selected](docs/images/editor.png)
 
 A workspace holds templates, their data and export presets. Save the whole
-project as a `.coatworkspace`, or share an individual template as a `.coat`.
+project as a `.coatworkspace`, or export an individual template as a `.coat`
+package or `.coat.json` file. See the [template format guide](../../packages/coatfile/README.md#packages-coat)
+for the difference.
 The editor has three sections, switched from the
 menu bar or with Ctrl/Cmd+1, 2 and 3:
 

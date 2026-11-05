@@ -20,7 +20,8 @@ the records, and **Export** turns templates and records into files.
   - Save the whole workspace as `.coatworkspace` with Ctrl/Cmd+S.
   - Templates are exported on their own, as with VS Code's workspaces: the
     active one as `.coat` or `.coat.json`, or all of them as a zip of `.coat`
-    files. The current side still exports as a PNG at 1×, 2× or 3×, and File > Export
+    files. See the [template format guide](../../../packages/coatfile/README.md#packages-coat)
+    for the difference. The current side still exports as a PNG at 1×, 2× or 3×, and File > Export
     with preset opens Export with a chosen preset and the current record.
   - Saving, exporting or sending back a template raises its
     `format_version` to the lowest minor that covers the fields it uses, so
@@ -1001,7 +1002,7 @@ data/<id>/records.json            its records and their export status
 data/<id>/assets/<sha256>.<ext>   images, referenced from records as ws:<sha256>
 ```
 
-`.coat` and `.coat.json` are coatfile's formats, unchanged by the workspace.
+A template extracted from the workspace opens on its own as a `.coat`.
 The manifest names each template's entry, so a workspace saved before the
 rename, with `templates/<id>.tkit` entries, still opens.
 `@freshcoat-js/workspace` reads and writes the format with no browser APIs, so
