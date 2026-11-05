@@ -22,8 +22,23 @@ untrusted templates? See [safer defaults](security-defaults.md).
 These land in the next release's notes. Entries marked **(breaking)** need a
 code or command change; entries marked **(output change)** change the bytes or
 pixels Freshcoat writes for the same input.
-[Migrating to 0.5](migrating-to-0.5.md) covers each one, and how to keep the
-old behaviour where that is possible.
+
+## 0.5.1
+
+- **Figma plugin starts in the latest Figma.** Figma's plugin sandbox no
+  longer provides `Intl`, `TextEncoder` or `TextDecoder`, and the plugin
+  failed on load with `ReferenceError: 'Intl' is not defined` and `TypeError:
+  TextEncoder is not a constructor`. The engine now creates its grapheme
+  segmenter and UTF-8 encoder on first use instead of at import time, and the
+  plugin no longer bundles the QR encoder, which created an encoder at import
+  time, into its main thread. No API or output change.
+
+## 0.5.0
+
+Entries marked **(breaking)** need a code or command change; entries marked
+**(output change)** change the bytes or pixels Freshcoat writes for the same
+input. [Migrating to 0.5](migrating-to-0.5.md) covers each one, and how to
+keep the old behaviour where that is possible.
 
 - **Supported runtimes.** The npm packages declare `"engines": { "node": ">=22" }`
   and run on Node 22 or later and Bun 1.3.13 or later. On Node 22, npm warns
