@@ -1,10 +1,9 @@
 # @freshcoat-js/cli
 
-The `freshcoat` command line for [Freshcoat](../../README.md): render a
-template to images, once per spreadsheet row, or a workspace's export preset
-to a zip or PDF, check a
-template or workspace and list what it holds, and package a template, without
-writing a script. It is built on
+The `freshcoat` command line for [Freshcoat](../../README.md) renders templates
+to images or runs a workspace's export preset to a zip or PDF. It can render
+once per spreadsheet row, check and inspect templates and workspaces, and
+package templates without a script. It is built on
 [`@freshcoat-js/coatfile`](../coatfile), [`@freshcoat-js/engine`](../engine)
 and [`@freshcoat-js/workspace`](../workspace), and runs on Node 22 or later
 and Bun 1.3.13 or later.

@@ -24,20 +24,24 @@ npm install @freshcoat-js/coatfile @freshcoat-js/engine
 The engine is needed because you create the renderer from it.
 
 For template-to-image output, use `renderTemplate()` with a renderer from the
-coat engine. It loads the fonts the template describes through the renderer
+Freshcoat engine. It loads the fonts the template describes through the renderer
 and paints each side at the template's own size unless you give another.
+Download [`minimal-card.json`](fixtures/minimal-card.json) into your working
+directory to try this example:
 
 ```ts
+import { readFile } from "node:fs/promises";
+import { loadTemplate } from "@freshcoat-js/coatfile";
 import { createRenderer } from "@freshcoat-js/engine";
 import { loadCanvasKit } from "@freshcoat-js/engine/node"; // or /browser
 import { renderTemplate } from "@freshcoat-js/coatfile/render";
 
+const loaded = await loadTemplate(await readFile("minimal-card.json"));
+if (!loaded.ok) throw new Error("Could not read minimal-card.json");
+const template = loaded.template;
 const renderer = await createRenderer({ ck: await loadCanvasKit() });
 
-const [front] = await renderTemplate(renderer, template, { displayName: "Alex" }, {
-  variantId: "amber",
-  frameNames: ["front"],
-});
+const [front] = await renderTemplate(renderer, template, { displayName: "Alex" });
 // front.bytes: PNG by default; front.name, front.width, front.height, front.warnings
 ```
 
