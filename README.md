@@ -59,6 +59,11 @@ start.
 
 ## Quick start
 
+A template can be a `.coat` package or JSON, usually saved as `.coat.json`.
+Studio, the CLI and the Coatfile SDK can also open template JSON named `.json`,
+like the example below. See the [template format guide](packages/coatfile/README.md#packages-coat)
+for how each format stores assets.
+
 ### CLI
 
 > The CLI and its packages require Node 22 or later or Bun 1.3.13 or later.

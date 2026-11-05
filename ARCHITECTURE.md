@@ -79,8 +79,9 @@ explicit entry points, such as the engine's node and browser subpaths.
 
 ## Files and identity
 
-A `.coat` holds one template and can embed fonts and images. A
-`.coatworkspace` holds templates, datasets, bindings, presets and assets.
+A `.coat` package or template JSON holds one template; see the
+[format guide](packages/coatfile/README.md#packages-coat) for how each stores
+assets. A `.coatworkspace` holds templates, datasets, bindings, presets and assets.
 A scene is the engine's rendering input, not another authoring file format.
 The format and workspace READMEs describe their schemas and compatibility.
 

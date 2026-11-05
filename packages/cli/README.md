@@ -461,9 +461,10 @@ lowest that covers the fields it uses, assets nothing uses left out, the result
 validated (an invalid one is refused, listing its issues), and images
 it names by a relative path read from its directory and embedded, so the
 package renders anywhere. An image that cannot be read keeps its path, with a
-warning. `--out` names a `.coat` or a `.coat.json`, which carries the assets
-inline. From a `.coatworkspace`, `--template` packs one template, by file name
-or id, and without it every template goes into a `.zip` of
+warning. The extension on `--out` picks the format: `.coat` writes a zip package,
+and `.coat.json` writes JSON with any embedded assets inline. From a
+`.coatworkspace`, `--template` packs one template, by file name or id, and
+without it every template goes into a `.zip` of
 `templates/<name>.coat`, the same zip as Studio's Export all templates, which
 `render` and `validate` read.
 

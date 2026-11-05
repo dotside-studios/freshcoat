@@ -2,8 +2,10 @@
 
 The template format, validator and compiler for
 [Freshcoat](../../README.md). A template describes named frames, layers,
-fields and variants; a `.coat` file packages that document with its embedded
-fonts and images.
+fields and variants. A `.coat` file is a zip package containing the template
+and any embedded fonts and images. The same template can be stored as JSON,
+usually named `.coat.json`, with any embedded assets encoded inline. Template
+JSON named `.json` can be read too. See [Packages](#packages-coat) for details.
 
 Use this package when you want to render a design with different values,
 read or write template files, or build an authoring tool. Freshcoat Studio
