@@ -4,7 +4,7 @@
 they did not write. Loaders refuse unsafe URL schemes, and the image, font and
 spreadsheet readers refuse input over new size limits. Coatfile throws one
 typed error, and the engine and coatfile package roots export only their
-documented API. The [release notes](releases.md#unreleased-changes) list
+documented API. The [release notes](releases.md#050) list
 every change.
 
 ## Replacements
