@@ -1006,7 +1006,10 @@ export type ShapedTextLine = {
 	decorations: DecorationRect[];
 };
 
-const utf8 = new TextEncoder();
+let utf8Encoder: TextEncoder | undefined;
+const utf8 = {
+	encode: (text: string) => (utf8Encoder ??= new TextEncoder()).encode(text),
+};
 
 // A straight text command's lines shaped as drawText shapes them, for a
 // backend that places the glyphs itself. The paragraphs are freed here, the

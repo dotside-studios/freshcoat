@@ -7,6 +7,7 @@ export {
 	resizeVectorBoolean,
 	resizeVectorPath,
 } from "./constraints";
+export { fieldTitle } from "./fields";
 export { pieceSpec } from "./piece";
 export { isOpenVector, sliceLayers } from "./slices";
 export { type ResolvedStrokeTrim, resolveStrokeTrim } from "./stroke-trim";
