@@ -118,7 +118,7 @@ To make it easier to use your existing Figma designs in Freshcoat, we provide a
 [Figma plugin](https://www.figma.com/community/plugin/1685967766479998641)
 that lets you export them as Freshcoat templates.
 
-[Figma screenshot goes here]
+![Freshcoat for Figma plugin preview](apps/figma-plugin/docs/preview.png)
 
 ## Develop
 
