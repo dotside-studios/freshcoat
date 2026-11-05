@@ -7,7 +7,7 @@ fields and variants.
 | File | What it contains |
 |---|---|
 | `.coat` | A zip package with one template and any embedded fonts and images |
-| `.coat.json` or `.json` | A template as JSON, with any embedded assets encoded inline |
+| `.coat.json` | A template as JSON, with any embedded assets encoded inline; plain `.json` also opens |
 | `.coatworkspace` | A workspace with templates, datasets, bindings, export presets and assets |
 
 See [Packages](#packages-coat) for template format details and the

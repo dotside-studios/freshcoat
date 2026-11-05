@@ -1002,8 +1002,7 @@ data/<id>/records.json            its records and their export status
 data/<id>/assets/<sha256>.<ext>   images, referenced from records as ws:<sha256>
 ```
 
-Each template uses coatfile's ordinary `.coat` package format, so it can be
-opened on its own after extracting it from the workspace.
+A template extracted from the workspace opens on its own as a `.coat`.
 The manifest names each template's entry, so a workspace saved before the
 rename, with `templates/<id>.tkit` entries, still opens.
 `@freshcoat-js/workspace` reads and writes the format with no browser APIs, so

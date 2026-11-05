@@ -81,9 +81,10 @@ explicit entry points, such as the engine's node and browser subpaths.
 
 A `.coat` package or template JSON holds one template; see the
 [format guide](packages/coatfile/README.md#packages-coat) for how each stores
-assets. A `.coatworkspace` holds templates, datasets, bindings, presets and assets.
+assets. A `.coatworkspace` holds templates, datasets, bindings, presets and
+assets.
 A scene is the engine's rendering input, not another authoring file format.
-The format and workspace READMEs describe their schemas and compatibility.
+The workspace README describes its schema and compatibility.
 
 The UI term "layer" and the engine term "node" describe different levels of
 the pipeline. Application copy conventions do not rename SDK types.
