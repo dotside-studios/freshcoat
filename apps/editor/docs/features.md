@@ -38,7 +38,9 @@ the records, and **Export** turns templates and records into files.
     reads it again and offers it back; **Discard old autosave** deletes it
     and starts autosaving the open work. If another tab has since saved a
     readable autosave, Discard keeps it and offers it back instead. Until
-    then, **Autosave paused** stays in the status bar and offers both.
+    then, **Autosave paused** stays in the status bar and offers both. When
+    recovery resumes saving, it uses the latest edits, including edits made
+    while Retry or Discard was waiting for storage.
   - An autosave saved by a newer version of Studio is never written over or
     discarded. **Autosave paused** stays in the status bar with Retry only.
   - The welcome screen's **Recent** group lists the last workspaces opened

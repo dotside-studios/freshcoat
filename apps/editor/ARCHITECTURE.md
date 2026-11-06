@@ -104,7 +104,10 @@ history, side and view, and restored when switched to. Autosave
 (`app/autosave.ts`) writes the workspace to IndexedDB, and each photo once,
 apart from the templates and data. Each opened workspace gets a recent entry
 (`app/recent.ts`), and its autosave names that entry, so the welcome screen
-lists only what it can still open.
+lists only what it can still open. Autosave reads and recovery actions run in
+request order. The store owns pause transitions and resumes the latest held
+edits when recovery finds no saved work; normal writes and page-exit flushes
+retain their own scheduling.
 
 ## Data
 

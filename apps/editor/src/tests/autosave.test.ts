@@ -91,6 +91,38 @@ function breakGets(): () => void {
 	return () => get.mockRestore();
 }
 
+function delayNextRead() {
+	let release!: () => void;
+	let entered!: () => void;
+	const started = new Promise<void>((resolve) => {
+		entered = resolve;
+	});
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const get = IDBObjectStore.prototype.get;
+	let reads = 0;
+	const spy = vi
+		.spyOn(IDBObjectStore.prototype, "get")
+		.mockImplementation(function (this: IDBObjectStore, key) {
+			const request = get.call(this, key);
+			if (this.name === "autosave" && key === "current" && ++reads === 1) {
+				request.addEventListener("success", (event) => {
+					event.stopImmediatePropagation();
+					entered();
+					void gate.then(() => request.onsuccess?.call(request, event));
+				});
+			}
+			return request;
+		});
+	return {
+		started,
+		release,
+		reads: () => reads,
+		restore: () => spy.mockRestore(),
+	};
+}
+
 async function bytes(blob: Blob): Promise<number[]> {
 	return [...new Uint8Array(await blob.arrayBuffer())];
 }
@@ -661,6 +693,176 @@ describe("autosave", () => {
 		expect(onWriteBlocked).toHaveBeenCalledTimes(1);
 		expect(onWriteFailed).not.toHaveBeenCalled();
 		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("kept");
+	});
+
+	it.each([
+		"reread",
+		"discard",
+	] as const)("%s resumes the latest edit held during recovery", async (action) => {
+		const db = freshDb();
+		const store = createAutosaveStore(db);
+		if (action === "discard") {
+			await putCurrent(db, { version: "bad", fileName: "bad", savedAt: 1 });
+			expect((await store.read()).status).toBe("failed");
+		} else {
+			const fix = breakGets();
+			expect((await store.read()).status).toBe("failed");
+			fix();
+		}
+		await store.write({
+			workspace: workspace([asset(1)]),
+			fileName: "earlier",
+		});
+		const get = IDBObjectStore.prototype.get;
+		let edited = false;
+		const spy = vi
+			.spyOn(IDBObjectStore.prototype, "get")
+			.mockImplementation(function (this: IDBObjectStore, key) {
+				const request = get.call(this, key);
+				if (!edited && this.name === "autosave" && key === "current") {
+					edited = true;
+					request.addEventListener("success", () => {
+						void store.write({
+							workspace: workspace([asset(2)]),
+							fileName: "latest",
+						});
+					});
+				}
+				return request;
+			});
+		await store[action]();
+		spy.mockRestore();
+		expect(edited).toBe(true);
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe("latest");
+	});
+
+	it("orders overlapping recovery actions and keeps a newer autosave", async () => {
+		const db = freshDb();
+		await putCurrent(db, { version: 99, fileName: "future", savedAt: 1 });
+		const onPausedChange = vi.fn();
+		const store = createAutosaveStore(db, { onPausedChange });
+		const delayed = delayNextRead();
+		const first = store.read();
+		await delayed.started;
+		const second = store.reread();
+		const third = store.discard();
+		try {
+			await Promise.resolve();
+			expect(delayed.reads()).toBe(1);
+		} finally {
+			delayed.release();
+		}
+		expect(await first).toEqual({ status: "newer" });
+		expect(await second).toEqual({ status: "newer" });
+		expect(await third).toBeNull();
+		delayed.restore();
+		expect(onPausedChange.mock.calls).toEqual([["newer"]]);
+		expect(await rawGet(db, "autosave", "current")).toMatchObject({
+			version: 99,
+		});
+	});
+
+	it("queued recovery keeps a readable autosave another tab wrote", async () => {
+		const db = freshDb();
+		await putCurrent(db, { version: 99, fileName: "future", savedAt: 1 });
+		const onPausedChange = vi.fn();
+		const store = createAutosaveStore(db, { onPausedChange });
+		const delayed = delayNextRead();
+		const first = store.read();
+		await delayed.started;
+		const second = store.reread();
+		const third = store.discard();
+		try {
+			await createAutosaveStore(db, { tabId: "other" }).write({
+				workspace: workspace([]),
+				fileName: "other tab",
+			});
+		} finally {
+			delayed.release();
+		}
+		expect(await first).toEqual({ status: "newer" });
+		expect(await second).toMatchObject({
+			status: "found",
+			autosave: { fileName: "other tab" },
+		});
+		expect(await third).toBeNull();
+		delayed.restore();
+		expect(onPausedChange.mock.calls).toEqual([["newer"], [null]]);
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe(
+			"other tab",
+		);
+	});
+
+	it("an unsuccessful discard does not poison queued recovery", async () => {
+		const db = freshDb();
+		await putCurrent(db, { version: "bad", savedAt: 1 });
+		const store = createAutosaveStore(db);
+		expect(await store.read()).toEqual({ status: "failed" });
+		const clear = vi
+			.spyOn(IDBObjectStore.prototype, "clear")
+			.mockImplementationOnce(() => {
+				throw new Error("cannot discard");
+			});
+		const discard = store.discard();
+		const reread = store.reread();
+		await expect(discard).rejects.toThrow("cannot discard");
+		expect(await reread).toEqual({ status: "failed" });
+		clear.mockRestore();
+		expect(await store.discard()).toEqual({ status: "empty" });
+	});
+
+	it("resumes the latest flush held while recovery is awaiting storage", async () => {
+		const db = freshDb();
+		const onPausedChange = vi.fn();
+		const store = createAutosaveStore(db, { onPausedChange });
+		const fix = breakGets();
+		await store.read();
+		fix();
+		await store.write({
+			workspace: workspace([asset(1)]),
+			fileName: "earlier",
+		});
+		const delayed = delayNextRead();
+		const recovery = store.reread();
+		try {
+			await delayed.started;
+			store.flush({
+				workspace: workspace([asset(2)]),
+				fileName: "latest flush",
+			});
+		} finally {
+			delayed.release();
+		}
+		await recovery;
+		delayed.restore();
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe(
+			"latest flush",
+		);
+		expect(onPausedChange.mock.calls).toEqual([["failed"], [null]]);
+	});
+
+	it("resuming held edits cannot overwrite an edit made by the resume notification", async () => {
+		const db = freshDb();
+		const store = createAutosaveStore(db, {
+			onPausedChange: (paused) => {
+				if (paused === null)
+					void store.write({
+						workspace: workspace([asset(2)]),
+						fileName: "notification edit",
+					});
+			},
+		});
+		const fix = breakGets();
+		await store.read();
+		fix();
+		await store.write({
+			workspace: workspace([asset(1)]),
+			fileName: "earlier",
+		});
+		await store.reread();
+		expect((await readSaved(createAutosaveStore(db)))?.fileName).toBe(
+			"notification edit",
+		);
 	});
 
 	it("reads again on retry and writes once the read succeeds", async () => {
