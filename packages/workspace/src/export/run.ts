@@ -14,7 +14,7 @@ import {
 	type JobPool,
 	type JobProgress,
 	type JobResult,
-	runExportJob,
+	runPreparedExportJob,
 } from "./job";
 import type { JobFile, OutputSink } from "./sink";
 import { applyJobResult } from "./status";
@@ -121,19 +121,31 @@ export async function exportWorkspace(
 	const items = createItemRenderer({ renderer: options.renderer, fonts });
 	try {
 		const sink = found.format === "pdf" ? undefined : output?.sink?.();
-		const job = await runExportJob(workspace, found, {
-			pool: options.pool ?? inlinePool(items),
-			...(sink ? { sink } : {}),
-			...(signal ? { signal } : {}),
-			...(onProgress ? { onProgress } : {}),
-			...(options.pdfCreator ? { pdfCreator: options.pdfCreator } : {}),
-			...(options.confirmLargePdf
-				? { confirmLargePdf: options.confirmLargePdf }
-				: {}),
-			...(options.largePdfBytes !== undefined
-				? { largePdfBytes: options.largePdfBytes }
-				: {}),
-		});
+		const started = performance.now();
+		// Font loading may yield; resolve the execution entry when planning starts.
+		const preparedEntry = workspace.templates.find(
+			(t) => t.id === found.templateId,
+		);
+		const plan = preparedEntry ? planExport(workspace, found) : [];
+		const template = preparedEntry?.template ?? entry.template;
+		const job = await runPreparedExportJob(
+			workspace,
+			found,
+			{
+				pool: options.pool ?? inlinePool(items),
+				...(sink ? { sink } : {}),
+				...(signal ? { signal } : {}),
+				...(onProgress ? { onProgress } : {}),
+				...(options.pdfCreator ? { pdfCreator: options.pdfCreator } : {}),
+				...(options.confirmLargePdf
+					? { confirmLargePdf: options.confirmLargePdf }
+					: {}),
+				...(options.largePdfBytes !== undefined
+					? { largePdfBytes: options.largePdfBytes }
+					: {}),
+			},
+			{ entry: preparedEntry, plan, started },
+		);
 		const result: ExportWorkspaceResult = {
 			...job,
 			workspace: markExported(workspace, found, job, options.now),
@@ -145,8 +157,8 @@ export async function exportWorkspace(
 		}
 		if (options.checkGlyphs) {
 			const glyphs = await checkAllGlyphs(
-				entry.template,
-				planExport(workspace, found),
+				template,
+				plan,
 				options.renderer,
 				() => signal?.aborted ?? false,
 			);

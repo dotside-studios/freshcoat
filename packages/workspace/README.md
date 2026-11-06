@@ -462,7 +462,10 @@ of the network.
 
 Pass `checkGlyphs: true` to also get `result.glyphs`: each item's text that
 the template's fonts have no glyphs for, by record, side and element, so a CLI
-can warn before the cards print with boxes. `checkGlyphs` and
+can warn before the cards print with boxes. These checks use the same export
+plan as rendering, so changes to source record values or the preset's record
+selection during the job do not change which items are checked. Each export
+prepares a new plan. `checkGlyphs` and
 `checkAllGlyphs` run the same check on given items with a renderer that holds
 the fonts, and `summarizeGlyphs` and `codepointLabel` shape it for display.
 

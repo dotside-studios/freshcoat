@@ -31,6 +31,7 @@ import {
 	exportWorkspace,
 	type JobPool,
 	REPORT_FILE_NAME,
+	runExportJob,
 } from "./index";
 
 const FONT_CSS = "https://fonts.example/css2?family=Inter";
@@ -229,6 +230,14 @@ async function packTo(logoSrc: string): Promise<string> {
 	const file = join(dir, "badges.coatworkspace");
 	await writeFile(file, await (await packWorkspace(fixture(logoSrc))).bytes());
 	return file;
+}
+
+function glyphWorkspace(): Workspace {
+	const workspace = fixture("logo.png", ["Kim", "Ana"]);
+	const record = workspace.datasets[0]?.records[0];
+	if (!record) throw new Error("fixture needs a record");
+	record.values.name = "김민준";
+	return workspace;
 }
 
 describe("export from a workspace file in Node", () => {
@@ -516,6 +525,257 @@ describe("export from a workspace file in Node", () => {
 					codepoints: [0xae40, 0xbbfc, 0xc900],
 				},
 			]);
+		} finally {
+			renderer.dispose();
+		}
+	});
+
+	it("checks glyphs against the values rendered even if records change", async () => {
+		const workspace = fixture("logo.png");
+		const record = workspace.datasets[0]?.records[1];
+		if (!record) throw new Error("missing fixture record");
+		record.values.name = "김민준";
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			load: fileLoader({ root: dir }),
+		});
+		try {
+			const result = await exportWorkspace(workspace, preset, {
+				renderer,
+				fontOptions: { fetch: fontFetch },
+				checkGlyphs: true,
+				onProgress: () => {
+					record.values.name = "Ben";
+				},
+			});
+			expect(result.glyphs).toEqual([
+				{
+					recordId: "r_00000002",
+					side: "front",
+					elementId: "name",
+					text: "김민준",
+					codepoints: [0xae40, 0xbbfc, 0xc900],
+				},
+			]);
+		} finally {
+			renderer.dispose();
+		}
+	});
+
+	it("keeps the rendered selection for glyphs and replans the next invocation", async () => {
+		const workspace = glyphWorkspace();
+		const selected: ExportPreset = {
+			...preset,
+			records: "selected",
+			selected: ["r_00000001"],
+		};
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			load: fileLoader({ root: dir }),
+		});
+		try {
+			const options = {
+				renderer,
+				fontOptions: { fetch: fontFetch },
+				checkGlyphs: true,
+			};
+			const first = await exportWorkspace(workspace, selected, {
+				...options,
+				onProgress: () => {
+					selected.selected = ["r_00000002"];
+				},
+			});
+			expect(first.items.map((item) => item.recordId)).toEqual(["r_00000001"]);
+			expect(first.items.every((item) => item.ok)).toBe(true);
+			expect(
+				first.glyphs?.map((issue) => ({
+					recordId: issue.recordId,
+					text: issue.text,
+				})),
+			).toEqual([{ recordId: "r_00000001", text: "김민준" }]);
+			const second = await exportWorkspace(workspace, selected, options);
+			expect(second.items.map((item) => item.recordId)).toEqual(["r_00000002"]);
+			expect(second.items.every((item) => item.ok)).toBe(true);
+			expect(second.glyphs).toEqual([]);
+		} finally {
+			renderer.dispose();
+		}
+	});
+
+	it("retains resolved view and variant items for glyph checking", async () => {
+		const workspace = glyphWorkspace();
+		const entry = workspace.templates[0];
+		if (!entry?.binding) throw new Error("fixture needs a binding");
+		const binding = entry.binding;
+		entry.template.variants = [
+			{
+				id: "gold",
+				label: "Gold",
+				overrides: [
+					{
+						name: "front",
+						elements: [{ id: "name", properties: { color: "#b8860b" } }],
+					},
+				],
+			},
+		];
+		binding.variant = { kind: "all" };
+		binding.view = {
+			filters: [{ column: "name", op: "contains", value: "김" }],
+		};
+		const planned = planExport(workspace, preset);
+		expect(planned).toHaveLength(2);
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			load: fileLoader({ root: dir }),
+		});
+		try {
+			const result = await exportWorkspace(workspace, preset, {
+				renderer,
+				fontOptions: { fetch: fontFetch },
+				checkGlyphs: true,
+				onProgress: () => {
+					binding.variant = { kind: "fixed", id: "gold" };
+					binding.view = {
+						filters: [{ column: "name", op: "equals", value: "no match" }],
+					};
+				},
+			});
+			expect(result.items.map((item) => item.key)).toEqual(
+				planned.map((item) => item.key),
+			);
+			expect(result.items.every((item) => item.ok)).toBe(true);
+			expect(
+				result.glyphs?.map((issue) => [
+					issue.recordId,
+					issue.side,
+					issue.variantId,
+				]),
+			).toEqual(
+				planned.map((item) => [item.recordId, item.side, item.variantId]),
+			);
+		} finally {
+			renderer.dispose();
+		}
+	});
+
+	it("uses the execution template when its entry changes while fonts load", async () => {
+		const workspace = glyphWorkspace();
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			load: fileLoader({ root: dir }),
+		});
+		let replaced = false;
+		try {
+			const result = await exportWorkspace(workspace, preset, {
+				renderer,
+				checkGlyphs: true,
+				fontOptions: {
+					fetch: async (url, init) => {
+						if (!replaced) {
+							const entry = workspace.templates[0];
+							if (!entry) throw new Error("fixture needs a template");
+							workspace.templates[0] = {
+								...entry,
+								template: {
+									...entry.template,
+									template_data: entry.template.template_data.map((frame) => ({
+										...frame,
+										name: "back",
+									})),
+								},
+							};
+							replaced = true;
+						}
+						return fontFetch(url, init);
+					},
+				},
+			});
+			expect(replaced).toBe(true);
+			expect(result.items).toHaveLength(2);
+			expect(
+				result.items.every((item) => item.ok && item.side === "back"),
+			).toBe(true);
+			expect(
+				result.glyphs?.map((issue) => [issue.recordId, issue.side, issue.text]),
+			).toEqual([["r_00000001", "back", "김민준"]]);
+		} finally {
+			renderer.dispose();
+		}
+	});
+
+	it("discards output when cancellation arrives during glyph checking", async () => {
+		const workspace = glyphWorkspace();
+		const renderer = await createRenderer({
+			ck: await loadCanvasKit("full"),
+			load: fileLoader({ root: dir }),
+		});
+		const controller = new AbortController();
+		let rendered = false;
+		const compile = renderer.compile;
+		renderer.compile = (...args) => {
+			if (rendered) controller.abort();
+			return compile(...args);
+		};
+		const output = {
+			commit: vi.fn(async () => {}),
+			discard: vi.fn(async () => {}),
+		};
+		try {
+			const result = await exportWorkspace(
+				workspace,
+				{ ...preset, markExported: true },
+				{
+					renderer,
+					output,
+					fontOptions: { fetch: fontFetch },
+					checkGlyphs: true,
+					signal: controller.signal,
+					onProgress: (progress) => {
+						rendered = progress.done === progress.total;
+					},
+				},
+			);
+			expect(result.items).toHaveLength(2);
+			expect(result.items.every((item) => item.ok)).toBe(true);
+			expect(result.cancelled).toBe(true);
+			expect(result.glyphs).toBeUndefined();
+			expect(result.workspace).toBe(workspace);
+			expect(output.discard).toHaveBeenCalledTimes(1);
+			expect(output.commit).not.toHaveBeenCalled();
+		} finally {
+			renderer.dispose();
+		}
+	});
+
+	it("preserves missing-template and empty-plan behavior at each entry point", async () => {
+		const workspace = fixture("logo.png");
+		const pool: JobPool = {
+			size: 1,
+			render: vi.fn(async () => {
+				throw new Error("must not render");
+			}),
+			cancel: vi.fn(),
+		};
+		const renderer = await createRenderer({ ck: await loadCanvasKit("full") });
+		try {
+			const missing = { ...workspace, templates: [] };
+			let ticks = 0;
+			const result = await runExportJob(missing, preset, {
+				pool,
+				now: () => ticks++ * 10,
+			});
+			expect(result).toMatchObject({ items: [], cancelled: false, ms: 10 });
+			await expect(
+				exportWorkspace(missing, preset, { renderer }),
+			).rejects.toThrow(/no template/);
+			const empty = await runExportJob(
+				workspace,
+				{ ...preset, records: "selected", selected: [] },
+				{ pool },
+			);
+			expect(empty).toMatchObject({ items: [], cancelled: false });
+			expect(pool.render).not.toHaveBeenCalled();
 		} finally {
 			renderer.dispose();
 		}
