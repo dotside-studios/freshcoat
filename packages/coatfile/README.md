@@ -26,31 +26,57 @@ the rendering helpers live on the `render` subpath.
 ## Quick start
 
 ```sh
-npm install @freshcoat-js/coatfile @freshcoat-js/engine
+npm install @freshcoat-js/coatfile
 ```
 
-The engine is needed because you create the renderer from it.
-
-For template-to-image output, use `renderTemplate()` with a renderer from the
-Freshcoat engine. It loads the fonts the template describes through the renderer
-and paints each side at the template's own size unless you give another.
-Download [`minimal-card.json`](fixtures/minimal-card.json) into your working
-directory to try this example:
+In Node or Bun, read a template and render each side as an image. Download
+[`minimal-card.json`](fixtures/minimal-card.json) into your working directory:
 
 ```ts
-import { readFile } from "node:fs/promises";
-import { loadTemplate } from "@freshcoat-js/coatfile";
-import { createRenderer } from "@freshcoat-js/engine";
-import { loadCanvasKit } from "@freshcoat-js/engine/node"; // or /browser
+import { writeFile } from "node:fs/promises";
+import { createTemplateRenderer, readTemplateFile } from "@freshcoat-js/coatfile/node";
+
+const { template } = await readTemplateFile("minimal-card.json");
+const renderer = await createTemplateRenderer({ fontOptions: {} });
+try {
+  const [front] = await renderer.render(template, { displayName: "Alex" });
+  await writeFile("front.png", front.bytes);
+} finally {
+  renderer.dispose();
+}
+```
+
+The renderer keeps fonts and paint caches between calls. Create it once per
+batch or worker and dispose it when finished. `fontOptions: {}` resolves
+undeclared fonts through Google Fonts, including this example's Comfortaa.
+Omit `fontOptions` to load only declared fonts and fonts supplied through
+`fonts`. Pass `{ fontOptions: { fallback: null } }` to use the resolver without
+looking up undeclared families; its other options configure fetching and caching.
+
+`readTemplateFile` accepts template JSON and `.coat` packages. Its result also
+includes `healed`, `renamedIds` and `packaged`. It throws `TemplateFileError`,
+a `CoatError` with `filePath` and, for validation failures, `issues`.
+`loadTemplate` remains available for callers that handle errors as results.
+
+Pass engine options such as `fonts`, `load`, `cache` and `build: "full"` to
+`createTemplateRenderer`. It grants no local asset access by default; supply
+an engine `fileLoader` or your own `load` when needed. The full build supports
+JPEG and WebP encoding. The underlying engine renderer is `renderer.renderer`.
+
+In a browser or worker, import `createTemplateRenderer` from
+`@freshcoat-js/coatfile/browser` and pass the URL directory holding CanvasKit
+as its first argument, as with the [engine browser factory](../engine/#in-a-browser).
+
+### Use an existing renderer
+
+For hosts that already own an engine renderer, keep using `renderTemplate`
+from `@freshcoat-js/coatfile/render`. This function loads declared fonts and
+uses the host's renderer, loaders and lifetime:
+
+```ts
 import { renderTemplate } from "@freshcoat-js/coatfile/render";
 
-const loaded = await loadTemplate(await readFile("minimal-card.json"));
-if (!loaded.ok) throw new Error("Could not read minimal-card.json");
-const template = loaded.template;
-const renderer = await createRenderer({ ck: await loadCanvasKit() });
-
-const [front] = await renderTemplate(renderer, template, { displayName: "Alex" });
-// front.bytes: PNG by default; front.name, front.width, front.height, front.warnings
+const frames = await renderTemplate(renderer, template, { displayName: "Alex" });
 ```
 
 `output` picks what comes back, as on the renderer: `{ encode: { format: "webp" } }`,

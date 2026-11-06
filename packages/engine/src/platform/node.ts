@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type { CanvasKit } from "canvaskit-wasm";
+import {
+	createRenderer as createBaseRenderer,
+	type Renderer,
+	type RendererOptions,
+} from "../renderer";
 import type { CanvasKitBuild, CanvasKitInit } from "./types";
 
 export { type FileLoaderOptions, fileLoader } from "./file-loader";
@@ -47,4 +52,19 @@ export function loadCanvasKit(
 		loaded.set(build, ck);
 	}
 	return ck;
+}
+
+export type NodeRendererOptions = Omit<RendererOptions, "ck"> & {
+	ck?: CanvasKit;
+	build?: CanvasKitBuild;
+};
+
+export async function createRenderer(
+	options: NodeRendererOptions = {},
+): Promise<Renderer> {
+	const { ck, build, ...rest } = options;
+	return createBaseRenderer({
+		...rest,
+		ck: ck ?? (await loadCanvasKit(build)),
+	});
 }
