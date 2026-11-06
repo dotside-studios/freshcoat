@@ -420,11 +420,31 @@ export function runExportJob(
 	preset: ExportPreset,
 	options: ExportJobOptions,
 ): Promise<JobResult> {
+	const started = (options.now ?? (() => performance.now()))();
+	const entry = workspace.templates.find((t) => t.id === preset.templateId);
+	const plan = entry ? planExport(workspace, preset) : [];
+	return runPreparedExportJob(workspace, preset, options, {
+		entry,
+		plan,
+		started,
+	});
+}
+
+type PreparedExportJob = {
+	entry: Workspace["templates"][number] | undefined;
+	plan: readonly ExportItem[];
+	started: number;
+};
+
+export function runPreparedExportJob(
+	workspace: Workspace,
+	preset: ExportPreset,
+	options: ExportJobOptions,
+	prepared: PreparedExportJob,
+): Promise<JobResult> {
 	const { pool, onProgress, signal } = options;
 	const now = options.now ?? (() => performance.now());
-	const started = now();
-	const entry = workspace.templates.find((t) => t.id === preset.templateId);
-	const plan: ExportItem[] = entry ? planExport(workspace, preset) : [];
+	const { entry, plan, started } = prepared;
 	const total = plan.length;
 	const pdf = preset.format === "pdf";
 	const pieced = plan.some((item) => item.piece !== undefined);
