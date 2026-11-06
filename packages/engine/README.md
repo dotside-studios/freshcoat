@@ -20,23 +20,21 @@ card-printer correction policy belongs to
 npm install @freshcoat-js/engine
 ```
 
-Create a renderer with a CanvasKit instance and render a scene:
+In Node or Bun, create a renderer and render a scene:
 
 ```ts
-import { createRenderer, type RectNode } from "@freshcoat-js/engine";
-import { loadCanvasKit } from "@freshcoat-js/engine/node";
+import { createRenderer } from "@freshcoat-js/engine/node";
 
-const renderer = await createRenderer({ ck: await loadCanvasKit() });
+const renderer = await createRenderer();
 
-const root: RectNode = {
+const result = await renderer.render({
   kind: "rect",
   pos: { x: 0, y: 0 },
   size: { width: 640, height: 360 },
   fills: [{ kind: "solid", color: "#1f6fe8" }],
-};
-
-const result = await renderer.render(root, { width: 640, height: 360 });
+}, { width: 640, height: 360 });
 // result.bytes: PNG by default; result.warnings: paint diagnostics
+renderer.dispose();
 ```
 
 The engine depends on the `canvaskit-wasm` version its conformance goldens were
@@ -44,16 +42,22 @@ made with. `loadCanvasKit` from `@freshcoat-js/engine/node` creates the
 instance in Node or Bun; from `@freshcoat-js/engine/browser` it loads
 `canvaskit.js` and `canvaskit.wasm` from a URL on a page or in a worker.
 
+The platform factories accept the same fonts, loaders, surfaces, caches and
+size limits as the root factory. In Node, `build: "full"` enables JPEG and
+WebP encoding. Pass `ck` to reuse your own CanvasKit instance. The root
+`createRenderer({ ck, ... })` remains available to hosts that initialize it
+themselves. Disposing a renderer frees its resources and leaves shared
+CanvasKit instances available to other renderers.
+
 ### In a browser
 
 Serve `canvaskit.js` and `canvaskit.wasm` from `node_modules/canvaskit-wasm/bin`
 under a path of your own, then pass that path:
 
 ```ts
-import { createRenderer } from "@freshcoat-js/engine";
-import { loadCanvasKit } from "@freshcoat-js/engine/browser";
+import { createRenderer } from "@freshcoat-js/engine/browser";
 
-const renderer = await createRenderer({ ck: await loadCanvasKit("/canvaskit/0.41.1") });
+const renderer = await createRenderer("/canvaskit/0.41.1");
 ```
 
 Under a Content-Security-Policy, a page needs `script-src 'wasm-unsafe-eval'` and a

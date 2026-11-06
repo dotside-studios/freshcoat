@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { loadCanvasKit } from "../../src/platform/browser";
+import { loadCanvasKit as testCanvasKit } from "@freshcoat-js/test-utils";
+import { createRenderer, loadCanvasKit } from "../../src/platform/browser";
 
 type Globals = Record<string, unknown>;
 const globals = globalThis as unknown as Globals;
@@ -72,4 +73,27 @@ describe("browser loader on a page", () => {
 			/did not define CanvasKitInit/,
 		);
 	});
+});
+
+test("browser factory accepts host CanvasKit and retains output typing", async () => {
+	const ck = await testCanvasKit();
+	const renderer = await createRenderer("/unused-host-url", {
+		ck,
+		cache: false,
+	});
+	try {
+		expect(renderer.ck).toBe(ck);
+		const frame = await renderer.render(
+			{
+				kind: "rect",
+				size: { width: 4, height: 2 },
+				fills: [{ kind: "solid", color: "#ff0000" }],
+			},
+			{ width: 4, height: 2, output: { pixels: true } },
+		);
+		expect(frame.pixels.width).toBe(4);
+		expect([...frame.pixels.data.slice(0, 4)]).toEqual([255, 0, 0, 255]);
+	} finally {
+		renderer.dispose();
+	}
 });

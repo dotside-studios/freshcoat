@@ -1,4 +1,9 @@
 import type { CanvasKit } from "canvaskit-wasm";
+import {
+	createRenderer as createBaseRenderer,
+	type Renderer,
+	type RendererOptions,
+} from "../renderer";
 import type { CanvasKitInit } from "./types";
 
 export type { CanvasKitBuild } from "./types";
@@ -62,4 +67,16 @@ async function evalScript(src: string): Promise<CanvasKitInit> {
 	const indirectEval = globalThis.eval;
 	indirectEval(code);
 	return initFromGlobal();
+}
+
+export type BrowserRendererOptions = Omit<RendererOptions, "ck"> & {
+	ck?: CanvasKit;
+};
+
+export async function createRenderer(
+	base: string,
+	options: BrowserRendererOptions = {},
+): Promise<Renderer> {
+	const { ck, ...rest } = options;
+	return createBaseRenderer({ ...rest, ck: ck ?? (await loadCanvasKit(base)) });
 }
