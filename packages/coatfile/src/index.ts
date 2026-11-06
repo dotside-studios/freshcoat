@@ -126,7 +126,11 @@ export {
 	inlineImageSize,
 } from "./image-dpi";
 export { formatImageFocus, parseImageFocus } from "./image-focus";
-export { type LoadTemplateResult, loadTemplate } from "./load";
+export {
+	type LoadTemplateOptions,
+	type LoadTemplateResult,
+	loadTemplate,
+} from "./load";
 export {
 	FIELD_FORMATS,
 	FIELD_ID,

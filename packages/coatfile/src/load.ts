@@ -1,8 +1,15 @@
+import { type AssetHashMismatch, verifyAssets } from "./assets";
 import { decodeTemplate, type UnpackOptions } from "./coat";
 import type { CoatErrorCode } from "./errors";
+import { formatVersionStatus } from "./format-version";
 import { healElementIds } from "./normalize";
 import type { Template, ValidationError } from "./types";
 import { validate } from "./validate";
+
+export type LoadTemplateOptions = UnpackOptions & {
+	/** Include format and asset hash findings. JSON assets are hashed only when enabled. */
+	diagnostics?: boolean;
+};
 
 export type LoadTemplateResult =
 	| {
@@ -14,6 +21,11 @@ export type LoadTemplateResult =
 			renamedIds: string[];
 			/** Whether it arrived as a `.coat` rather than as JSON. */
 			packaged: boolean;
+			/** Present only when diagnostics were requested. Hash failures reject the load. */
+			diagnostics?: {
+				newerFormat: boolean;
+				misKeyedAssets: AssetHashMismatch[];
+			};
 	  }
 	/** Unreadable bytes, malformed JSON, or a broken package. */
 	| { ok: false; reason: "unreadable"; code: CoatErrorCode; message: string }
@@ -28,7 +40,7 @@ export type LoadTemplateResult =
  */
 export async function loadTemplate(
 	input: Uint8Array | string,
-	options: UnpackOptions = {},
+	options: LoadTemplateOptions = {},
 ): Promise<LoadTemplateResult> {
 	const decoded = await decodeTemplate(input, options);
 	if (!decoded.ok)
@@ -48,6 +60,9 @@ export async function loadTemplate(
 			healed: false,
 			renamedIds: [],
 			packaged,
+			...(options.diagnostics
+				? { diagnostics: await diagnostics(asWritten.value, options) }
+				: {}),
 		};
 	const healed = validate(healElementIds(raw));
 	if (!healed.ok)
@@ -58,6 +73,9 @@ export async function loadTemplate(
 		healed: true,
 		renamedIds: renamedIds(raw, healed.value),
 		packaged,
+		...(options.diagnostics
+			? { diagnostics: await diagnostics(healed.value, options) }
+			: {}),
 	};
 }
 
@@ -76,4 +94,11 @@ function frameElementIds(template: unknown): string[] {
 			? elements.map((el) => String((el as { id?: unknown }).id))
 			: [];
 	});
+}
+
+async function diagnostics(template: Template, options: LoadTemplateOptions) {
+	return {
+		newerFormat: formatVersionStatus(template.format_version) === "newer",
+		misKeyedAssets: await verifyAssets(template, options.sha256),
+	};
 }
