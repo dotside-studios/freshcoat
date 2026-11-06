@@ -8,8 +8,8 @@ import {
 	type TemplateFontOptions,
 	type TemplateRenderer,
 } from "./bound-renderer";
-import type { UnpackOptions } from "./coat";
 import { CoatError, errorMessage } from "./errors";
+import type { LoadTemplateOptions } from "./load";
 import { loadTemplate } from "./load";
 import type { ValidationError } from "./types";
 
@@ -45,7 +45,10 @@ export async function createTemplateRenderer(
 }
 
 /** Reads JSON or a .coat package, preserving successful load diagnostics. */
-export async function readTemplateFile(path: string, options?: UnpackOptions) {
+export async function readTemplateFile(
+	path: string,
+	options?: LoadTemplateOptions,
+) {
 	let bytes: Uint8Array;
 	try {
 		bytes = await readFile(path);

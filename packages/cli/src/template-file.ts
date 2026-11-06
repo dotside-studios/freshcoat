@@ -1,11 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
-	formatVersionStatus,
 	loadTemplate,
 	type Template,
 	type ValidationError,
-	verifyAssets,
 } from "@freshcoat-js/coatfile";
 import {
 	unpackTemplates,
@@ -103,7 +101,7 @@ async function openTemplate(
 	input: Parameters<typeof loadTemplate>[0],
 	directory: string,
 ): Promise<TemplateFile> {
-	const loaded = await loadTemplate(input);
+	const loaded = await loadTemplate(input, { diagnostics: true });
 	if (!loaded.ok) {
 		if (loaded.reason === "unreadable")
 			throw new CliError(`${path}: ${loaded.message}`);
@@ -115,7 +113,7 @@ async function openTemplate(
 		notes.push(
 			`renamed duplicate element ${loaded.renamedIds.length === 1 ? "id" : "ids"} ${loaded.renamedIds.join(", ")}`,
 		);
-	const misKeyed = await verifyAssets(template);
+	const misKeyed = loaded.diagnostics?.misKeyedAssets ?? [];
 	if (misKeyed.length > 0)
 		notes.push(
 			`${misKeyed.length === 1 ? "asset" : "assets"} ${misKeyed.map((m) => m.declared).join(", ")} ${misKeyed.length === 1 ? "is" : "are"} not keyed by the hash of ${misKeyed.length === 1 ? "its" : "their"} bytes`,
@@ -124,7 +122,7 @@ async function openTemplate(
 		directory,
 		template,
 		notes,
-		newerFormat: formatVersionStatus(template.format_version) === "newer",
+		newerFormat: loaded.diagnostics?.newerFormat ?? false,
 	};
 }
 

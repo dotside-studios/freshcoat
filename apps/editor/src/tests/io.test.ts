@@ -171,6 +171,35 @@ describe("openFile", () => {
 		expect(r.kind === "ok" && r.healed).toEqual(["a_2"]);
 	});
 
+	test("healing retains all file findings together", async () => {
+		const t = doc();
+		t.template_data[0].elements[1].id = "a";
+		t.format_version = "1.99";
+		const asset = t.assets?.[0];
+		if (!asset) throw new Error("fixture has no asset");
+		asset.sha256 = "miskeyed";
+		expect(await openFile(JSON.stringify(t), "findings.json")).toMatchObject({
+			kind: "ok",
+			fileName: "findings.json",
+			healed: ["a_2"],
+			newerFormat: true,
+			misKeyedAssets: ["miskeyed"],
+		});
+	});
+
+	test("corrupt package assets remain unreadable", async () => {
+		const saved = await saveCoat(frozenDoc());
+		if (!saved.ok) throw new Error("save failed");
+		const entries = unzipSync(saved.data);
+		const asset = Object.keys(entries).find((key) => key.startsWith("assets/"));
+		if (!asset) throw new Error("fixture has no packaged asset");
+		entries[asset] = new Uint8Array([1, 2, 3]);
+		expect(await openFile(zipSync(entries), "corrupt.coat")).toMatchObject({
+			kind: "unreadable",
+			fileName: "corrupt.coat",
+		});
+	});
+
 	test("flags a newer format and mis-keyed assets", async () => {
 		const t = doc();
 		const raw = {

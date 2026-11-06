@@ -295,8 +295,15 @@ const fonts = { Geist: [new Uint8Array(readFileSync(${JSON.stringify(font)}))] }
 				name === "coatfile"
 					? `
 import { createTemplateRenderer, readTemplateFile } from "@freshcoat-js/coatfile/node";
+import { loadTemplate } from "@freshcoat-js/coatfile";
 const { template, healed } = await readTemplateFile(${JSON.stringify(join(parent, "template.json"))});
 assert.equal(healed, false);
+const inspected = await loadTemplate(JSON.stringify({ ...template, format_version: "1.99" }), { diagnostics: true });
+assert.equal(inspected.ok, true);
+assert.equal(inspected.diagnostics.newerFormat, true);
+assert.deepEqual(inspected.diagnostics.misKeyedAssets, []);
+const file = await readTemplateFile(${JSON.stringify(join(parent, "template.json"))}, { diagnostics: true });
+assert.equal(file.diagnostics.newerFormat, false);
 const renderer = await createTemplateRenderer({ fonts, build: "full" });
 try {
   const [png] = await renderer.render(template, { displayName: "Only Coatfile" });
@@ -323,8 +330,17 @@ assert.equal(readFileSync("cards.zip")[0], 0x50);
 					? `
 import { createTemplateRenderer, readTemplateFile } from "@freshcoat-js/coatfile/node";
 import { createTemplateRenderer as browserRenderer } from "@freshcoat-js/coatfile/browser";
+import { loadTemplate, type LoadTemplateOptions } from "@freshcoat-js/coatfile";
 async function check() {
   const { template } = await readTemplateFile("card.coat");
+  const options: LoadTemplateOptions = { diagnostics: true, sha256: () => "hash" };
+  const inspected = await loadTemplate("{}", options);
+  if (inspected.ok && inspected.diagnostics) {
+    const newer: boolean = inspected.diagnostics.newerFormat;
+    const mismatches: { declared: string; actual: string }[] = inspected.diagnostics.misKeyedAssets;
+    void newer; void mismatches;
+  }
+  await readTemplateFile("card.coat", options);
   const renderer = await createTemplateRenderer();
   const [png] = await renderer.render(template, {});
   const bytes: Uint8Array = png.bytes;

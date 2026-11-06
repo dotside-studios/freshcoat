@@ -441,6 +441,32 @@ describe("reading a template as Studio opens it", () => {
 		} as Template;
 	}
 
+	test("keeps combined findings in their warning order", async () => {
+		await box.write(
+			"findings.json",
+			JSON.stringify({
+				...duplicated(),
+				format_version: "1.99",
+				assets: [
+					{ sha256: "deadbeef", base64: "AAAA", contentType: "image/png" },
+				],
+			}),
+		);
+		const run = await box.run("inspect", "findings.json");
+		expect(run.code).toBe(0);
+		const warnings = run.stderr.trim().split("\n");
+		expect(warnings).toHaveLength(3);
+		expect(warnings[0]).toMatch(
+			/warning: findings.json: renamed duplicate element ids? /,
+		);
+		expect(warnings[1]).toBe(
+			"warning: findings.json: asset deadbeef is not keyed by the hash of its bytes",
+		);
+		expect(warnings[2]).toBe(
+			"warning: findings.json: format_version 1.99 is newer than this freshcoat reads; fields it adds are ignored",
+		);
+	});
+
 	test("heals duplicate element ids and warns", async () => {
 		await box.write("dupes.json", JSON.stringify(duplicated()));
 		for (const argv of [

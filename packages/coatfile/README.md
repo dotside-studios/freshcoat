@@ -603,6 +603,18 @@ if (loaded.ok) {
 }
 ```
 
+To inspect format and asset findings while loading, opt in to diagnostics:
+
+```ts
+const loaded = await loadTemplate(fileBytes, { diagnostics: true });
+if (loaded.ok) console.log(loaded.diagnostics);
+```
+
+Diagnostics include `newerFormat` and `misKeyedAssets` (declared and actual hashes).
+JSON assets are hashed only when diagnostics are enabled. A custom `sha256`
+option handles both package integrity and diagnostics; a diagnostic hash failure
+rejects the load. Package integrity checks always run.
+
 `pruneUnusedAssets` (on `./coat` and the root) drops carried assets nothing
 references. Image srcs in frames and variant overrides, and local font files,
 count as references. Studio prunes before it saves, and the workspace archive
