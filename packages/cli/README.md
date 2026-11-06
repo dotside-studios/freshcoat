@@ -24,6 +24,8 @@ Results go to stdout; progress, warnings and errors go to stderr. Exit codes:
 commands exit on the first signal. A `.zip` or `.pdf` is written to a
 temporary file beside `--out` and renamed over it only when the export
 succeeds, so a cancelled or failed export leaves any existing file as it was.
+Exports and workspace saves use separate temporary files for overlapping writes
+to the same destination; the last successful replacement wins.
 `main()` from `@freshcoat-js/cli` installs no signal handlers; pass an
 `AbortSignal` as `io.signal` to cancel it. `-q` or `--quiet` hides warnings and progress;
 `--version` prints the version and `--help` works on the tool and on every

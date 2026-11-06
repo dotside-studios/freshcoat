@@ -314,7 +314,7 @@ try {
 } finally { renderer.dispose(); }
 `
 					: `
-import { exportWorkspaceFile } from "@freshcoat-js/workspace/node";
+import { exportWorkspaceFile, fileOutput } from "@freshcoat-js/workspace/node";
 const result = await exportWorkspaceFile(${JSON.stringify(join(parent, "workspace.coatworkspace"))}, {
   preset: "All", out: "cards.zip", fonts: new Map(Object.entries(fonts)),
 });
@@ -323,6 +323,14 @@ assert.equal(result.items.length, 2);
 assert.ok(result.items.every(item => item.ok));
 assert.deepEqual(result.warnings, []);
 assert.equal(readFileSync("cards.zip")[0], 0x50);
+const first = fileOutput("isolated.pdf");
+const second = fileOutput("isolated.pdf");
+assert.notEqual(first.temporary, second.temporary);
+await first.save({ name: "isolated.pdf", mediaType: "application/pdf", blob: new Blob(["first"]) });
+await second.save({ name: "isolated.pdf", mediaType: "application/pdf", blob: new Blob(["second"]) });
+await first.discard();
+await second.commit();
+assert.equal(readFileSync("isolated.pdf", "utf8"), "second");
 `;
 			run(["node", "--input-type=module", "--eval", setup + code], directory);
 			const check =

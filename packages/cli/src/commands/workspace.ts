@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -160,18 +161,24 @@ export async function saveWorkspace(
 	path: string,
 	workspace: Workspace,
 ): Promise<void> {
-	const temporary = `${path}.${process.pid}.tmp`;
-	pendingFiles.add(temporary);
+	const temporary = `${path}.${randomUUID()}.tmp`;
+	let owned = false;
+	const stream = createWriteStream(temporary, { flags: "wx" });
+	stream.once("open", () => {
+		owned = true;
+		pendingFiles.add(temporary);
+	});
 	try {
 		await packWorkspace(
 			workspace,
-			Writable.toWeb(
-				createWriteStream(temporary),
-			) as WritableStream<Uint8Array>,
+			Writable.toWeb(stream) as WritableStream<Uint8Array>,
 		);
 		await rename(temporary, path);
 	} catch (err) {
-		await rm(temporary, { force: true });
+		stream.destroy();
+		if (!stream.closed)
+			await new Promise<void>((resolve) => stream.once("close", resolve));
+		if (owned) await rm(temporary, { force: true });
 		throw err;
 	} finally {
 		pendingFiles.delete(temporary);
