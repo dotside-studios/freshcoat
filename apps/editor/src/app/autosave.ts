@@ -567,17 +567,23 @@ export function createAutosaveStore(
 		opts.onWriteBlocked?.(blocked);
 	}
 
-	function block(next: AutosavePause | null): void {
+	function block(next: AutosavePause): void {
 		if (blocked === next) return;
 		blocked = next;
 		heldReported = false;
 		opts.onPausedChange?.(next);
 	}
 
-	function unblock(): void {
-		block(null);
+	function unblock(resumeHeld = false): Promise<void> {
+		const held = heldEntry;
 		heldEntry = null;
 		heldReported = false;
+		const wasBlocked = blocked !== null;
+		blocked = null;
+		// Queue held edits before the notification can trigger a newer write.
+		const writing = resumeHeld && held ? api.write(held) : Promise.resolve();
+		if (wasBlocked) opts.onPausedChange?.(null);
+		return writing;
 	}
 
 	function failed(err: unknown, entry: Omit<Autosave, "savedAt">): void {
@@ -709,6 +715,70 @@ export function createAutosaveStore(
 		written = null;
 	}
 
+	let recoveryQueue: Promise<unknown> = Promise.resolve();
+	function queueRecovery<T>(operation: () => Promise<T>): Promise<T> {
+		const result = recoveryQueue.then(operation);
+		recoveryQueue = result.catch(() => {});
+		return result;
+	}
+	async function readStored(): Promise<AutosaveRead> {
+		let read: AutosaveRead;
+		try {
+			const db = await connect();
+			const tx = db.transaction([DOC_STORE, ASSET_STORE]);
+			const v: unknown = await request(tx.objectStore(DOC_STORE).get(KEY));
+			read = await parse(tx, v);
+			if (read.status === "found" && isSingleRecord(v))
+				await migrate(db, v).catch(() => {});
+		} catch {
+			await disconnect();
+			return { status: "failed" };
+		}
+		return read;
+	}
+	async function settleRead(
+		read: AutosaveRead,
+		resumeHeld: boolean,
+	): Promise<AutosaveRead> {
+		if (read.status === "failed" || read.status === "newer") block(read.status);
+		else await unblock(resumeHeld && read.status === "empty");
+		return read;
+	}
+	async function rereadStored(): Promise<AutosaveRead> {
+		return settleRead(await readStored(), true);
+	}
+
+	async function discardStored(): Promise<AutosaveRead | null> {
+		if (blocked !== "failed") return null;
+		last = null;
+		savedAssets = null;
+		written = null;
+		let cleared = false;
+		try {
+			const db = await connect();
+			const tx = db.transaction([DOC_STORE, ASSET_STORE], "readwrite");
+			const docs = tx.objectStore(DOC_STORE);
+			const now = await parse(tx, await request(docs.get(KEY))).catch(
+				(): AutosaveRead => ({ status: "failed" }),
+			);
+			if (now.status === "failed") {
+				docs.clear();
+				tx.objectStore(ASSET_STORE).clear();
+				cleared = true;
+			}
+			await done(tx);
+			if (cleared) {
+				stored = new Set();
+				written = new Map();
+			}
+		} catch (err) {
+			await disconnect();
+			throw err;
+		}
+		if (!cleared) return rereadStored();
+		return settleRead({ status: "empty" }, true);
+	}
+
 	const api: AutosaveStore = {
 		write(entry) {
 			if (blocked) {
@@ -811,66 +881,10 @@ export function createAutosaveStore(
 			await api.write(entry);
 		},
 
-		async read(): Promise<AutosaveRead> {
-			let read: AutosaveRead;
-			try {
-				const db = await connect();
-				const tx = db.transaction([DOC_STORE, ASSET_STORE]);
-				const v: unknown = await request(tx.objectStore(DOC_STORE).get(KEY));
-				read = await parse(tx, v);
-				if (read.status === "found" && isSingleRecord(v))
-					await migrate(db, v).catch(() => {});
-			} catch {
-				block("failed");
-				await disconnect();
-				return { status: "failed" };
-			}
-			if (read.status === "failed" || read.status === "newer")
-				block(read.status);
-			else unblock();
-			return read;
-		},
-
-		async reread() {
-			const held = heldEntry;
-			const read = await api.read();
-			if (read.status === "empty" && held) await api.write(held);
-			return read;
-		},
-
-		async discard() {
-			if (blocked !== "failed") return null;
-			const held = heldEntry;
-			last = null;
-			savedAssets = null;
-			written = null;
-			let cleared = false;
-			try {
-				const db = await connect();
-				const tx = db.transaction([DOC_STORE, ASSET_STORE], "readwrite");
-				const docs = tx.objectStore(DOC_STORE);
-				const now = await parse(tx, await request(docs.get(KEY))).catch(
-					(): AutosaveRead => ({ status: "failed" }),
-				);
-				if (now.status === "failed") {
-					docs.clear();
-					tx.objectStore(ASSET_STORE).clear();
-					cleared = true;
-				}
-				await done(tx);
-				if (cleared) {
-					stored = new Set();
-					written = new Map();
-				}
-			} catch (err) {
-				await disconnect();
-				throw err;
-			}
-			if (!cleared) return api.reread();
-			unblock();
-			if (held) await api.write(held);
-			return { status: "empty" };
-		},
+		read: () =>
+			queueRecovery(async () => settleRead(await readStored(), false)),
+		reread: () => queueRecovery(rereadStored),
+		discard: () => queueRecovery(discardStored),
 
 		async asset(sha256) {
 			try {
