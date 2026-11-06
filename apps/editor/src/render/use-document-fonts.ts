@@ -1,5 +1,6 @@
 import {
 	collectFontRequests,
+	fontUsage,
 	resolveTemplateFonts,
 	type Template,
 } from "@freshcoat-js/coatfile";
@@ -32,9 +33,7 @@ const EMPTY: Report = {
 };
 
 /**
- * The font bytes a document needs. Refetches only when the set of families or
- * their descriptors change, so the returned map keeps its identity across every
- * other edit (the render session caches on it).
+ * Keeps the font map stable until a family, descriptor or fallback weight changes.
  */
 export function useDocumentFonts(template: Template | null): DocumentFonts {
 	const computed = useMemo(() => fontKey(template), [template]);
@@ -100,8 +99,21 @@ export function fontKey(template: Template | null): FontKey {
 
 function computeFontKey(template: Template): FontKey {
 	const requests = collectFontRequests(template);
+	const usage = requests.some((request) => !("descriptor" in request))
+		? fontUsage(template)
+		: undefined;
 	return {
-		key: requests.map(fontRequestKey).sort().join("\n"),
+		key: requests
+			.map((request) =>
+				JSON.stringify([
+					fontRequestKey(request),
+					"descriptor" in request
+						? null
+						: (usage?.get(request.family)?.weights ?? [400]),
+				]),
+			)
+			.sort()
+			.join("\n"),
 		families: requests.map((r) => r.family).sort(),
 	};
 }
