@@ -1,10 +1,5 @@
 import type { Template, ValidationError } from "@freshcoat-js/coatfile";
-import {
-	formatVersionStatus,
-	loadTemplate,
-	validate,
-	verifyAssets,
-} from "@freshcoat-js/coatfile";
+import { loadTemplate, validate } from "@freshcoat-js/coatfile";
 import {
 	type COAT_EXTENSION,
 	type COAT_JSON_EXTENSION,
@@ -37,7 +32,7 @@ export async function openFile(
 	fileName: string,
 ): Promise<LoadOutcome> {
 	try {
-		const loaded = await loadTemplate(input);
+		const loaded = await loadTemplate(input, { diagnostics: true });
 		if (!loaded.ok)
 			return loaded.reason === "unreadable"
 				? { kind: "unreadable", fileName, message: loaded.message }
@@ -48,8 +43,10 @@ export async function openFile(
 			fileName,
 			template,
 			healed: loaded.renamedIds,
-			newerFormat: formatVersionStatus(template.format_version) === "newer",
-			misKeyedAssets: (await verifyAssets(template)).map((m) => m.declared),
+			newerFormat: loaded.diagnostics?.newerFormat ?? false,
+			misKeyedAssets: (loaded.diagnostics?.misKeyedAssets ?? []).map(
+				(m) => m.declared,
+			),
 		};
 	} catch (err) {
 		return { kind: "unreadable", fileName, message: String(err) };
