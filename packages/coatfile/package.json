@@ -16,6 +16,8 @@
 		"./bleed": "./src/bleed.ts",
 		"./fills": "./src/fills.ts",
 		"./fonts": "./src/font-usage.ts",
+		"./node": "./src/node.ts",
+		"./browser": "./src/browser.ts",
 		"./render": "./src/render.ts",
 		"./svg": "./src/svg.ts",
 		"./coat": "./src/coat.ts",
@@ -42,6 +44,7 @@
 	"devDependencies": {
 		"@freshcoat-js/test-utils": "workspace:*",
 		"@types/bun": "^1.3.12",
+		"@types/node": "^26.6.3",
 		"@zxing/library": "^0.23.0",
 		"jsqr": "1.4.0",
 		"typescript": "^5.7.2"

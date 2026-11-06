@@ -93,28 +93,29 @@ See the [CLI README](packages/cli/README.md) for more details.
 ### SDK
 
 Using the same [`minimal-card.json`](packages/coatfile/fixtures/minimal-card.json)
-template, install the Coatfile SDK and engine packages:
+template, install the Coatfile SDK:
 
 ```sh
-npm install @freshcoat-js/coatfile @freshcoat-js/engine
+npm install @freshcoat-js/coatfile
 ```
 
 ```ts
-import { readFile, writeFile } from "node:fs/promises";
-import { loadTemplate } from "@freshcoat-js/coatfile";
-import { renderTemplate } from "@freshcoat-js/coatfile/render";
-import { createRenderer } from "@freshcoat-js/engine";
-import { loadCanvasKit } from "@freshcoat-js/engine/node";
+import { writeFile } from "node:fs/promises";
+import { createTemplateRenderer, readTemplateFile } from "@freshcoat-js/coatfile/node";
 
-const loaded = await loadTemplate(await readFile("minimal-card.json"));
-if (!loaded.ok) throw new Error("Could not read minimal-card.json");
-
-const renderer = await createRenderer({ ck: await loadCanvasKit() });
-const [front] = await renderTemplate(renderer, loaded.template, { displayName: "Alex" });
-await writeFile("front.png", front.bytes);
+const { template } = await readTemplateFile("minimal-card.json");
+const renderer = await createTemplateRenderer({ fontOptions: {} });
+try {
+  const [front] = await renderer.render(template, { displayName: "Alex" });
+  await writeFile("front.png", front.bytes);
+} finally {
+  renderer.dispose();
+}
 ```
 
-Create the renderer once and reuse it. See the
+`fontOptions: {}` resolves undeclared fonts through Google Fonts, including the
+example's Comfortaa font. Omit it to load only fonts declared by the template
+or supplied to the renderer. Create the renderer once and reuse it. See the
 [Coatfile SDK README](packages/coatfile/README.md) for variants, export sizes and
 batch rendering.
 
