@@ -130,7 +130,7 @@ try {
 	);
 	const smoke = `
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, join } from "node:path";
 const loaded = new Map();
@@ -177,6 +177,8 @@ const { unzipSync } = await import(require.resolve("fflate"));
 const dataset = { id: "d_1", name: "Members", columns: [{ key: "displayName", type: "text" }], records: [{ id: "r_00000001", values: { displayName: "Ana" }, status: "pending" }, { id: "r_00000002", values: { displayName: "Ben" }, status: "pending" }], assets: [] };
 const preset = { id: "p_1", name: "All", templateId: "t_1", records: "all", sides: "all", format: "png-zip", scale: 0.25, dpi: 300, fileName: "{{index}}-{{side}}", markExported: false };
 const workspace = { formatVersion: "1.0", name: "Release check", templates: [{ id: "t_1", fileName: "card.coat", template, binding: { datasetId: "d_1", fields: { displayName: { kind: "column", column: "displayName" } } } }], datasets: [dataset], presets: [preset] };
+writeFileSync("template.json", JSON.stringify(template));
+writeFileSync("workspace.coatworkspace", await (await packWorkspace({ ...workspace, presets: [{ ...preset, scale: 1 }] })).bytes());
 const items = createItemRenderer({ renderer });
 const job = await runExportJob(workspace, preset, { pool: inlinePool(items) });
 items.dispose();
@@ -210,6 +212,7 @@ console.log("All public imports, scene, text and barcode rendering, print analys
 	console.log(
 		run(["node", "--input-type=module", "--eval", smoke], consumer).trim(),
 	);
+	checkSinglePackageConsumers(consumer, font);
 	checkCli(consumer, font);
 	writeFileSync(
 		join(consumer, "check.ts"),
@@ -249,6 +252,127 @@ console.log("All public imports, scene, text and barcode rendering, print analys
 	);
 } finally {
 	rmSync(consumer, { recursive: true, force: true });
+}
+
+function checkSinglePackageConsumers(parent: string, font: string): void {
+	for (const name of ["coatfile", "workspace"] as const) {
+		const directory = mkdtempSync(join(tmpdir(), `freshcoat-only-${name}-`));
+		try {
+			const tarball = (directory: string) => {
+				const data = manifest(`packages/${directory}`);
+				return `file:${join(artifactRoot, `${data.name.replace(/^@/, "").replace("/", "-")}-${data.version}.tgz`)}`;
+			};
+			writeFileSync(
+				join(directory, "package.json"),
+				JSON.stringify({
+					private: true,
+					type: "module",
+					dependencies: { [`@freshcoat-js/${name}`]: tarball(name) },
+					overrides: Object.fromEntries(
+						packages
+							.filter((p) => p !== name && p !== "cli")
+							.map((p) => [`@freshcoat-js/${p}`, tarball(p)]),
+					),
+				}),
+			);
+			run(
+				[
+					"npm",
+					"install",
+					"--ignore-scripts",
+					"--no-audit",
+					"--no-fund",
+					"--package-lock=false",
+				],
+				directory,
+			);
+			const setup = `
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const fonts = { Geist: [new Uint8Array(readFileSync(${JSON.stringify(font)}))] };
+`;
+			const code =
+				name === "coatfile"
+					? `
+import { createTemplateRenderer, readTemplateFile } from "@freshcoat-js/coatfile/node";
+const { template, healed } = await readTemplateFile(${JSON.stringify(join(parent, "template.json"))});
+assert.equal(healed, false);
+const renderer = await createTemplateRenderer({ fonts, build: "full" });
+try {
+  const [png] = await renderer.render(template, { displayName: "Only Coatfile" });
+  assert.equal(png.format, "png");
+  assert.equal(png.warnings.length, 0);
+  const [webp] = await renderer.render(template, {}, { output: { encode: { format: "webp" } } });
+  assert.equal(webp.format, "webp");
+} finally { renderer.dispose(); }
+`
+					: `
+import { exportWorkspaceFile } from "@freshcoat-js/workspace/node";
+const result = await exportWorkspaceFile(${JSON.stringify(join(parent, "workspace.coatworkspace"))}, {
+  preset: "All", out: "cards.zip", fonts: new Map(Object.entries(fonts)),
+});
+assert.equal(result.cancelled, false);
+assert.equal(result.items.length, 2);
+assert.ok(result.items.every(item => item.ok));
+assert.deepEqual(result.warnings, []);
+assert.equal(readFileSync("cards.zip")[0], 0x50);
+`;
+			run(["node", "--input-type=module", "--eval", setup + code], directory);
+			const check =
+				name === "coatfile"
+					? `
+import { createTemplateRenderer, readTemplateFile } from "@freshcoat-js/coatfile/node";
+import { createTemplateRenderer as browserRenderer } from "@freshcoat-js/coatfile/browser";
+async function check() {
+  const { template } = await readTemplateFile("card.coat");
+  const renderer = await createTemplateRenderer();
+  const [png] = await renderer.render(template, {});
+  const bytes: Uint8Array = png.bytes;
+  const [pixels] = await renderer.render(template, {}, { output: { pixels: true } });
+  const width: number = pixels.pixels.width;
+  const [canvas] = await renderer.render(template, {}, { output: { canvas: true } });
+  void canvas.canvas;
+  void bytes; void width; void browserRenderer;
+  renderer.dispose();
+}
+void check;
+`
+					: `
+import { exportWorkspaceFile } from "@freshcoat-js/workspace/node";
+void exportWorkspaceFile("club.coatworkspace", { preset: "All", out: "cards.zip" });
+`;
+			writeFileSync(join(directory, "check.ts"), check);
+			writeFileSync(
+				join(directory, "tsconfig.json"),
+				JSON.stringify({
+					compilerOptions: {
+						noEmit: true,
+						strict: true,
+						module: "NodeNext",
+						moduleResolution: "NodeNext",
+						target: "ES2022",
+						lib: ["ES2022", "DOM", "DOM.Iterable"],
+						types: [],
+					},
+					include: ["check.ts"],
+				}),
+			);
+			run(
+				[
+					"node",
+					join(root, "node_modules/typescript/bin/tsc"),
+					"--project",
+					"tsconfig.json",
+				],
+				directory,
+			);
+		} finally {
+			rmSync(directory, { recursive: true, force: true });
+		}
+	}
+	console.log(
+		"Single-package Coatfile and Workspace consumers rendered and passed NodeNext typechecks",
+	);
 }
 
 function checkCli(consumer: string, font: string): void {
