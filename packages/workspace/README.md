@@ -10,12 +10,47 @@ bind them to templates, plan a batch export or assemble rendered images into
 PDFs. Freshcoat Studio uses it for its Data and Export sections.
 
 The model and planning code are independent of React and the DOM and can run
-in a browser, Bun or Node. The host application supplies rendering, job
-scheduling and file destinations.
+in a browser, Bun or Node. The host application can supply rendering, job
+scheduling and file destinations, or use the Node helper to export directly
+from a file.
 
 ```sh
-npm install @freshcoat-js/workspace @freshcoat-js/coatfile @freshcoat-js/engine
+npm install @freshcoat-js/workspace
 ```
+
+## Quick start
+
+In Node or Bun, run a preset saved in a `.coatworkspace` file:
+
+```ts
+import { exportWorkspaceFile } from "@freshcoat-js/workspace/node";
+
+const result = await exportWorkspaceFile("club.coatworkspace", {
+  preset: "All cards",
+  out: "club.zip",
+});
+```
+
+The helper reads the archive, creates a full-build renderer and disposes it
+after the export, including on cancellation or failure. The preset chooses
+the format; `out` names the destination file. Use `destination: "folder"`
+to write separate files into that directory.
+
+`result.warnings` contains archive read warnings, `result.fonts.missing`
+lists unresolved fonts, and `result.items` reports each item's outcome.
+The resolver looks up undeclared fonts through Google Fonts by default;
+`fontOptions: { fallback: null }` disables that lookup.
+
+Embedded assets work without extra options. To read relative paths and
+`file:` URLs under a directory, pass `assetRoot: "./assets"`. Alternatively,
+pass a custom `rendererOptions.load`; these options are mutually exclusive.
+The same loader reads local font files unless `fontOptions.load` overrides it.
+Other engine settings go in `rendererOptions`; export settings such as
+`signal`, `onProgress`, `fontOptions` and `pool` are passed through.
+
+Record status changes are returned in `result.workspace`; the source file
+is not saved. For repeated exports with a shared renderer, custom output
+sinks or an in-memory workspace, use [exportWorkspace](#where-it-sits).
 
 ## What is in it
 
@@ -38,7 +73,7 @@ npm install @freshcoat-js/workspace @freshcoat-js/coatfile @freshcoat-js/engine
 | `assets` | photos as `ws:<sha256>` references, prepared once and stored once; `collectPhotoFiles` picks the images out of dropped files and zips |
 | `image-info` | a photo's size and orientation read from its file header, without decoding it; re-exported from `@freshcoat-js/engine/image` |
 | `ids` | the stable ids, keys and slugs the workspace is addressed by; `slug` is coatfile's `fieldKeyFrom` with `column` as the fallback |
-| `node` | Bun and Node only: `readWorkspaceFile`, `fileOutput` and `folderOutput` for files on disk |
+| `node` | Bun and Node only: `exportWorkspaceFile`, `readWorkspaceFile`, `fileOutput` and `folderOutput` for files on disk |
 
 Most utilities are exported from `@freshcoat-js/workspace`. Dataset editing
 lives at `@freshcoat-js/workspace/dataset`; its functions take a `Dataset`

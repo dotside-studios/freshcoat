@@ -9,13 +9,19 @@ import {
 	decodePixels,
 	type FontFetch,
 } from "@freshcoat-js/engine";
+import * as nodeEngine from "@freshcoat-js/engine/node";
 import { fileLoader, loadCanvasKit } from "@freshcoat-js/engine/node";
 import { testFontBytes } from "@freshcoat-js/test-utils";
-import { unzipSync } from "fflate";
+import { unzipSync, zipSync } from "fflate";
 import { PDFDict, PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { packWorkspace } from "../archive";
-import { fileOutput, folderOutput, readWorkspaceFile } from "../node";
+import {
+	exportWorkspaceFile,
+	fileOutput,
+	folderOutput,
+	readWorkspaceFile,
+} from "../node";
 import { planExport } from "../plan";
 import { makePng, sha256 } from "../test-fixtures";
 import type { ExportPreset, Workspace } from "../types";
@@ -583,6 +589,180 @@ describe("export from a workspace file in Node", () => {
 		} finally {
 			items.dispose();
 			renderer.dispose();
+		}
+	});
+});
+
+describe("exportWorkspaceFile", () => {
+	async function saveFixture(
+		name: string,
+		format: ExportPreset["format"] = "png-zip",
+	) {
+		const workspace = fixture("logo.png");
+		workspace.presets = [{ ...preset, format, scale: 1, markExported: true }];
+		const file = join(dir, `${name}.coatworkspace`);
+		await writeFile(file, await (await packWorkspace(workspace)).bytes());
+		return file;
+	}
+
+	it("exports a saved preset and returns statuses without saving the source", async () => {
+		const file = await saveFixture("convenience");
+		const original = await readFile(file);
+		const out = join(dir, "convenience.zip");
+		const progress: number[] = [];
+		const result = await exportWorkspaceFile(file, {
+			preset: "Badges",
+			out,
+			assetRoot: dir,
+			fontOptions: { fetch: fontFetch },
+			onProgress: (p) => progress.push(p.done),
+		});
+		expect(result.cancelled).toBe(false);
+		expect(result.warnings).toEqual([]);
+		expect(result.items.map((i) => i.ok)).toEqual([true, true]);
+		expect(result.fonts?.missing).toEqual([]);
+		expect(result.workspace.datasets[0]?.records.map((r) => r.status)).toEqual([
+			"exported",
+			"exported",
+		]);
+		expect(await readFile(file)).toEqual(original);
+		expect(progress.length).toBeGreaterThan(0);
+		const zip = unzipSync(new Uint8Array(await readFile(out)));
+		expect(Object.keys(zip)).toHaveLength(3);
+	});
+
+	it.each([
+		"jpeg-zip",
+		"webp-zip",
+		"pdf",
+	] as const)("supports %s with the full build", async (format) => {
+		const file = await saveFixture(`convenience-${format}`, format);
+		const out = join(dir, `convenience-${format}.out`);
+		const result = await exportWorkspaceFile(file, {
+			preset: preset.id,
+			out,
+			assetRoot: dir,
+			fontOptions: { fetch: fontFetch },
+		});
+		expect(result.items.every((i) => i.ok)).toBe(true);
+		const bytes = await readFile(out);
+		if (format === "pdf")
+			expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2);
+		else {
+			const zip = unzipSync(new Uint8Array(bytes));
+			expect(
+				Object.keys(zip).some((name) =>
+					name.endsWith(format === "jpeg-zip" ? ".jpg" : ".webp"),
+				),
+			).toBe(true);
+		}
+	});
+
+	it("supports folder output and a custom loader without implicit filesystem access", async () => {
+		const file = await saveFixture("convenience-loader");
+		const denied = await exportWorkspaceFile(file, {
+			preset: preset.id,
+			out: join(dir, "denied.zip"),
+			fontOptions: { fetch: fontFetch },
+		});
+		expect(
+			denied.items.some((i) =>
+				i.warnings?.some((w) => w.code === "image_load_failed"),
+			),
+		).toBe(true);
+		const requests: string[] = [];
+		const out = join(dir, "convenience-folder");
+		const result = await exportWorkspaceFile(file, {
+			preset: preset.id,
+			out,
+			destination: "folder",
+			fontOptions: { fetch: fontFetch },
+			rendererOptions: {
+				load: async (src) => {
+					requests.push(src);
+					if (src === "logo.png") return logo;
+					throw new Error(src);
+				},
+			},
+		});
+		expect(requests).toContain("logo.png");
+		expect(
+			result.items.every(
+				(i) => i.ok && !i.warnings?.some((w) => w.code === "image_load_failed"),
+			),
+		).toBe(true);
+		expect(await readdir(out)).toHaveLength(3);
+		await expect(
+			exportWorkspaceFile(file, {
+				preset: preset.id,
+				out,
+				assetRoot: dir,
+				rendererOptions: { load: async () => logo },
+			}),
+		).rejects.toThrow("not both");
+	});
+
+	it("returns warnings from a newer archive without losing export results", async () => {
+		const file = await saveFixture("convenience-warnings");
+		const entries = unzipSync(new Uint8Array(await readFile(file)));
+		const manifest = JSON.parse(
+			new TextDecoder().decode(entries["workspace.json"]),
+		);
+		manifest.formatVersion = "1.4";
+		entries["workspace.json"] = new TextEncoder().encode(
+			JSON.stringify(manifest),
+		);
+		await writeFile(file, zipSync(entries));
+		const result = await exportWorkspaceFile(file, {
+			preset: preset.id,
+			out: join(dir, "warnings.zip"),
+			assetRoot: dir,
+			fontOptions: { fetch: fontFetch },
+		});
+		expect(result.warnings).toEqual([
+			"Saved by a newer Freshcoat (format 1.4); anything it added was dropped",
+		]);
+		expect(result.items.every((item) => item.ok)).toBe(true);
+	});
+
+	it("disposes its renderer after success, cancellation, and exceptions", async () => {
+		const file = await saveFixture("convenience-dispose");
+		const create = nodeEngine.createRenderer;
+		const disposals: ReturnType<typeof vi.fn>[] = [];
+		const spy = vi
+			.spyOn(nodeEngine, "createRenderer")
+			.mockImplementation(async (options) => {
+				const renderer = await create(options);
+				const dispose = vi.fn(() => renderer.dispose());
+				disposals.push(dispose);
+				return { ...renderer, dispose };
+			});
+		try {
+			const options = {
+				preset: preset.id,
+				out: join(dir, "disposed.zip"),
+				assetRoot: dir,
+				fontOptions: { fetch: fontFetch },
+			};
+			await exportWorkspaceFile(file, options);
+			const cancelled = await exportWorkspaceFile(file, {
+				...options,
+				signal: AbortSignal.abort(),
+			});
+			expect(cancelled.cancelled).toBe(true);
+			await expect(
+				exportWorkspaceFile(file, { ...options, preset: "missing" }),
+			).rejects.toThrow("no preset");
+			await expect(
+				exportWorkspaceFile(file, {
+					...options,
+					out: join(dir, "missing", "out.zip"),
+				}),
+			).rejects.toThrow();
+			expect(disposals).toHaveLength(4);
+			for (const dispose of disposals) expect(dispose).toHaveBeenCalledTimes(1);
+		} finally {
+			spy.mockRestore();
 		}
 	});
 });
