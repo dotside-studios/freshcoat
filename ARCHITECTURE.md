@@ -43,6 +43,13 @@ storage, a network policy or a UI framework. Loading CanvasKit and reading
 files differ by platform, so they live on the engine's `node` and `browser`
 subpaths.
 
+Scripts can use `createTemplateRenderer` from `coatfile/node` or
+`coatfile/browser`, which initializes and owns an engine renderer. Its
+`render` method calls the same `renderTemplate`; the underlying renderer is
+available for lower-level operations. Font resolution beyond declared fonts
+is an explicit option. `readTemplateFile` on `coatfile/node` adds file I/O
+and exceptions to the existing template-loading pipeline.
+
 For batch work, `workspace` turns templates, datasets, bindings and presets
 into export plans, and `workspace/export` runs them through coatfile with a
 renderer the host creates: `createItemRenderer` renders one item, and
@@ -50,7 +57,10 @@ renderer the host creates: `createItemRenderer` renders one item, and
 PDF. The pool and the destination are the host's. Studio runs items in a pool
 of workers and writes to a folder or file it asks the user for; a script calls
 `exportWorkspace`, which renders on its own thread, and can write to disk with
-`fileOutput` from `workspace/node`. Both write a job's record statuses back
+`fileOutput` from `workspace/node`. `exportWorkspaceFile` on `workspace/node`
+reads a workspace and runs a preset with an owned renderer and file or folder
+destination. It returns read warnings and the updated workspace without
+saving the source. All export paths write a job's record statuses back
 through the same `applyJobResult`, when the preset has `markExported`. Print
 correction uses `for-print` when requested.
 

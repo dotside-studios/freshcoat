@@ -39,35 +39,45 @@ npm install @freshcoat-js/for-print @freshcoat-js/engine
 
 ### Plan a scene for print
 
+For the target's fixed preset, plan the scene and compile it with the
+whole-frame finish:
+
+```ts
+import { planForPrint } from "@freshcoat-js/for-print";
+import { compileScene } from "@freshcoat-js/engine";
+
+const { scene, finish } = await planForPrint(nodeTree);
+const commands = compileScene(scene, { width, height, textEngine, finish });
+```
+
+For per-photo analysis, supply a sampler that draws each image with its fit,
+crop and adjustments:
+
 ```ts
 import { planForPrint, type ImageSampler } from "@freshcoat-js/for-print";
-import { sampleImageNode, compileScene } from "@freshcoat-js/engine";
+import { sampleImageNode } from "@freshcoat-js/engine";
 
-// Analyze photos as displayed: their fit, crop and own adjustment.
 const sample: ImageSampler = async (image) => {
   const pixels = await sampleImageNode(ck, image, loadBytes);
   if (!pixels) throw new Error(`Couldn't decode ${image.src}`);
   return pixels;
 };
-
 const { scene, finish } = await planForPrint(nodeTree, {
-  sample,                     // omit for the target's fixed preset
-  balance: profile?.balance,  // a measured printer, if you have one
-  target: YMCKO_DYE_SUB,      // the default
+  sample,
+  balance: profile?.balance,
 });
-
-// freshcoat does the output: per-layer adjust + the whole-frame finish.
-const commands = compileScene(scene, { width, height, textEngine, finish });
 ```
 
-These examples assume an initialized CanvasKit instance (`ck`), a scene and
-text engine, and a `loadBytes(src)` function supplied by your application.
-Paint the resulting commands through an engine runtime.
+These examples assume a scene and text engine. The analysis example also
+needs an initialized CanvasKit instance (`ck`) and a `loadBytes(src)` function
+supplied by your application. Paint the compiled commands through an engine
+renderer. For template rendering, Coatfile's `print` option handles this
+planning and sampling for you.
 
-`planForPrint` also takes `policy`, `finish` (`false` keeps only the balance
-curve), `onAnalysis`, `cache` and `srcKey`. The parts are available on their
-own: `planScene` (sync, preset), `analyzeScene` (per-photo analysis) and
-`printFinish(balance)`.
+`planForPrint` defaults to the `YMCKO_DYE_SUB` target. It also takes `target`,
+`policy`, `finish` (`false` keeps only the balance curve), `onAnalysis`, `cache`
+and `srcKey`. The parts are available on their own: `planScene` (sync,
+preset), `analyzeScene` (per-photo analysis) and `printFinish(balance)`.
 
 ### Analyze a single image
 
