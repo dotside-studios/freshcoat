@@ -1,8 +1,6 @@
 import type { DefaultOutput, Output, Renderer } from "@freshcoat-js/engine";
-import {
-	type ResolveTemplateFontsOptions,
-	resolveTemplateFonts,
-} from "./fonts";
+import { createFontPreparation } from "./font-preparation";
+import type { ResolveTemplateFontsOptions } from "./fonts";
 import { type RenderTemplateOptions, renderTemplate } from "./render";
 import type { Template } from "./types";
 
@@ -17,18 +15,18 @@ export function bindTemplateRenderer(
 	options: TemplateFontOptions = {},
 ) {
 	const { fontOptions } = options;
-	const ownedCache =
-		fontOptions?.cache === undefined
-			? new Map<string, Promise<Uint8Array[]>>()
-			: undefined;
-	const cache = fontOptions?.cache ?? ownedCache;
+	const preparation =
+		fontOptions === undefined
+			? undefined
+			: createFontPreparation(renderer, fontOptions);
 	let disposed = false;
+	let pending: Promise<unknown> = Promise.resolve();
 
 	return {
 		renderer,
 		dispose: () => {
 			disposed = true;
-			ownedCache?.clear();
+			preparation?.dispose();
 			renderer.dispose();
 		},
 		render: async <O extends Output = DefaultOutput>(
@@ -37,17 +35,14 @@ export function bindTemplateRenderer(
 			options?: RenderTemplateOptions<O>,
 		) => {
 			if (disposed) throw new Error("template renderer is disposed");
-			if (fontOptions !== undefined) {
-				const resolved = await resolveTemplateFonts(template, {
-					...fontOptions,
-					cache,
-				});
-				const fonts = Object.fromEntries(
-					[...resolved.fonts].filter(([family]) => !renderer.fonts.has(family)),
-				);
-				await renderer.addFonts(fonts);
-			}
-			return renderTemplate(renderer, template, values, options);
+			const work = pending.then(async () => {
+				if (disposed) throw new Error("template renderer is disposed");
+				await preparation?.prepare(template);
+				if (disposed) throw new Error("template renderer is disposed");
+				return renderTemplate(renderer, template, values, options);
+			});
+			pending = work.catch(() => {});
+			return work;
 		},
 	};
 }

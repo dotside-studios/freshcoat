@@ -53,6 +53,11 @@ Omit `fontOptions` to load only declared fonts and fonts supplied through
 `fonts`. Pass `{ fontOptions: { fallback: null } }` to use the resolver without
 looking up undeclared families; its other options configure fetching and caching.
 
+Automatically resolved fonts refresh as descriptors or requested fallback
+weights change. Fonts supplied through `fonts` or the underlying renderer's
+`addFonts` take precedence. Render calls run in order, keeping font preparation
+and painting together when a renderer is shared across templates.
+
 `readTemplateFile` accepts template JSON and `.coat` packages. Its result also
 includes `healed`, `renamedIds` and `packaged`. It throws `TemplateFileError`,
 a `CoatError` with `filePath` and, for validation failures, `issues`.
