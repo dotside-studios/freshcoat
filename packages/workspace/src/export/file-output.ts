@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
 	createWriteStream,
 	lstatSync,
@@ -5,7 +6,7 @@ import {
 	realpathSync,
 	type WriteStream,
 } from "node:fs";
-import { chmod, rename, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, open, rename, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { Writable } from "node:stream";
 import type { ExportOutput } from "./run";
@@ -51,9 +52,9 @@ function realPath(path: string): string {
  *  job removes only the temporary file. */
 export function fileOutput(path: string): FileOutput {
 	const target = realPath(path);
-	const temporary = `${target}.${process.pid}.tmp`;
+	const temporary = `${target}.${randomUUID()}.tmp`;
 	let stream: WriteStream | undefined;
-	let written = false;
+	let owned = false;
 	const closed = async () => {
 		if (stream && !stream.closed)
 			await new Promise((done) => stream?.once("close", done));
@@ -61,29 +62,37 @@ export function fileOutput(path: string): FileOutput {
 	return {
 		temporary,
 		sink() {
-			written = true;
-			stream = createWriteStream(temporary);
+			stream = createWriteStream(temporary, { flags: owned ? "w" : "wx" });
+			stream.once("open", () => {
+				owned = true;
+			});
 			return createStreamZipSink(
 				Writable.toWeb(stream) as WritableStream<Uint8Array>,
 			);
 		},
 		async save(file) {
-			written = true;
-			await writeFile(temporary, new Uint8Array(await file.blob.arrayBuffer()));
+			const data = new Uint8Array(await file.blob.arrayBuffer());
+			const handle = await open(temporary, owned ? "w" : "wx");
+			owned = true;
+			try {
+				await handle.writeFile(data);
+			} finally {
+				await handle.close();
+			}
 		},
 		async commit() {
 			await closed();
-			if (written) {
+			if (owned) {
 				const existing = await stat(target).catch(() => undefined);
 				if (existing) await chmod(temporary, existing.mode & 0o7777);
 				await rename(temporary, target);
 			}
-			written = false;
+			owned = false;
 		},
 		async discard() {
 			await closed();
-			if (written) await rm(temporary, { force: true });
-			written = false;
+			if (owned) await rm(temporary, { force: true });
+			owned = false;
 		},
 	};
 }

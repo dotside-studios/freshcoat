@@ -306,9 +306,10 @@ renders one item at a time on the calling thread, or through `pool`, a
 `createItemRenderer` and the fonts; `renderer` still checks glyphs then. The renderer is the host's, so its `load`
 decides where image sources that are not dataset photos come from. Without
 an `output`, the zip or PDF comes back as `result.file`. `fileOutput` writes
-it to `<path>.<pid>.tmp` beside the path, the zip as it renders, and renames
+it to a unique temporary file beside the path, the zip as it renders, and renames
 that over the path once the job succeeds, so a cancelled or failed job leaves
-an existing file as it was and removes only the temporary file. A symlinked
+an existing file as it was and removes only its own temporary file. Concurrent
+outputs use separate temporary files; the last successful commit wins. A symlinked
 path keeps its link: the file it points to is replaced, or created when the
 link dangles. A symlink loop throws. The replaced file's
 mode carries over. An `ExportOutput` of the host's own follows the same

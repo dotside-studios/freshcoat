@@ -42,6 +42,62 @@ afterAll(async () => {
 });
 
 describe("exportWorkspace with fileOutput", () => {
+	it("discarding one output preserves another output's staged bytes", async () => {
+		const out = join(dir, "isolated.pdf");
+		await writeFile(out, "original");
+		const first = fileOutput(out);
+		const second = fileOutput(out);
+		const file = (text: string) => ({
+			name: "isolated.pdf",
+			mediaType: "application/pdf",
+			blob: new Blob([text]),
+		});
+		await first.save?.(file("first"));
+		await second.save?.(file("second"));
+		expect(first.temporary).not.toBe(second.temporary);
+		await first.discard?.();
+		expect(await readFile(out, "utf8")).toBe("original");
+		expect(await readFile(second.temporary, "utf8")).toBe("second");
+		await second.commit?.();
+		expect(await readFile(out, "utf8")).toBe("second");
+		expect(existsSync(first.temporary)).toBe(false);
+		expect(existsSync(second.temporary)).toBe(false);
+	});
+
+	it("the last successful commit wins without sharing streamed staging", async () => {
+		const out = join(dir, "concurrent.zip");
+		const first = fileOutput(out);
+		const second = fileOutput(out);
+		const a = first.sink?.();
+		const b = second.sink?.();
+		if (!a || !b) throw new Error("missing sink");
+		await a.add("first.txt", new TextEncoder().encode("first"));
+		await b.add("second.txt", new TextEncoder().encode("second"));
+		await a.finish();
+		await b.finish();
+		await second.commit?.();
+		expect(unzipSync(await readFile(out))).toHaveProperty("second.txt");
+		await first.commit?.();
+		expect(unzipSync(await readFile(out))).toHaveProperty("first.txt");
+	});
+
+	it("an exclusive-open failure never removes a file it did not create", async () => {
+		const output = fileOutput(join(dir, "collision.pdf"));
+		await writeFile(output.temporary, "someone else's bytes");
+		await expect(
+			output.save?.({
+				name: "collision.pdf",
+				mediaType: "application/pdf",
+				blob: new Blob(["new"]),
+			}),
+		).rejects.toThrow();
+		await output.discard?.();
+		expect(await readFile(output.temporary, "utf8")).toBe(
+			"someone else's bytes",
+		);
+		await rm(output.temporary);
+	});
+
 	it("streams a zip to disk", async () => {
 		const out = join(dir, "club.zip");
 		const result = await exportWorkspace(workspace, small, {
